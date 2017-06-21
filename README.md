@@ -8,6 +8,9 @@
 7. For each candidate read check that neighboring reads belong to the same alignment
 8. for each candidate read find reads which extend the HIV section. Check how far the read ends
 
+### Output Log:
+1. percent and number of reads filtered out and for what reason (PCRdup, Secondary, etc...)
+
 ### Possible alterations:
 1. do not run Kraken. Instead run bowtie2 against both human and hiv databases using a full set of reads.
 
