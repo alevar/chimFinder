@@ -7,6 +7,7 @@ import glob
 import time
 import itertools
 import scipy
+import argparse
 
 # The function below returns a dataframe which consists of paired-end reads
 # where each read is confirmed to contain a segment from both viral and human genomes
@@ -33,8 +34,8 @@ def calcAlignmentStartEnd(cigar,forward,start):
     end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
     return str(start)+":"+str(end)
 
-def main():
-    dataHIV = pd.read_csv("./108PI_pos_S2.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL','12','13','14','15','16','17','18','19','20','21'])
+def wrapper(outDir,baseName):
+    dataHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".hiv.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL','12','13','14','15','16','17','18','19','20','21'])
     dataHIV["paired"]=dataHIV["FLAG"]               &1 #template having multiple segments in sequencing
     dataHIV["aligned2Mates"]=dataHIV["FLAG"]        &2 #each segment properly aligned according to the aligner
     dataHIV["unmappedCurr"]=dataHIV["FLAG"]         &4 #segment unmapped
@@ -52,7 +53,7 @@ def main():
     dataHIV["Reference_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']),axis=1)
     dataHIV[["Reference_start","Reference_end"]]=dataHIV["Reference_start:end"].str.split(':', expand=True).astype(int)
    
-    dataHUM = pd.read_csv("./108PI_pos_S2.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL','12','13','14','15','16','17','18','19','20','21']) 
+    dataHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".hum.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL','12','13','14','15','16','17','18','19','20','21']) 
     dataHUM["paired"]=dataHUM["FLAG"]               &1 #template having multiple segments in sequencing
     dataHUM["aligned2Mates"]=dataHUM["FLAG"]        &2 #each segment properly aligned according to the aligner
     dataHUM["unmappedCurr"]=dataHUM["FLAG"]         &4 #segment unmapped
@@ -75,7 +76,12 @@ def main():
     #remove all reads that belong to secondary or supplementary alignments and did not have PCR duplicates
     dataHUM=dataHUM[(dataHUM["secondaryAlignment"]==0)&(dataHUM["PCRdup"]==0)&(dataHUM["suppAl"]==0)&(dataHUM["noPassFilter"]==0)]
     dataHIV=dataHIV[(dataHIV["secondaryAlignment"]==0)&(dataHIV["PCRdup"]==0)&(dataHIV["suppAl"]==0)&(dataHIV["noPassFilter"]==0)]
-
+    #now we can exclude paired-end reads which do not contain information from both references
+    setHIV=set(dataHIV["QNAME"])
+    setHUM=set(dataHUM["QNAME"])
+    setQnames=setHIV.intersection(setHUM)
+    dataHUM=dataHUM[dataHUM["QNAME"].isin(setQnames)]
+    dataHIV=dataHIV[dataHIV["QNAME"].isin(setQnames)]
     #calculate full length of the read
     dataHIV["lenAlign"]=dataHIV.apply(lambda row: len(row["SEQ"]),axis=1)
     dataHUM["lenAlign"]=dataHUM.apply(lambda row: len(row["SEQ"]),axis=1)
@@ -105,6 +111,10 @@ def main():
     #for the reads identified run the following check:
     #if the hiv alignment is on the inside of the pair - unlikely
     #if on the outer should look for the neighboring reads
+
+    #we may express the overlap between the hiv and human alignments within a read as follows:
+    #+n - there is n nucleotides separating the two alignments
+    #-n - the two alignments overlap by n nucleotides
 
     #==========================================
     #Now let's look at those reads where forward mate aligned to one reference and the reverse mate to the other
@@ -139,8 +149,66 @@ def main():
     outCols=list(dataHUM)
     outCols.remove("Template_start:end")
     outCols.remove("Reference_start:end")
-    dataHUM[outCols].to_csv("./dataHUM.csv")
-    dataHIV[outCols].to_csv("./dataHIV.csv")
+    dataHUM[outCols].to_csv(outDir+"/localAlignments/"+baseName+".hum.chim.csv")
+    dataHIV[outCols].to_csv(outDir+"/localAlignments/"+baseName+".hiv.chim.csv")
+
+    data=pd.DataFrame(dataHUM["QNAME"]).reset_index().drop("index",axis=1)
+    dataHUM.reset_index().drop("index",axis=1)
+    dataHIV.reset_index().drop("index",axis=1)
+    data[["R1HUM_TS","R1HUM_TE","R1HUM_RS","R1HUM_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)])>0 else [0,0,0,0],axis=1)])
+    data[["R2HUM_TS","R2HUM_TE","R2HUM_RS","R2HUM_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)])>0 else [0,0,0,0],axis=1)])
+    data[["R1HIV_TS","R1HIV_TE","R1HIV_RS","R1HIV_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)])>0 else [0,0,0,0],axis=1)])
+    data[["R2HIV_TS","R2HIV_TE","R2HIV_RS","R2HIV_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)])>0 else [0,0,0,0],axis=1)])
+    data.to_csv(outDir+"/localAlignments/"+baseName+".chim.csv")
+
+def mainRun(args):
+    for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
+    # for file in glob.glob(os.path.abspath(args.input)+"/*ht2"):
+        fullPath=os.path.abspath(file)
+        fileName=fullPath.split('/')[-1]
+        dirPath="/".join(fullPath.split('/')[:-1])
+        
+        scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
+        os.system(scriptCMD)
+
+        baseName="_R1".join(fileName.split("_R1")[:-1])
+        wrapper(os.path.abspath(args.out),baseName)
+
+
+def main(argv):
+
+    parser = argparse.ArgumentParser(description='''Help Page''')
+
+    parser.add_argument('-i',
+                                '--input',
+                                required=True,
+                                type=str,
+                                help="directory which contains fastq.gz files")
+    parser.add_argument('-o',
+                                '--out',
+                                required=False,
+                                type=str,
+                                default="./out",
+                                help="output directory")
+    parser.add_argument('-k',
+                                '--krakenDB',
+                                required=True,
+                                type=str,
+                                help="path to kraken database")
+    parser.add_argument('-v',
+                                '--hivDB',
+                                required=True,
+                                type=str,
+                                help="path to the hiv reference")
+    parser.add_argument('-g',
+                                '--humDB',
+                                required=True,
+                                type=str,
+                                help="path to the hg38 reference")
+
+    parser.set_defaults(func=mainRun)
+    args=parser.parse_args()
+    args.func(args)
 
 if __name__=="__main__":
-    main()
+    main(sys.argv[1:])
