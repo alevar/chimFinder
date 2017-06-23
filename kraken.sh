@@ -44,6 +44,6 @@ bowtie2 --no-unal --local --phred33 -k 20 -x ${hivDB} -1 ${outputDir}/krakenOut/
 # #Make a full alignment of human
 # hisat2 -x ${humanDB}.2 -p 8 --dta -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ./fullAlignments/${sample}.hum.sam
 
-# #or
-# bowtie2 --no-unal --local --phred33 -x ../refs/bowtie2/hg38 -1 ./data/108PI_pos_S2_R1_001.fastq.gz -2 ./data/108PI_pos_S2_R2_001.fastq.gz -S ./fullAlignments/108PI_pos_S2.hum.all.sam
-# bowtie2 --no-unal --local --phred33 -x ../refs/bowtie2/hg38 -1 ./data/108PI_pos_S2_R1_001.fastq.gz -2 ./data/108PI_pos_S2_R2_001.fastq.gz -S ./fullAlignments/108PI_pos_S2.hum.all.sam
+echo ALIGNING ALL READS
+bowtie2 --no-unal --local --phred33 -x ${humanDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.hum.full.sam
+bowtie2 --no-unal --local --phred33 -x ${hivDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.hiv.full.sam

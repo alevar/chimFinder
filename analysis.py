@@ -28,11 +28,14 @@ def getFromSplits(dataHIV,dataHUM):
 def calcAlignmentStartEnd(cigar,forward,start):
     # first, break cigar into parseable entities
     cigarList=["".join(x) for _, x in itertools.groupby(cigar, key=str.isdigit)]
-    idxfM=cigarList.index("M") #index of the first M
-    idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
-    start=start+sum(list(map(int,cigarList[:idxfM-1][::2])))
-    end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
-    return str(start)+":"+str(end)
+    if 'M' in cigarList:
+        idxfM=cigarList.index("M") #index of the first M
+        idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
+        start=start+sum(list(map(int,cigarList[:idxfM-1][::2])))
+        end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
+        return str(start)+":"+str(end)
+    else:
+        pass
 
 def wrapper(outDir,baseName):
     dataHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".hiv.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
@@ -48,9 +51,11 @@ def wrapper(outDir,baseName):
     dataHIV["noPassFilter"]=dataHIV["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
     dataHIV["PCRdup"]=dataHIV["FLAG"]               &1024 #PCR or optical duplicate
     dataHIV["suppAl"]=dataHIV["FLAG"]               &2048 #supplementary alignment
-    dataHIV["Template_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,0),axis=1)
+    dataHIV["Template_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,0) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHIV.dropna(axis=0,inplace=True)
     dataHIV[["Template_start","Template_end"]]=dataHIV["Template_start:end"].str.split(':', expand=True).astype(int)
-    dataHIV["Reference_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']),axis=1)
+    dataHIV["Reference_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHIV.dropna(axis=0,inplace=True)
     dataHIV[["Reference_start","Reference_end"]]=dataHIV["Reference_start:end"].str.split(':', expand=True).astype(int)
    
     dataHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".hum.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL']) 
@@ -66,11 +71,12 @@ def wrapper(outDir,baseName):
     dataHUM["noPassFilter"]=dataHUM["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
     dataHUM["PCRdup"]=dataHUM["FLAG"]               &1024 #PCR or optical duplicate
     dataHUM["suppAl"]=dataHUM["FLAG"]               &2048 #supplementary alignment
-    dataHUM["Template_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,0),axis=1)
+    dataHUM["Template_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,0) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHUM.dropna(axis=0,inplace=True)
     dataHUM[["Template_start","Template_end"]]=dataHUM["Template_start:end"].str.split(':', expand=True).astype(int)
-    dataHUM["Reference_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']),axis=1)
+    dataHUM["Reference_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHUM.dropna(axis=0,inplace=True)
     dataHUM[["Reference_start","Reference_end"]]=dataHUM["Reference_start:end"].str.split(':', expand=True).astype(int)
-
 
     #filtering the reads based on the flags:
     #remove all reads that belong to secondary or supplementary alignments and did not have PCR duplicates
@@ -155,10 +161,12 @@ def wrapper(outDir,baseName):
     data=pd.DataFrame(dataHUM["QNAME"]).reset_index().drop("index",axis=1)
     dataHUM.reset_index().drop("index",axis=1)
     dataHIV.reset_index().drop("index",axis=1)
-    data[["R1HUM_TS","R1HUM_TE","R1HUM_RS","R1HUM_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)])>0 else [0,0,0,0],axis=1)])
-    data[["R2HUM_TS","R2HUM_TE","R2HUM_RS","R2HUM_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)])>0 else [0,0,0,0],axis=1)])
-    data[["R1HIV_TS","R1HIV_TE","R1HIV_RS","R1HIV_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)])>0 else [0,0,0,0],axis=1)])
-    data[["R2HIV_TS","R2HIV_TE","R2HIV_RS","R2HIV_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)])>0 else [0,0,0,0],axis=1)])
+    data["HUM_AL_MAP"]=''
+    data["HIV_AL_MAP"]=''
+    data[["R1HUM_TS","R1HUM_TE","R1HUM_RS","R1HUM_RE","HUM_AL_MAP"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0]+[row["HUM_AL_MAP"]+"1"] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)])>0 else [0,0,0,0,row["HUM_AL_MAP"]+"0"],axis=1)])
+    data[["R2HUM_TS","R2HUM_TE","R2HUM_RS","R2HUM_RE","HUM_AL_MAP"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0]+[row["HUM_AL_MAP"]+"1"] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)])>0 else [0,0,0,0,row["HUM_AL_MAP"]+"0"],axis=1)])
+    data[["R1HIV_TS","R1HIV_TE","R1HIV_RS","R1HIV_RE","HIV_AL_MAP"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0]+[row["HIV_AL_MAP"]+"1"] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)])>0 else [0,0,0,0,row["HIV_AL_MAP"]+"0"],axis=1)])
+    data[["R2HIV_TS","R2HIV_TE","R2HIV_RS","R2HIV_RE","HIV_AL_MAP"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)][["Template_start","Template_end","Reference_start","Reference_end"]].values.tolist()[0]+[row["HIV_AL_MAP"]+"1"] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)])>0 else [0,0,0,0,row["HIV_AL_MAP"]+"0"],axis=1)])
     data.to_csv(outDir+"/localAlignments/"+baseName+".chim.csv")
 
 def mainRun(args):
