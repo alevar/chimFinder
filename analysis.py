@@ -35,7 +35,7 @@ def calcAlignmentStartEnd(cigar,forward,start):
     return str(start)+":"+str(end)
 
 def wrapper(outDir,baseName):
-    dataHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".hiv.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL','12','13','14','15','16','17','18','19','20','21'])
+    dataHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".hiv.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataHIV["paired"]=dataHIV["FLAG"]               &1 #template having multiple segments in sequencing
     dataHIV["aligned2Mates"]=dataHIV["FLAG"]        &2 #each segment properly aligned according to the aligner
     dataHIV["unmappedCurr"]=dataHIV["FLAG"]         &4 #segment unmapped
@@ -53,7 +53,7 @@ def wrapper(outDir,baseName):
     dataHIV["Reference_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']),axis=1)
     dataHIV[["Reference_start","Reference_end"]]=dataHIV["Reference_start:end"].str.split(':', expand=True).astype(int)
    
-    dataHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".hum.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL','12','13','14','15','16','17','18','19','20','21']) 
+    dataHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".hum.chim.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL']) 
     dataHUM["paired"]=dataHUM["FLAG"]               &1 #template having multiple segments in sequencing
     dataHUM["aligned2Mates"]=dataHUM["FLAG"]        &2 #each segment properly aligned according to the aligner
     dataHUM["unmappedCurr"]=dataHUM["FLAG"]         &4 #segment unmapped
@@ -173,7 +173,6 @@ def mainRun(args):
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
         wrapper(os.path.abspath(args.out),baseName)
-
 
 def main(argv):
 
