@@ -25,15 +25,18 @@ def getFromSplits(dataHIV,dataHUM):
     splitMates=setHIV_First.intersection(setHUM_First)
     
 # the function below will calculate and return start:end of the alignment within template read
-def calcAlignmentStartEnd(cigar,forward,start):
+def calcAlignmentStartEnd(row,reference,start):
     # first, break cigar into parseable entities
-    cigarList=["".join(x) for _, x in itertools.groupby(cigar, key=str.isdigit)]
+    cigarList=["".join(x) for _, x in itertools.groupby(row["CIGAR"], key=str.isdigit)]
     if 'M' in cigarList:
         idxfM=cigarList.index("M") #index of the first M
         idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
         start=start+sum(list(map(int,cigarList[:idxfM-1][::2])))
         end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
-        return str(start)+":"+str(end)
+        if (row['reversedCurr']==16) and (reference==False):
+            return str(len(row["SEQ"])-1-end)+":"+str(len(row["SEQ"])-1-start)
+        else:
+            return str(start)+":"+str(end)
     else:
         pass
 
@@ -51,10 +54,10 @@ def wrapper(outDir,baseName):
     dataHIV["noPassFilter"]=dataHIV["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
     dataHIV["PCRdup"]=dataHIV["FLAG"]               &1024 #PCR or optical duplicate
     dataHIV["suppAl"]=dataHIV["FLAG"]               &2048 #supplementary alignment
-    dataHIV["Template_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,0) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHIV["Template_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row,False,0) if not row['CIGAR']=="*" else np.nan,axis=1)
     dataHIV.dropna(axis=0,inplace=True)
     dataHIV[["Template_start","Template_end"]]=dataHIV["Template_start:end"].str.split(':', expand=True).astype(int)
-    dataHIV["Reference_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHIV["Reference_start:end"]=dataHIV.apply(lambda row: calcAlignmentStartEnd(row,True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
     dataHIV.dropna(axis=0,inplace=True)
     dataHIV[["Reference_start","Reference_end"]]=dataHIV["Reference_start:end"].str.split(':', expand=True).astype(int)
    
@@ -71,10 +74,10 @@ def wrapper(outDir,baseName):
     dataHUM["noPassFilter"]=dataHUM["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
     dataHUM["PCRdup"]=dataHUM["FLAG"]               &1024 #PCR or optical duplicate
     dataHUM["suppAl"]=dataHUM["FLAG"]               &2048 #supplementary alignment
-    dataHUM["Template_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,0) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHUM["Template_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row,False,0) if not row['CIGAR']=="*" else np.nan,axis=1)
     dataHUM.dropna(axis=0,inplace=True)
     dataHUM[["Template_start","Template_end"]]=dataHUM["Template_start:end"].str.split(':', expand=True).astype(int)
-    dataHUM["Reference_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row['CIGAR'],True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
+    dataHUM["Reference_start:end"]=dataHUM.apply(lambda row: calcAlignmentStartEnd(row,True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
     dataHUM.dropna(axis=0,inplace=True)
     dataHUM[["Reference_start","Reference_end"]]=dataHUM["Reference_start:end"].str.split(':', expand=True).astype(int)
 
@@ -88,6 +91,8 @@ def wrapper(outDir,baseName):
     setQnames=setHIV.intersection(setHUM)
     dataHUM=dataHUM[dataHUM["QNAME"].isin(setQnames)]
     dataHIV=dataHIV[dataHIV["QNAME"].isin(setQnames)]
+    if (len(setQnames)==0):
+        return
     #calculate full length of the read
     dataHIV["lenAlign"]=dataHIV.apply(lambda row: len(row["SEQ"]),axis=1)
     dataHUM["lenAlign"]=dataHUM.apply(lambda row: len(row["SEQ"]),axis=1)
