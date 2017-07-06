@@ -53,7 +53,7 @@ samtools index -@ 8 ${outputDir}/fullAlignments/${sample}.full.hiv.bam
 
 #build consensus hiv sequence
 echo BUILDING CONSENSUS SEQUENCE
-samtools mpileup -uf ./refs/HIV-1_89.6_sequence.fa ${outputDir}/fullAlignments/${sample}.full.hiv.bam | bcftools call -c | vcfutils.pl vcf2fq > vcfutils ${outputDir}/consensusHIV/${sample}.fq
+samtools mpileup -uf ./refs/HIV-1_89.6_sequence.fa ${outputDir}/fullAlignments/${sample}.full.hiv.bam | bcftools call -c | vcfutils.pl vcf2fq > ${outputDir}/consensusHIV/${sample}.fq
 echo CONVERT TO FASTA
 seqtk fq2fa ${outputDir}/consensusHIV/${sample}.fq 20 > ${outputDir}/consensusHIV/${sample}.fa
 echo BUILDING HISAT INDEX
