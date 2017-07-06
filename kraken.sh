@@ -12,6 +12,8 @@ mkdir -p ${outputDir}/krakenOut
 mkdir -p ${outputDir}/krakenOut/selected
 mkdir -p ${outputDir}/localAlignments
 mkdir -p ${outputDir}/fullAlignments
+mkdir -p ${outputDir}/consensusHIV
+mkdir -p ${outputDir}/hisat
 
 sampleR1Base=$(basename ${file})
 sampleR1="${sampleR1Base%.*.*}"
@@ -34,16 +36,27 @@ zcat ${inputDir}/${sampleR2Base} | grep -A 3 --no-group-separator -Ff ${outputDi
 
 #align with bowtie2 to hg38
 echo ALIGNING TO HG38
-bowtie2 --no-unal --local --phred33 -k 20 -x ${humanDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.hum.chim.sam
+bowtie2 --no-unal --local --phred33 -p 8 -x ${humanDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.chim.hum.sam
 #align with bowtie2 to hiv89.6
 echo ALIGNING TO HIV89.6
-bowtie2 --no-unal --local --phred33 -k 20 -x ${hivDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.hiv.chim.sam
+bowtie2 --no-unal --local --phred33 -p 8 -x ${hivDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.chim.hiv.sam
 
-# #Make a full alignment of HIV89.6
-# hisat2 -x ${hivDB} -p 8 --dta -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ./fullAlignments/${sample}.hiv.sam
-# #Make a full alignment of human
-# hisat2 -x ${humanDB}.2 -p 8 --dta -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ./fullAlignments/${sample}.hum.sam
+echo ALIGNING ALL HUMAN READS
+bowtie2 --very-sensitive --no-unal --local --phred33 -p 8 -x ${humanDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.full.hum.sam
+samtools view -S -@ 8 -b ${outputDir}/fullAlignments/${sample}.full.hum.sam | samtools sort -o ${outputDir}/fullAlignments/${sample}.full.hum.bam -
+samtools index -@ 8 ${outputDir}/fullAlignments/${sample}.full.hum.bam
 
-echo ALIGNING ALL READS
-bowtie2 --no-unal --local --phred33 -x ${humanDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.hum.full.sam
-bowtie2 --no-unal --local --phred33 -x ${hivDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.hiv.full.sam
+echo ALIGNING ALL HIV READS
+bowtie2 --very-sensitive --no-unal --local --phred33 -p 8 -x ${hivDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.full.hiv.sam
+samtools view -S -@ 8 -b ${outputDir}/fullAlignments/${sample}.full.hiv.sam | samtools sort -o ${outputDir}/fullAlignments/${sample}.full.hiv.bam -
+samtools index -@ 8 ${outputDir}/fullAlignments/${sample}.full.hiv.bam
+
+#build consensus hiv sequence
+echo BUILDING CONSENSUS SEQUENCE
+samtools mpileup -uf ./refs/HIV-1_89.6_sequence.fa ${outputDir}/fullAlignments/${sample}.full.hiv.bam | bcftools call -c | vcfutils.pl vcf2fq > vcfutils ${outputDir}/consensusHIV/${sample}.fq
+echo CONVERT TO FASTA
+seqtk fq2fa ${outputDir}/consensusHIV/${sample}.fq 20 > ${outputDir}/consensusHIV/${sample}.fa
+echo BUILDING HISAT INDEX
+hisat2-build ${outputDir}/consensusHIV/${sample}.fa ${outputDir}/consensusHIV/${sample}
+echo ALIGNING WITH hisat2
+hisat2 --no-unal -x ${outputDir}/consensusHIV/${sample} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/hisat/${sample}.sam
