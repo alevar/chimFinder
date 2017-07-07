@@ -2,6 +2,7 @@
 #./post2.py -o ./out -i ./data/YHo060517 -k ./customDB -v ./refs/hiv89.6/hiv89.6 -g ./refs/bowtie2/hg38
 import pandas as pd
 import numpy as np
+import numba
 import os
 import shutil
 import sys
@@ -54,6 +55,92 @@ def calcAlignmentStartEnd(row,reference,start):
             return str(start)+":"+str(end)
     else:
         pass
+
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),()->()')    
+def calcAlignmentTemplateStart(cigar,reversedCurr,lenSeq,res):
+    start=0
+    end=0
+    cigarListRAW=[]
+    for i in cigar:
+        cigarListRAW.append(chr(i))
+    cigarTxt=''.join(cigarListRAW)
+#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
+    it=itertools.groupby(cigarTxt, key=str.isdigit)
+    cigarList=[]
+    for _,x in it:
+        tmp="".join(x)
+        cigarList.append(tmp.rstrip('\x00'))
+    if 'M' in cigarList:
+        idxfM=cigarList.index("M") #index of the first M
+        idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
+        start=start+sum(list(map(int,cigarList[:idxfM-1][::2])))
+        end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
+        if (reversedCurr==16):
+            start=lenSeq-1-end
+    res[0]=start
+    
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),()->()')    
+def calcAlignmentTemplateEnd(cigar,reversedCurr,lenSeq,res):
+    start=0
+    end=0
+    cigarListRAW=[]
+    for i in cigar:
+        cigarListRAW.append(chr(i))
+    cigarTxt=''.join(cigarListRAW)
+#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
+    it=itertools.groupby(cigarTxt, key=str.isdigit)
+    cigarList=[]
+    for _,x in it:
+        tmp="".join(x)
+        cigarList.append(tmp.rstrip('\x00'))
+    if 'M' in cigarList:
+        idxfM=cigarList.index("M") #index of the first M
+        idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
+        start=start+sum(list(map(int,cigarList[:idxfM-1][::2])))
+        end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
+        if (reversedCurr==16):
+            end=lenSeq-1-start
+    res[0]=end
+
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),(),()->()')    
+def calcAlignmentReferenceStart(cigar,reversedCurr,lenSeq,pos,res):
+    start=pos
+    end=0
+    cigarListRAW=[]
+    for i in cigar:
+        cigarListRAW.append(chr(i))
+    cigarTxt=''.join(cigarListRAW)
+#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
+    it=itertools.groupby(cigarTxt, key=str.isdigit)
+    cigarList=[]
+    for _,x in it:
+        tmp="".join(x)
+        cigarList.append(tmp.rstrip('\x00'))
+    if 'M' in cigarList:
+        idxfM=cigarList.index("M") #index of the first M
+        idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
+        end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
+    res[0]=start
+    
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),(),()->()')    
+def calcAlignmentReferenceEnd(cigar,reversedCurr,lenSeq,pos,res):
+    start=pos
+    end=0
+    cigarListRAW=[]
+    for i in cigar:
+        cigarListRAW.append(chr(i))
+    cigarTxt=''.join(cigarListRAW)
+#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
+    it=itertools.groupby(cigarTxt, key=str.isdigit)
+    cigarList=[]
+    for _,x in it:
+        tmp="".join(x)
+        cigarList.append(tmp.rstrip('\x00'))
+    if 'M' in cigarList:
+        idxfM=cigarList.index("M") #index of the first M
+        idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
+        end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
+    res[0]=end
     
 def alMap(row,data1,data2):
     dataTMP_1=data1[data1['QNAME']==row["QNAME"]]
@@ -128,13 +215,19 @@ def extractFlagBits(data):
 
 # extract start and end for both template and reference
 def extractStartEnd(data):
-    data["Template_start:end"]=data.apply(lambda row: calcAlignmentStartEnd(row,False,0) if not row['CIGAR']=="*" else np.nan,axis=1)
+    data["CIGAR"].replace("*",np.nan,inplace=True)
     data.dropna(axis=0,inplace=True)
-    data[["Template_start","Template_end"]]=data["Template_start:end"].str.split(':', expand=True).astype(int)
-    data["Reference_start:end"]=data.apply(lambda row: calcAlignmentStartEnd(row,True,row['POS']) if not row['CIGAR']=="*" else np.nan,axis=1)
-    data.dropna(axis=0,inplace=True)
-    data[["Reference_start","Reference_end"]]=data["Reference_start:end"].str.split(':', expand=True).astype(int)
-    data.drop(["Template_start:end","Reference_start:end"],inplace=True,axis=1)
+    t=data.values[:,5].astype("S")
+    tx=t.view(np.uint8).reshape(-1, t.itemsize)
+    ty=data.reversedCurr.values.astype("I")
+    data['lenSEQ']=data["SEQ"].str.len()
+    tz=data.lenSEQ.values.astype("I")
+    tz=data.POS.values.astype("I")
+
+    data["Template_start"]=calcAlignmentTemplateStart(tx,ty,tz)
+    data["Template_end"]=calcAlignmentTemplateEnd(tx,ty,tz)
+    data["Reference_start"]=calcAlignmentReferenceStart(tx,ty,tz,tu)
+    data["Reference_end"]=calcAlignmentReferenceEnd(tx,ty,tz,tu)
 
 # filtering the reads based on the flags:
 def filterReads(dataHUM,dataHIV):
