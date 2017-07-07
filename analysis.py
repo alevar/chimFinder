@@ -222,7 +222,7 @@ def findSupport(data): # current method
     dataPosR1Right=pd.DataFrame([])
     dataPosR1Right[["split","count"]]=pd.DataFrame(dataR1Right.groupby(by=["split"])["QNAME"].count()).reset_index()
     if not len(dataPosR1Right)==0:
-        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: list(dataR1Right[dataR1Right["split"]==row["split"]]["QNAME"]),axis=1)
+        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: set(list(dataR1Right[dataR1Right["split"]==row["split"]]["QNAME"])),axis=1)
         dataPosR1Right["Read:orient"]="R1:right"
 
     # find support for R1 left
@@ -233,7 +233,7 @@ def findSupport(data): # current method
     dataPosR1Left=pd.DataFrame([])
     dataPosR1Left[["split","count"]]=pd.DataFrame(dataR1Left.groupby(by=["split"])["QNAME"].count()).reset_index()
     if not len(dataPosR1Left)==0:
-        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: list(dataR1Left[dataR1Left["split"]==row["split"]]["QNAME"]),axis=1)
+        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: set(list(dataR1Left[dataR1Left["split"]==row["split"]]["QNAME"])),axis=1)
         dataPosR1Left["Read:orient"]="R1:left"
 
     # find support for R2 right
@@ -243,7 +243,7 @@ def findSupport(data): # current method
     dataPosR2Right=pd.DataFrame([])
     dataPosR2Right[["split","count"]]=pd.DataFrame(dataR2Right.groupby(by=["split"])["QNAME"].count()).reset_index()
     if not len(dataPosR2Right)==0:
-        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: list(dataR2Right[dataR2Right["split"]==row["split"]]["QNAME"]),axis=1)
+        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: set(list(dataR2Right[dataR2Right["split"]==row["split"]]["QNAME"])),axis=1)
         dataPosR2Right["Read:orient"]="R2:right"
 
     # find support for R2 left
@@ -254,7 +254,7 @@ def findSupport(data): # current method
     dataPosR2Left=pd.DataFrame([])
     dataPosR2Left[["split","count"]]=pd.DataFrame(dataR2Left.groupby(by=["split"])["QNAME"].count()).reset_index()
     if not len(dataPosR2Left)==0:
-        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: list(dataR2Left[dataR2Left["split"]==row["split"]]["QNAME"]),axis=1)
+        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: set(list(dataR2Left[dataR2Left["split"]==row["split"]]["QNAME"])),axis=1)
         dataPosR2Left["Read:orient"]="R2:left"
 
     frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
@@ -268,67 +268,117 @@ def wrapper(outDir,baseName):
     # load data from full alignments
     dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    # extract flag information
-    extractFlagBits(dataLocalHIV)
-    extractFlagBits(dataLocalHUM)
-    extractFlagBits(dataFullHIV)
-    extractFlagBits(dataFullHUM)
-    # extract start and end for both template and reference
-    extractStartEnd(dataLocalHIV)
-    extractStartEnd(dataLocalHUM)
-    extractStartEnd(dataFullHIV)
-    extractStartEnd(dataFullHUM)
-    dataLocalHUM,dataLocalHIV=filterReads(dataLocalHUM,dataLocalHIV)
-    if len(dataLocalHUM)==0:
+    
+    if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
         return
 
-    dataLocalHIV["lenAlign"]=dataLocalHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-    dataLocalHUM["lenAlign"]=dataLocalHUM.apply(lambda row: len(row["SEQ"]),axis=1)
-    #calculate the percent aligned (num bp aligned/total read length bp)
-    dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
-    dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
-    dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index().drop("index",axis=1)
-    dataLocalHUM=dataLocalHUM.reset_index().drop("index",axis=1)
-    dataLocalHIV=dataLocalHIV.reset_index().drop("index",axis=1)
-    createData(dataLocal,dataLocalHUM,dataLocalHIV)
-    dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum.csv")
-    dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.csv")
+    if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
+        # extract flag information
+        print("Begin Extracting flags")
+        extractFlagBits(dataLocalHIV)
+        extractFlagBits(dataLocalHUM)
+        extractFlagBits(dataFullHIV)
+        extractFlagBits(dataFullHUM)
+        # extract start and end for both template and reference
+        print("Begin extracting pos")
+        extractStartEnd(dataLocalHIV)
+        extractStartEnd(dataLocalHUM)
+        extractStartEnd(dataFullHIV)
+        extractStartEnd(dataFullHUM)
+        print("Begin filtering reads")
+        dataLocalHUM,dataLocalHIV=filterReads(dataLocalHUM,dataLocalHIV)
+        if len(dataLocalHUM)==0:
+            return
 
-    dataLocal.replace('', np.nan,inplace=True)
-    dataLocal.fillna(0,inplace=True)
-    dataLocal["overlapR1"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR1(row),axis=1))
-    dataLocal["overlapR2"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR2(row),axis=1))
-    dataLocal["HIV"]=dataLocal.apply(lambda row: leftRight(row),axis=1)
-    dataLocal.to_csv(outDir+"/"+baseName+".chim.csv")
-    # drop duplicated reads - preserve first occurence
-    dataLocal.drop_duplicates(inplace=True)
-    dataPosLocal=findSupport(dataLocal)
-    dataPosLocal.to_csv(outDir+"/"+baseName+"_Pos.chim.csv")
-
-    dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
-    if not len(dataFullHUM)==0:
-        dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-        dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
+        dataLocalHIV["lenAlign"]=dataLocalHIV.apply(lambda row: len(row["SEQ"]),axis=1)
+        dataLocalHUM["lenAlign"]=dataLocalHUM.apply(lambda row: len(row["SEQ"]),axis=1)
         #calculate the percent aligned (num bp aligned/total read length bp)
-        dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
-        dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
-        dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
-        dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
-        dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
-        createData(dataFull,dataFullHUM,dataFullHIV)
-        dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv")
-        dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv")
+        dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
+        dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
+        dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index().drop("index",axis=1)
+        dataLocalHUM=dataLocalHUM.reset_index().drop("index",axis=1)
+        dataLocalHIV=dataLocalHIV.reset_index().drop("index",axis=1)
+        print("create data")
+        createData(dataLocal,dataLocalHUM,dataLocalHIV)
+        dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum.csv")
+        dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.csv")
 
-        dataFull.replace('', np.nan,inplace=True)
-        dataFull.fillna(0,inplace=True)
-        dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
-        dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
-        dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
-        dataFull.to_csv(outDir+"/"+baseName+".full.csv")
+        dataLocal.replace('', np.nan,inplace=True)
+        dataLocal.fillna(0,inplace=True)
+        dataLocal["overlapR1"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR1(row),axis=1))
+        dataLocal["overlapR2"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR2(row),axis=1))
+        dataLocal["HIV"]=dataLocal.apply(lambda row: leftRight(row),axis=1)
+        dataLocal.to_csv(outDir+"/"+baseName+".chim.csv")
         # drop duplicated reads - preserve first occurence
-        dataFull.drop_duplicates(inplace=True)
-        dataPosFull=findSupport(dataFull)
-        dataPosFull.to_csv(outDir+"/"+baseName+"_Pos.full.csv")
+        dataLocal.drop_duplicates(inplace=True)
+        print("find support")
+        dataPosLocal=findSupport(dataLocal)
+        dataPosLocal.to_csv(outDir+"/"+baseName+"_Pos.chim.csv")
+
+        dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
+        if not len(dataFullHUM)==0:
+            print("len full")
+            dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
+            dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
+            #calculate the percent aligned (num bp aligned/total read length bp)
+            dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
+            dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
+            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
+            dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
+            dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
+            print("create data full")
+            createData(dataFull,dataFullHUM,dataFullHIV)
+            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv")
+            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv")
+
+            dataFull.replace('', np.nan,inplace=True)
+            dataFull.fillna(0,inplace=True)
+            dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
+            dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
+            print("left right full")
+            dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
+            dataFull.to_csv(outDir+"/"+baseName+".full.csv")
+            # drop duplicated reads - preserve first occurence
+            dataFull.drop_duplicates(inplace=True)
+            print("find support full")
+            dataPosFull=findSupport(dataFull)
+            dataPosFull.to_csv(outDir+"/"+baseName+"_Pos.full.csv")
+
+    if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
+        # extract flag information
+        print("Begin Extracting flags")
+        extractFlagBits(dataFullHIV)
+        extractFlagBits(dataFullHUM)
+        # extract start and end for both template and reference
+        print("Begin extracting pos")
+        extractStartEnd(dataFullHIV)
+        extractStartEnd(dataFullHUM)
+
+        print("Begin filtering reads")
+        dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
+        if not len(dataFullHUM)==0:
+            dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
+            dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
+            #calculate the percent aligned (num bp aligned/total read length bp)
+            dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
+            dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
+            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
+            dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
+            dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
+            createData(dataFull,dataFullHUM,dataFullHIV)
+            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv")
+            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv")
+
+            dataFull.replace('', np.nan,inplace=True)
+            dataFull.fillna(0,inplace=True)
+            dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
+            dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
+            dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
+            dataFull.to_csv(outDir+"/"+baseName+".full.csv")
+            # drop duplicated reads - preserve first occurence
+            dataFull.drop_duplicates(inplace=True)
+            dataPosFull=findSupport(dataFull)
+            dataPosFull.to_csv(outDir+"/"+baseName+"_Pos.full.csv")
 
 def mainRun(args):
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
