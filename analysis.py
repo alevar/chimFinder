@@ -555,10 +555,10 @@ def wrapper(outDir,baseName):
 
             dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
             data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
-            dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['set'])),axis=1)
-            dataPosLocal=dataPosLocal.drop(["set"],axis=1)
-            dataPosLocal["prim"]=0
-            data=pd.concat([data,dataPosLocal])
+            dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['set'])),axis=1)
+            dataPosFull=dataPosFull.drop(["set"],axis=1)
+            dataPosFull["prim"]=0
+            data=pd.concat([data,dataPosFull])
             data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
@@ -571,8 +571,9 @@ def mainRun(args):
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
         # os.system(scriptCMD)
-        print(baseName)
-        wrapper(os.path.abspath(args.out),baseName)
+        if not baseName in ["Y430_pos_12_S51","PH029_pos_3_S39","Y430_pos_3_S42","Y430_pos_10_S49","Y430_neg_14_S17","Y111_pos_3_S62"]:
+            print(baseName)
+            wrapper(os.path.abspath(args.out),baseName)
 
 def main(argv):
 
