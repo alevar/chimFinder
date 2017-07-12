@@ -330,7 +330,7 @@ def findSupportOld(data): # deprecated
     frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
     return pd.concat(frames).reset_index()
 
-def findSupport(data): # current method
+def findSupportOverlap(data): # current method
 
     # find support for R1 right
     dataR1Right=data[data["HIV"].str.contains("R1:right")]
@@ -377,6 +377,53 @@ def findSupport(data): # current method
     frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
     return pd.concat(frames).reset_index()
 
+def findSupport(data): # current method
+
+    # find support for R1 right
+    dataR1Right=data[data["HIV"].str.contains("R1:right")]
+    dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
+    dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
+    dataPosR1Right=pd.DataFrame([])
+    dataPosR1Right[["split","count"]]=pd.DataFrame(dataR1Right.groupby(by=["split"])["QNAME"].count()).reset_index()
+    if not len(dataPosR1Right)==0:
+        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: set(list(dataR1Right[dataR1Right["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR1Right["Read:orient"]="R1:right"
+
+    # find support for R1 left
+    dataR1Left=data[data["HIV"].str.contains("R1:left")]
+    dataR1Left
+    dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
+    dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
+    dataPosR1Left=pd.DataFrame([])
+    dataPosR1Left[["split","count"]]=pd.DataFrame(dataR1Left.groupby(by=["split"])["QNAME"].count()).reset_index()
+    if not len(dataPosR1Left)==0:
+        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: set(list(dataR1Left[dataR1Left["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR1Left["Read:orient"]="R1:left"
+
+    # find support for R2 right
+    dataR2Right=data[data["HIV"].str.contains("R2:right")]
+    dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
+    dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
+    dataPosR2Right=pd.DataFrame([])
+    dataPosR2Right[["split","count"]]=pd.DataFrame(dataR2Right.groupby(by=["split"])["QNAME"].count()).reset_index()
+    if not len(dataPosR2Right)==0:
+        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: set(list(dataR2Right[dataR2Right["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR2Right["Read:orient"]="R2:right"
+
+    # find support for R2 left
+    dataR2Left=data[data["HIV"].str.contains("R2:left")]
+    dataR2Left
+    dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
+    dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
+    dataPosR2Left=pd.DataFrame([])
+    dataPosR2Left[["split","count"]]=pd.DataFrame(dataR2Left.groupby(by=["split"])["QNAME"].count()).reset_index()
+    if not len(dataPosR2Left)==0:
+        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: set(list(dataR2Left[dataR2Left["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR2Left["Read:orient"]="R2:left"
+
+    frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
+    return pd.concat(frames).reset_index()
+
 def approxCloseness(split1,split2):
     res=abs(int(split1.split(":")[0])-int(split2.split(":")[0]))+abs(int(split1.split(":")[2])-int(split2.split(":")[2]))
     try:
@@ -399,7 +446,6 @@ def writeReadNames(path,dataPos,dirPath,fileName,outPath):
         readsList.append(dataPos)
 
     for QNAME in readsList:
-        print(QNAME)
         readsFile.write(QNAME+"\n")
     readsFile.close()
 
@@ -489,9 +535,11 @@ def wrapper(outDir,baseName,dirPath,fileName):
             dataPosFull=findSupport(dataFull)
             dataPosFull=dataPosFull.drop("index",axis=1)
             dataPosLocal["set"]=np.nan
-            dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
+            if len(dataPosLocal)>0:
+                dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
             dataPosFull["set"]=np.nan
-            dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+            if len(dataPosFull)>0:
+                dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
             setLocalPos=set(dataPosLocal["split"])
             setFullPos=set(dataPosFull["split"])
             intersect=setFullPos.intersection(setLocalPos)
@@ -564,7 +612,8 @@ def wrapper(outDir,baseName,dirPath,fileName):
             dataPosFull=findSupport(dataFull)
 
             dataPosFull["set"]=np.nan
-            dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+            if len(dataPosFull)>0:
+                dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
             data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
             dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['set'])),axis=1)
             dataPosFull=dataPosFull.drop(["set"],axis=1)
@@ -584,7 +633,22 @@ def mainRun(args):
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
         # os.system(scriptCMD)
-        if not baseName in ["Y430_pos_12_S51","PH029_pos_3_S39","Y430_pos_3_S42","Y430_pos_10_S49","Y430_neg_14_S17","Y111_pos_3_S62","Y354_neg_1_S34","PH029_neg_1_S1","Y159_neg_2_S21"]:
+        # if not baseName in ["Y430_pos_12_S51",
+        #                     "PH029_pos_3_S39",
+        #                     "Y430_pos_3_S42",
+        #                     "Y430_pos_10_S49",
+        #                     "Y430_neg_14_S17",
+        #                     "Y111_pos_3_S62",
+        #                     "Y354_neg_1_S34",
+        #                     "PH029_neg_1_S1",
+        #                     "Y159_neg_2_S21",
+        #                     "Y430_neg_5_S8",
+        #                     "Y159_pos_2_S57",
+        #                     "Y430_pos_4_S43",
+        #                     "Y111_pos_6_S65",
+        #                     "PH029_neg_3_S3",
+        #                     "Y430_neg_13_S16"]:
+        if baseName in ["Y159_pos_2_S57"]:
             print(baseName)
             wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
 
