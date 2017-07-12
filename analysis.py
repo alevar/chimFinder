@@ -11,7 +11,6 @@ import time
 import itertools
 import argparse
 import scipy
-import pysam
 pd.set_option('display.max_columns', None)
 import matplotlib as mpl
 mpl.use('Agg')
@@ -48,7 +47,6 @@ def calcAlignmentStartEnd(row,reference,start):
             end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
         else:
             end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
-#         print(row["POS"])
         if (row['reversedCurr']==16)and(reference==False):
             return str(len(row["SEQ"])-1-end)+":"+str(len(row["SEQ"])-1-start)
         else:
@@ -214,7 +212,7 @@ def extractFlagBits(data):
     data["suppAl"]=data["FLAG"]               &2048 #supplementary alignment
 
 # extract start and end for both template and reference
-def extractStartEnd(data):
+def extractStartEndOld(data):
     data["CIGAR"].replace("*",np.nan,inplace=True)
     data.dropna(axis=0,inplace=True)
     t=data.values[:,5].astype("S")
@@ -222,12 +220,38 @@ def extractStartEnd(data):
     ty=data.reversedCurr.values.astype("I")
     data['lenSEQ']=data["SEQ"].str.len()
     tz=data.lenSEQ.values.astype("I")
-    tz=data.POS.values.astype("I")
+    tu=data.POS.values.astype("I")
 
     data["Template_start"]=calcAlignmentTemplateStart(tx,ty,tz)
     data["Template_end"]=calcAlignmentTemplateEnd(tx,ty,tz)
     data["Reference_start"]=calcAlignmentReferenceStart(tx,ty,tz,tu)
     data["Reference_end"]=calcAlignmentReferenceEnd(tx,ty,tz,tu)
+
+
+def extractStartEnd(data):
+    data["CIGAR"].replace("*",np.nan,inplace=True)
+    data.dropna(axis=0,inplace=True)
+
+    data["SEQ_LEN"]=data.SEQ.str.len()
+    data["CIGAR_POST"]=data.CIGAR.str.extract("[M]([0-9]+)[A-Z]$").replace(np.nan,0).astype(int)
+    data["END"]=data.SEQ_LEN-data.CIGAR_POST
+    data["CIGAR_PRE"]=data.CIGAR.str.extract("^([0-9]+)[S]").replace(np.nan,0).astype(int)
+
+    data16=data[data["reversedCurr"]==16]
+    data0=data[data["reversedCurr"]==0]
+    data16["Template_start"]=data16.SEQ_LEN-data16.END
+    data16["Template_end"]=data16.SEQ_LEN-data16.CIGAR_PRE-1
+    data0["Template_start"]=data0.CIGAR_PRE
+    data0["Template_end"]=data0.END
+
+    data16["Reference_start"]=data16.SEQ_LEN-data16.END+data16.POS-data16.Template_start
+    data16["Reference_end"]=data16.SEQ_LEN-data16.CIGAR_PRE-1+data16.POS-data16.Template_start
+    data0["Reference_start"]=data0.POS
+    data0["Reference_end"]=data0.END+data0.POS
+
+    data=pd.concat([data16,data0]).reset_index()
+    data.drop(["index","SEQ_LEN","CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
+    return data
 
 # filtering the reads based on the flags:
 def filterReads(dataHUM,dataHIV):
@@ -353,6 +377,31 @@ def findSupport(data): # current method
     frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
     return pd.concat(frames).reset_index()
 
+def approxCloseness(split1,split2):
+    res=abs(int(split1.split(":")[0])-int(split2.split(":")[0]))+abs(int(split1.split(":")[2])-int(split2.split(":")[2]))
+    try:
+        res2=math.log(res)
+    except:
+        return 0
+    return res2
+
+def getSet(row):
+    tmpLocalQNAME=list(row["readsLocal"])
+    return tmpLocalQNAME
+
+def writeReadNames(path,dataPos):
+    readsFile=open(path,'w+')
+    readsList=[]
+    if ";" in dataPos:
+        for x in dataPos.split(";"):
+            readsList.append(x)
+    else:
+        readsList.append(dataPos)
+
+    for QNAME in readsList:
+        readsFile.write(QNAME)
+    readsFile.close()
+
 def wrapper(outDir,baseName):
 
     # load data from local alignments
@@ -366,19 +415,23 @@ def wrapper(outDir,baseName):
         return
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
+
+        outDirPOS=outDir+"/Positions/"+baseName
+        if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
+            os.mkdir(os.path.abspath(outDir+"/Positions/"))
+        if not os.path.exists(os.path.abspath(outDirPOS)):
+            os.mkdir(os.path.abspath(outDirPOS))
+
         # extract flag information
-        print("Begin Extracting flags")
         extractFlagBits(dataLocalHIV)
         extractFlagBits(dataLocalHUM)
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
         # extract start and end for both template and reference
-        print("Begin extracting pos")
-        extractStartEnd(dataLocalHIV)
-        extractStartEnd(dataLocalHUM)
-        extractStartEnd(dataFullHIV)
-        extractStartEnd(dataFullHUM)
-        print("Begin filtering reads")
+        dataLocalHIV=extractStartEnd(dataLocalHIV)
+        dataLocalHUM=extractStartEnd(dataLocalHUM)
+        dataFullHIV=extractStartEnd(dataFullHIV)
+        dataFullHUM=extractStartEnd(dataFullHUM)
         dataLocalHUM,dataLocalHIV=filterReads(dataLocalHUM,dataLocalHIV)
         if len(dataLocalHUM)==0:
             return
@@ -391,7 +444,6 @@ def wrapper(outDir,baseName):
         dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index().drop("index",axis=1)
         dataLocalHUM=dataLocalHUM.reset_index().drop("index",axis=1)
         dataLocalHIV=dataLocalHIV.reset_index().drop("index",axis=1)
-        print("create data")
         createData(dataLocal,dataLocalHUM,dataLocalHIV)
         dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum.csv")
         dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.csv")
@@ -404,13 +456,12 @@ def wrapper(outDir,baseName):
         dataLocal.to_csv(outDir+"/"+baseName+".chim.csv")
         # drop duplicated reads - preserve first occurence
         dataLocal.drop_duplicates(inplace=True)
-        print("find support")
         dataPosLocal=findSupport(dataLocal)
-        dataPosLocal.to_csv(outDir+"/"+baseName+"_Pos.chim.csv")
+        dataPosLocal=dataPosLocal.drop("index",axis=1)
+        data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
 
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            print("len full")
             dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
             dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
             #calculate the percent aligned (num bp aligned/total read length bp)
@@ -419,7 +470,6 @@ def wrapper(outDir,baseName):
             dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
             dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
             dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
-            print("create data full")
             createData(dataFull,dataFullHUM,dataFullHIV)
             dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv")
             dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv")
@@ -428,26 +478,57 @@ def wrapper(outDir,baseName):
             dataFull.fillna(0,inplace=True)
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
-            print("left right full")
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
             dataFull.to_csv(outDir+"/"+baseName+".full.csv")
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
-            print("find support full")
             dataPosFull=findSupport(dataFull)
-            dataPosFull.to_csv(outDir+"/"+baseName+"_Pos.full.csv")
+            dataPosFull=dataPosFull.drop("index",axis=1)
+            dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
+            dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+            setLocalPos=set(dataPosLocal["split"])
+            setFullPos=set(dataPosFull["split"])
+            intersect=setFullPos.intersection(setLocalPos)
+            if len(intersect)>0:
+                for el in intersect:
+                    l1=set(list(dataPosLocal[dataPosLocal["split"]==el]["set"])[0])
+                    l2=set(list(dataPosFull[dataPosFull["split"]==el]["set"])[0])
+                    newSet=l1.union(l2)
+                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["split"]==el]["Read:orient"].iloc[0],10]],columns=['split','count','readsLocal','Read:orient','prim'])
+                    data=data.append(df2)
+
+                data=data.reset_index().drop("index",axis=1)
+            dataLocalPosDiff=dataPosLocal[~(dataPosLocal['split'].isin(intersect))]
+            if len(dataLocalPosDiff)>0:
+                dataLocalPosDiff["readsLocal"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['set'])),axis=1)
+            dataLocalPosDiff=dataLocalPosDiff.drop(["set"],axis=1)
+            dataLocalPosDiff["prim"]=1
+            dataFullPosDiff=dataPosFull[~(dataPosFull['split'].isin(intersect))]
+            if len(dataFullPosDiff):
+                dataFullPosDiff["readsLocal"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['set'])),axis=1)
+            dataFullPosDiff=dataFullPosDiff.drop(["set"],axis=1)
+            dataFullPosDiff["prim"]=0
+            data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
+
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
+
+        else:
+            dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['set'])),axis=1)
+            dataPosLocal=dataPosLocal.drop(["set"],axis=1)
+            dataPosLocal["prim"]=1
+            data=pd.concat([data,dataPosLocal])
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         # extract flag information
-        print("Begin Extracting flags")
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
         # extract start and end for both template and reference
-        print("Begin extracting pos")
-        extractStartEnd(dataFullHIV)
-        extractStartEnd(dataFullHUM)
+        dataFullHIV=extractStartEnd(dataFullHIV)
+        dataFullHUM=extractStartEnd(dataFullHUM)
 
-        print("Begin filtering reads")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
             dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
@@ -471,19 +552,26 @@ def wrapper(outDir,baseName):
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
             dataPosFull=findSupport(dataFull)
-            dataPosFull.to_csv(outDir+"/"+baseName+"_Pos.full.csv")
+
+            dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+            data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
+            dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['set'])),axis=1)
+            dataPosLocal=dataPosLocal.drop(["set"],axis=1)
+            dataPosLocal["prim"]=0
+            data=pd.concat([data,dataPosLocal])
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
 def mainRun(args):
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
-    # for file in glob.glob(os.path.abspath(args.input)+"/*ht2"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
-        os.system(scriptCMD)
-
+        # os.system(scriptCMD)
+        print(baseName)
         wrapper(os.path.abspath(args.out),baseName)
 
 def main(argv):
