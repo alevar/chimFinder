@@ -389,7 +389,7 @@ def getSet(row):
     tmpLocalQNAME=list(row["readsLocal"])
     return tmpLocalQNAME
 
-def writeReadNames(path,dataPos):
+def writeReadNames(path,dataPos,dirPath,fileName,outPath):
     readsFile=open(path,'w+')
     readsList=[]
     if ";" in dataPos:
@@ -399,10 +399,14 @@ def writeReadNames(path,dataPos):
         readsList.append(dataPos)
 
     for QNAME in readsList:
-        readsFile.write(QNAME)
+        print(QNAME)
+        readsFile.write(QNAME+"\n")
     readsFile.close()
 
-def wrapper(outDir,baseName):
+    scriptCMD="./extractReadsPerSplit.sh "+dirPath+" "+fileName+" "+path+" "+outPath
+    os.system(scriptCMD)
+
+def wrapper(outDir,baseName,dirPath,fileName):
 
     # load data from local alignments
     dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
@@ -411,16 +415,16 @@ def wrapper(outDir,baseName):
     dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     
+    outDirPOS=outDir+"/Positions/"+baseName
+    if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
+        os.mkdir(os.path.abspath(outDir+"/Positions/"))
+    if not os.path.exists(os.path.abspath(outDirPOS)):
+        os.mkdir(os.path.abspath(outDirPOS))
+
     if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
         return
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
-
-        outDirPOS=outDir+"/Positions/"+baseName
-        if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
-            os.mkdir(os.path.abspath(outDir+"/Positions/"))
-        if not os.path.exists(os.path.abspath(outDirPOS)):
-            os.mkdir(os.path.abspath(outDirPOS))
 
         # extract flag information
         extractFlagBits(dataLocalHIV)
@@ -484,7 +488,9 @@ def wrapper(outDir,baseName):
             dataFull.drop_duplicates(inplace=True)
             dataPosFull=findSupport(dataFull)
             dataPosFull=dataPosFull.drop("index",axis=1)
+            dataPosLocal["set"]=np.nan
             dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
+            dataPosFull["set"]=np.nan
             dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
             setLocalPos=set(dataPosLocal["split"])
             setFullPos=set(dataPosFull["split"])
@@ -511,14 +517,18 @@ def wrapper(outDir,baseName):
             data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
+            if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
+                os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+".fq"),axis=1)
 
         else:
             dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['set'])),axis=1)
             dataPosLocal=dataPosLocal.drop(["set"],axis=1)
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
+            if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
+                os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
@@ -553,13 +563,16 @@ def wrapper(outDir,baseName):
             dataFull.drop_duplicates(inplace=True)
             dataPosFull=findSupport(dataFull)
 
+            dataPosFull["set"]=np.nan
             dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
             data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
             dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['set'])),axis=1)
             dataPosFull=dataPosFull.drop(["set"],axis=1)
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"]),axis=1)
+            if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
+                os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
 def mainRun(args):
@@ -571,9 +584,9 @@ def mainRun(args):
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
         # os.system(scriptCMD)
-        if not baseName in ["Y430_pos_12_S51","PH029_pos_3_S39","Y430_pos_3_S42","Y430_pos_10_S49","Y430_neg_14_S17","Y111_pos_3_S62"]:
+        if not baseName in ["Y430_pos_12_S51","PH029_pos_3_S39","Y430_pos_3_S42","Y430_pos_10_S49","Y430_neg_14_S17","Y111_pos_3_S62","Y354_neg_1_S34","PH029_neg_1_S1","Y159_neg_2_S21"]:
             print(baseName)
-            wrapper(os.path.abspath(args.out),baseName)
+            wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
 
 def main(argv):
 
