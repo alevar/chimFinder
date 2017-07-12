@@ -55,7 +55,8 @@ samtools index -@ 10 ${outputDir}/fullAlignments/${sample}.full.hiv.bam
 echo BUILDING CONSENSUS SEQUENCE
 samtools mpileup -uf ./refs/HIV-1_89.6_sequence.fa ${outputDir}/fullAlignments/${sample}.full.hiv.bam | bcftools call -c | vcfutils.pl vcf2fq > ${outputDir}/consensusHIV/${sample}.fq
 echo CONVERT TO FASTA
-awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' ${outputDir}/consensusHIV/${sample}.fq 20 > ${outputDir}/consensusHIV/${sample}.fa
+# awk '{if(NR%4==1) {printf(">%s\n",substr($0,2));} else if(NR%4==2) print;}' ${outputDir}/consensusHIV/${sample}.fq 20 > ${outputDir}/consensusHIV/${sample}.fa
+seqtk seq -a  ${outputDir}/consensusHIV/${sample}.fq > ${outputDir}/consensusHIV/${sample}.fa
 echo BUILDING HISAT INDEX
 hisat2-build -p 10 ${outputDir}/consensusHIV/${sample}.fa ${outputDir}/consensusHIV/${sample}
 echo ALIGNING WITH hisat2

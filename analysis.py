@@ -452,6 +452,16 @@ def writeReadNames(path,dataPos,dirPath,fileName,outPath):
     scriptCMD="./extractReadsPerSplit.sh "+dirPath+" "+fileName+" "+path+" "+outPath
     os.system(scriptCMD)
 
+def getStats(data,baseName,outDir):
+    numSpliceJunctions=0
+    with open(outDir+"/hisat/"+baseName+".junctions") as f:
+        for i, l in enumerate(f):
+            pass
+    numSplits=len(data)
+    numReads=data["count"].sum()
+    numSpliceJunctions=numSpliceJunctions+1
+    return pd.DataFrame([[baseName,numSplits,numReads,numSpliceJunctions]],columns=["name","numSplits","numReads","numSpliceHIV"])
+
 def wrapper(outDir,baseName,dirPath,fileName):
 
     # load data from local alignments
@@ -469,6 +479,8 @@ def wrapper(outDir,baseName,dirPath,fileName):
 
     if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
         return
+
+    data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
 
@@ -508,15 +520,14 @@ def wrapper(outDir,baseName,dirPath,fileName):
         dataLocal.drop_duplicates(inplace=True)
         dataPosLocal=findSupport(dataLocal)
         dataPosLocal=dataPosLocal.drop("index",axis=1)
-        data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
 
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-            dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
+            # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
+            # dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
             #calculate the percent aligned (num bp aligned/total read length bp)
-            dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
-            dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
+            # dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
+            # dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
             dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
             dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
             dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
@@ -567,7 +578,7 @@ def wrapper(outDir,baseName,dirPath,fileName):
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+"_"+str(int(row["count"]))+".fq"),axis=1)
 
         else:
             dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['set'])),axis=1)
@@ -576,7 +587,7 @@ def wrapper(outDir,baseName,dirPath,fileName):
             data=pd.concat([data,dataPosLocal])
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+"_"+str(int(row["count"]))+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
@@ -614,17 +625,20 @@ def wrapper(outDir,baseName,dirPath,fileName):
             dataPosFull["set"]=np.nan
             if len(dataPosFull)>0:
                 dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
-            data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
             dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['set'])),axis=1)
             dataPosFull=dataPosFull.drop(["set"],axis=1)
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+"_"+str(int(row["count"]))+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
+    return getStats(data,baseName,outDir)
+
 def mainRun(args):
+
+    finalStatsDF=pd.DataFrame([],columns=["name","numSplits","numReads","numSpliceHIV"])
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
@@ -632,7 +646,6 @@ def mainRun(args):
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
-        # os.system(scriptCMD)
         # if not baseName in ["Y430_pos_12_S51",
         #                     "PH029_pos_3_S39",
         #                     "Y430_pos_3_S42",
@@ -648,9 +661,15 @@ def mainRun(args):
         #                     "Y111_pos_6_S65",
         #                     "PH029_neg_3_S3",
         #                     "Y430_neg_13_S16"]:
-        if baseName in ["Y159_pos_2_S57"]:
-            print(baseName)
-            wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
+        resultsRow=pd.DataFrame([])
+        # if baseName in ["Y159_pos_2_S57"]:
+        print(baseName)
+        # os.system(scriptCMD)
+        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
+        finalStatsDF=pd.concat([finalStatsDF,resultsRow])
+
+    finalStatsDF=finalStatsDF.reset_index().drop("index",axis=1)
+    finalStatsDF.to_csv(os.path.abspath(args.out)+"/results.csv")
 
 def main(argv):
 
