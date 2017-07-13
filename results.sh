@@ -11,7 +11,7 @@
 # 8.  - chimericBowtie          - number of unique chimeric reads detected using bowtie2 alignments of all reads against both hg38 and hiv89.6 references
 # 9.  - numSplits               - number of unique split points calculated from chimericKraken and chimericBowtie2 reads
 # 10. - numReads                - number of unique chimericKraken and chimericBowtie2 reads which support potential split locations
-# 11. - numSpliceJunctionsHIV      - number of unique splice junctions from Hisat2 output
+# 11. - numSpliceJunctionsHIV   - number of unique splice junctions from Hisat2 output
 
 outDir=$1
 

@@ -378,36 +378,37 @@ def findSupportOverlap(data): # current method
     return pd.concat(frames).reset_index()
 
 def findSupport(data): # current method
-
     # find support for R1 right
     dataR1Right=data[data["HIV"].str.contains("R1:right")]
     dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
     dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
+    dataR1Right["comb"]=dataR1Right.split+"_"+dataR1Right.R1HUM_ID
     dataPosR1Right=pd.DataFrame([])
-    dataPosR1Right[["split","count"]]=pd.DataFrame(dataR1Right.groupby(by=["split"])["QNAME"].count()).reset_index()
+    dataPosR1Right[["comb","split","chr","count"]]=pd.DataFrame(dataR1Right.groupby(by=["comb","split","R1HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR1Right)==0:
-        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: set(list(dataR1Right[dataR1Right["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: set(list(dataR1Right[(dataR1Right["split"]==row["split"])&(dataR1Right["R1HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
         dataPosR1Right["Read:orient"]="R1:right"
 
     # find support for R1 left
     dataR1Left=data[data["HIV"].str.contains("R1:left")]
-    dataR1Left
     dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
     dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
+    dataR1Left["comb"]=dataR1Left.split+"_"+dataR1Left.R1HUM_ID
     dataPosR1Left=pd.DataFrame([])
-    dataPosR1Left[["split","count"]]=pd.DataFrame(dataR1Left.groupby(by=["split"])["QNAME"].count()).reset_index()
+    dataPosR1Left[["comb","split","chr","count"]]=pd.DataFrame(dataR1Left.groupby(by=["comb","split","R1HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR1Left)==0:
-        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: set(list(dataR1Left[dataR1Left["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: set(list(dataR1Left[(dataR1Left["split"]==row["split"])&(dataR1Left["R1HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
         dataPosR1Left["Read:orient"]="R1:left"
 
     # find support for R2 right
     dataR2Right=data[data["HIV"].str.contains("R2:right")]
     dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
     dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
+    dataR2Right["comb"]=dataR2Right.split+"_"+dataR2Right.R2HUM_ID
     dataPosR2Right=pd.DataFrame([])
-    dataPosR2Right[["split","count"]]=pd.DataFrame(dataR2Right.groupby(by=["split"])["QNAME"].count()).reset_index()
+    dataPosR2Right[["comb","split","chr","count"]]=pd.DataFrame(dataR2Right.groupby(by=["comb","split","R2HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR2Right)==0:
-        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: set(list(dataR2Right[dataR2Right["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: set(list(dataR2Right[(dataR2Right["split"]==row["split"])&(dataR2Right["R2HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
         dataPosR2Right["Read:orient"]="R2:right"
 
     # find support for R2 left
@@ -415,10 +416,11 @@ def findSupport(data): # current method
     dataR2Left
     dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
     dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
+    dataR2Left["comb"]=dataR2Left.split+"_"+dataR2Left.R2HUM_ID
     dataPosR2Left=pd.DataFrame([])
-    dataPosR2Left[["split","count"]]=pd.DataFrame(dataR2Left.groupby(by=["split"])["QNAME"].count()).reset_index()
+    dataPosR2Left[["comb","split","chr","count"]]=pd.DataFrame(dataR2Left.groupby(by=["comb","split","R2HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR2Left)==0:
-        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: set(list(dataR2Left[dataR2Left["split"]==row["split"]]["QNAME"])),axis=1)
+        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: set(list(dataR2Left[(dataR2Left["split"]==row["split"])&(dataR2Left["R2HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
         dataPosR2Left["Read:orient"]="R2:left"
 
     frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
@@ -480,7 +482,7 @@ def wrapper(outDir,baseName,dirPath,fileName):
     if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
         return
 
-    data=pd.DataFrame([],columns=['split','readsLocal','count','Read:orient','prim'])
+    data=pd.DataFrame([],columns=['comb','split','readsLocal','count','Read:orient','prim'])
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
 
@@ -545,49 +547,50 @@ def wrapper(outDir,baseName,dirPath,fileName):
             dataFull.drop_duplicates(inplace=True)
             dataPosFull=findSupport(dataFull)
             dataPosFull=dataPosFull.drop("index",axis=1)
-            dataPosLocal["set"]=np.nan
-            if len(dataPosLocal)>0:
-                dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
-            dataPosFull["set"]=np.nan
-            if len(dataPosFull)>0:
-                dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
-            setLocalPos=set(dataPosLocal["split"])
-            setFullPos=set(dataPosFull["split"])
+            # dataPosLocal["set"]=np.nan
+            # if len(dataPosLocal)>0:
+            #     dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
+            # dataPosFull["set"]=np.nan
+            # if len(dataPosFull)>0:
+            #     dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+            setLocalPos=set(dataPosLocal["comb"])
+            setFullPos=set(dataPosFull["comb"])
             intersect=setFullPos.intersection(setLocalPos)
             if len(intersect)>0:
                 for el in intersect:
-                    l1=set(list(dataPosLocal[dataPosLocal["split"]==el]["set"])[0])
-                    l2=set(list(dataPosFull[dataPosFull["split"]==el]["set"])[0])
+                    l1=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsLocal"])[0])
+                    l2=set(list(dataPosFull[dataPosFull["comb"]==el]["readsLocal"])[0])
                     newSet=l1.union(l2)
-                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["split"]==el]["Read:orient"].iloc[0],10]],columns=['split','count','readsLocal','Read:orient','prim'])
+                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["comb"]==el]["Read:orient"].iloc[0],10]],columns=['comb','split','count','readsLocal','Read:orient','prim'])
                     data=data.append(df2)
 
                 data=data.reset_index().drop("index",axis=1)
             dataLocalPosDiff=dataPosLocal[~(dataPosLocal['split'].isin(intersect))]
             if len(dataLocalPosDiff)>0:
-                dataLocalPosDiff["readsLocal"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['set'])),axis=1)
-            dataLocalPosDiff=dataLocalPosDiff.drop(["set"],axis=1)
+                dataLocalPosDiff["readsLocal"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
+            # dataLocalPosDiff=dataLocalPosDiff.drop(["set"],axis=1)
             dataLocalPosDiff["prim"]=1
             dataFullPosDiff=dataPosFull[~(dataPosFull['split'].isin(intersect))]
-            if len(dataFullPosDiff):
-                dataFullPosDiff["readsLocal"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['set'])),axis=1)
-            dataFullPosDiff=dataFullPosDiff.drop(["set"],axis=1)
+            if len(dataFullPosDiff)>0:
+                dataFullPosDiff["readsLocal"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
+            # dataFullPosDiff=dataFullPosDiff.drop(["set"],axis=1)
             dataFullPosDiff["prim"]=0
             data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
 
         else:
-            dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['set'])),axis=1)
-            dataPosLocal=dataPosLocal.drop(["set"],axis=1)
+            if len(dataPosLocal)>0:
+                dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
+            # dataPosLocal=dataPosLocal.drop(["set"],axis=1)
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
@@ -622,23 +625,24 @@ def wrapper(outDir,baseName,dirPath,fileName):
             dataFull.drop_duplicates(inplace=True)
             dataPosFull=findSupport(dataFull)
 
-            dataPosFull["set"]=np.nan
+            # dataPosFull["set"]=np.nan
             if len(dataPosFull)>0:
-                dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
-            dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['set'])),axis=1)
-            dataPosFull=dataPosFull.drop(["set"],axis=1)
+                # dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+                dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
+                # dataPosFull=dataPosFull.drop(["set"],axis=1)
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["split"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["split"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
-    return getStats(data,baseName,outDir)
+    # return getStats(data,baseName,outDir)
+    return 1
 
 def mainRun(args):
 
-    finalStatsDF=pd.DataFrame([],columns=["name","numSplits","numReads","numSpliceHIV"])
+    # finalStatsDF=pd.DataFrame([],columns=["name","numSplits","numReads","numSpliceHIV"])
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
@@ -646,30 +650,71 @@ def mainRun(args):
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
-        # if not baseName in ["Y430_pos_12_S51",
-        #                     "PH029_pos_3_S39",
-        #                     "Y430_pos_3_S42",
-        #                     "Y430_pos_10_S49",
-        #                     "Y430_neg_14_S17",
-        #                     "Y111_pos_3_S62",
-        #                     "Y354_neg_1_S34",
-        #                     "PH029_neg_1_S1",
-        #                     "Y159_neg_2_S21",
-        #                     "Y430_neg_5_S8",
-        #                     "Y159_pos_2_S57",
-        #                     "Y430_pos_4_S43",
-        #                     "Y111_pos_6_S65",
-        #                     "PH029_neg_3_S3",
-        #                     "Y430_neg_13_S16"]:
-        resultsRow=pd.DataFrame([])
-        # if baseName in ["Y159_pos_2_S57"]:
-        print(baseName)
-        # os.system(scriptCMD)
-        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
-        finalStatsDF=pd.concat([finalStatsDF,resultsRow])
+        if not baseName in ["Y430_pos_12_S51",
+                            "PH029_pos_3_S39",
+                            "Y430_pos_3_S42",
+                            "Y430_pos_10_S49",
+                            "Y430_neg_14_S17",
+                            "Y111_pos_3_S62",
+                            "Y354_neg_1_S34",
+                            "PH029_neg_1_S1",
+                            "Y159_neg_2_S21",
+                            "Y430_neg_5_S8",
+                            "Y159_pos_2_S57",
+                            "Y430_pos_4_S43",
+                            "Y111_pos_6_S65",
+                            "PH029_neg_3_S3",
+                            "Y430_neg_13_S16",
+                            "Y111_pos_4_S63",
+                            "Y241_pos_2_S68",
+                            "Y430_pos_6_S45",
+                            "Y111_pos_5_S64",
+                            "Y430_pos_5_S44",
+                            "Y430_neg_8_S11",
+                            "Y241_neg_2_S32",
+                            "Y354_neg_2_S35",
+                            "Y159_neg_1_S20",
+                            "Y111_neg_4_S27",
+                            "Y159_pos_1_S56",
+                            "Y241_pos_1_S67",
+                            "Y430_pos_11_S50",
+                            "Y430_neg_2_S5",
+                            "Y111_neg_3_S26",
+                            "Y430_pos_8_S47",
+                            "Y241_neg_1_S31",
+                            "Y430_neg_11_S14",
+                            "PH029_pos_2_S38",
+                            "Y430_pos_15_S54",
+                            "Y354_pos_1_S69",
+                            "Y159_pos_4_S59",
+                            "Y430_neg_15_S18",
+                            "Y354_neg_3_S36",
+                            "Y430_neg_9_S12",
+                            "Y430_neg_6_S9",
+                            "Y111_pos_1_S60",
+                            "Y111_neg_6_S29",
+                            "Y430_pos_1_S40",
+                            "Y159_pos_3_S58",
+                            "Y111_neg_2_S25",
+                            "Y241_neg_3_S33",
+                            "Y159_neg_4_S23",
+                            "Y111_neg_1_S24",
+                            "Y430_neg_7_S10",
+                            "Y111_pos_2_S61",
+                            "Y111_neg_5_S28",
+                            "Y430_pos_2_S41",
+                            "Y111_neg_7_S30",
+                            "Y430_pos_13_S52",
+                            "PH029_pos_1_S37"]:
+            # resultsRow=pd.DataFrame([])
+            # if baseName in ["Y159_pos_2_S57"]:
+            print(baseName)
+            # os.system(scriptCMD)
+            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
+            # finalStatsDF=pd.concat([finalStatsDF,resultsRow])
 
-    finalStatsDF=finalStatsDF.reset_index().drop("index",axis=1)
-    finalStatsDF.to_csv(os.path.abspath(args.out)+"/results.csv")
+    # finalStatsDF=finalStatsDF.reset_index().drop("index",axis=1)
+    # finalStatsDF.to_csv(os.path.abspath(args.out)+"/results.csv")
 
 def main(argv):
 
