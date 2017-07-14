@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import numba
 import os
+import signal
+import multiprocessing
 import shutil
 import sys
 import glob
@@ -382,7 +384,7 @@ def findSupport(data): # current method
     dataR1Right=data[data["HIV"].str.contains("R1:right")]
     dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
     dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
-    dataR1Right["comb"]=dataR1Right.split+"_"+dataR1Right.R1HUM_ID
+    dataR1Right["comb"]=dataR1Right.split+"@"+dataR1Right.R1HUM_ID
     dataPosR1Right=pd.DataFrame([])
     dataPosR1Right[["comb","split","chr","count"]]=pd.DataFrame(dataR1Right.groupby(by=["comb","split","R1HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR1Right)==0:
@@ -393,7 +395,7 @@ def findSupport(data): # current method
     dataR1Left=data[data["HIV"].str.contains("R1:left")]
     dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
     dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
-    dataR1Left["comb"]=dataR1Left.split+"_"+dataR1Left.R1HUM_ID
+    dataR1Left["comb"]=dataR1Left.split+"@"+dataR1Left.R1HUM_ID
     dataPosR1Left=pd.DataFrame([])
     dataPosR1Left[["comb","split","chr","count"]]=pd.DataFrame(dataR1Left.groupby(by=["comb","split","R1HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR1Left)==0:
@@ -404,7 +406,7 @@ def findSupport(data): # current method
     dataR2Right=data[data["HIV"].str.contains("R2:right")]
     dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
     dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
-    dataR2Right["comb"]=dataR2Right.split+"_"+dataR2Right.R2HUM_ID
+    dataR2Right["comb"]=dataR2Right.split+"@"+dataR2Right.R2HUM_ID
     dataPosR2Right=pd.DataFrame([])
     dataPosR2Right[["comb","split","chr","count"]]=pd.DataFrame(dataR2Right.groupby(by=["comb","split","R2HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR2Right)==0:
@@ -416,7 +418,7 @@ def findSupport(data): # current method
     dataR2Left
     dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
     dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
-    dataR2Left["comb"]=dataR2Left.split+"_"+dataR2Left.R2HUM_ID
+    dataR2Left["comb"]=dataR2Left.split+"@"+dataR2Left.R2HUM_ID
     dataPosR2Left=pd.DataFrame([])
     dataPosR2Left[["comb","split","chr","count"]]=pd.DataFrame(dataR2Left.groupby(by=["comb","split","R2HUM_ID"])["QNAME"].count()).reset_index()
     if not len(dataPosR2Left)==0:
@@ -463,6 +465,59 @@ def getStats(data,baseName,outDir):
     numReads=data["count"].sum()
     numSpliceJunctions=numSpliceJunctions+1
     return pd.DataFrame([[baseName,numSplits,numReads,numSpliceJunctions]],columns=["name","numSplits","numReads","numSpliceHIV"])
+
+def allSamples(out):
+    # all Pos.csv results should be included in this analysis
+    # How:
+    # 1. concatenate all the sampleFiles together
+    # 2. groupby splits
+    # 3 compute the rest of statistics from there
+
+    paths=glob.glob(os.path.abspath(out)+"/*Pos.csv")
+    patientCodes=set([x.split("/")[-1].split('.')[0].split("_")[0] for x in paths])
+
+    data=pd.DataFrame([])
+
+    for patient in patientCodes:
+        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos.csv"):
+            dfT=pd.read_csv(sampleFile)
+            dfT["patientName"]=patient
+            dfT["sampleName"]=sampleFile.split("/")[-1].split(".")[0]
+            data=pd.concat([data,dfT])
+    data=data.reset_index().drop(["Unnamed: 0","level_0","index","chr","split"],axis=1)
+
+    aggregations = {
+        'count': { # work on the "duration" column
+            'numSamples': 'count',  # get the sum, and call this result 'total_duration'
+            'numReads': 'sum', # get mean, call result 'average_duration'
+            'median': 'median',
+            'mean': 'mean'
+        }
+    }
+
+    df=pd.DataFrame(data.groupby(by=["comb","Read:orient"])["count"].agg(aggregations)).reset_index()
+    df.columns=df.columns.droplevel(0)
+    columns=list(df)
+    columns[0]="split"
+    columns[1]="Read:orient"
+    df.columns=columns
+    df[["mean","median","numReads","numSamples"]]=df[["mean","median","numReads","numSamples"]].astype(int)
+    df=df.sort_values(by="numSamples",ascending=False).reset_index()
+    df["sampleNames"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["sampleName"]))),axis=1)
+    df["patientNames"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["patientName"]))),axis=1)
+    def countNegPos(row):
+        l=list(data[data["comb"]==row["split"]]["sampleName"])
+        countNeg=0
+        countPos=0
+        for el in l:
+            if "neg" in el:
+                countNeg=countNeg+1
+            else:
+                countPos=countPos+1
+        return [countNeg,countPos]
+    df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
+    df.drop("index",axis=1)
+    df.to_csv(os.path.abspath(out)+"/allSamples.csv")
 
 def wrapper(outDir,baseName,dirPath,fileName):
 
@@ -561,7 +616,7 @@ def wrapper(outDir,baseName,dirPath,fileName):
                     l1=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsLocal"])[0])
                     l2=set(list(dataPosFull[dataPosFull["comb"]==el]["readsLocal"])[0])
                     newSet=l1.union(l2)
-                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["comb"]==el]["Read:orient"].iloc[0],10]],columns=['comb','split','count','readsLocal','Read:orient','prim'])
+                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["comb"]==el]["Read:orient"].iloc[0],10]],columns=['split','count','readsLocal','Read:orient','prim'])
                     data=data.append(df2)
 
                 data=data.reset_index().drop("index",axis=1)
@@ -580,7 +635,25 @@ def wrapper(outDir,baseName,dirPath,fileName):
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+
+            childPIDS=[]
+            #==================================================
+
+            for index, row in data.iterrows():
+                if len(childPIDS) >= 20:
+                    childPIDS[0].join()
+                    childPIDS.remove(childPIDS[0])
+                else:
+                    p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
+                    childPIDS.append(p)
+                    p.start()
+            while(len(childPIDS)>0):
+                childPIDS[-1].join()
+                childPIDS.remove(childPIDS[-1])
+
+            #===================================================
+                
+            # data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
 
         else:
             if len(dataPosLocal)>0:
@@ -590,7 +663,25 @@ def wrapper(outDir,baseName,dirPath,fileName):
             data=pd.concat([data,dataPosLocal])
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+
+            childPIDS=[]
+            #==================================================
+
+            for index, row in data.iterrows():
+                if len(childPIDS) >= 20:
+                    childPIDS[0].join()
+                    childPIDS.remove(childPIDS[0])
+                else:
+                    p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
+                    childPIDS.append(p)
+                    p.start()
+            while(len(childPIDS)>0):
+                childPIDS[-1].join()
+                childPIDS.remove(childPIDS[-1])
+
+            #===================================================
+                
+            # data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
@@ -634,7 +725,25 @@ def wrapper(outDir,baseName,dirPath,fileName):
             data=pd.concat([data,dataPosFull])
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+
+            childPIDS=[]
+            #==================================================
+
+            for index, row in data.iterrows():
+                if len(childPIDS) >= 20:
+                    childPIDS[0].join()
+                    childPIDS.remove(childPIDS[0])
+                else:
+                    p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
+                    childPIDS.append(p)
+                    p.start()
+            while(len(childPIDS)>0):
+                childPIDS[-1].join()
+                childPIDS.remove(childPIDS[-1])
+
+            #===================================================
+                
+            # data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     # return getStats(data,baseName,outDir)
@@ -650,71 +759,12 @@ def mainRun(args):
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
-        if not baseName in ["Y430_pos_12_S51",
-                            "PH029_pos_3_S39",
-                            "Y430_pos_3_S42",
-                            "Y430_pos_10_S49",
-                            "Y430_neg_14_S17",
-                            "Y111_pos_3_S62",
-                            "Y354_neg_1_S34",
-                            "PH029_neg_1_S1",
-                            "Y159_neg_2_S21",
-                            "Y430_neg_5_S8",
-                            "Y159_pos_2_S57",
-                            "Y430_pos_4_S43",
-                            "Y111_pos_6_S65",
-                            "PH029_neg_3_S3",
-                            "Y430_neg_13_S16",
-                            "Y111_pos_4_S63",
-                            "Y241_pos_2_S68",
-                            "Y430_pos_6_S45",
-                            "Y111_pos_5_S64",
-                            "Y430_pos_5_S44",
-                            "Y430_neg_8_S11",
-                            "Y241_neg_2_S32",
-                            "Y354_neg_2_S35",
-                            "Y159_neg_1_S20",
-                            "Y111_neg_4_S27",
-                            "Y159_pos_1_S56",
-                            "Y241_pos_1_S67",
-                            "Y430_pos_11_S50",
-                            "Y430_neg_2_S5",
-                            "Y111_neg_3_S26",
-                            "Y430_pos_8_S47",
-                            "Y241_neg_1_S31",
-                            "Y430_neg_11_S14",
-                            "PH029_pos_2_S38",
-                            "Y430_pos_15_S54",
-                            "Y354_pos_1_S69",
-                            "Y159_pos_4_S59",
-                            "Y430_neg_15_S18",
-                            "Y354_neg_3_S36",
-                            "Y430_neg_9_S12",
-                            "Y430_neg_6_S9",
-                            "Y111_pos_1_S60",
-                            "Y111_neg_6_S29",
-                            "Y430_pos_1_S40",
-                            "Y159_pos_3_S58",
-                            "Y111_neg_2_S25",
-                            "Y241_neg_3_S33",
-                            "Y159_neg_4_S23",
-                            "Y111_neg_1_S24",
-                            "Y430_neg_7_S10",
-                            "Y111_pos_2_S61",
-                            "Y111_neg_5_S28",
-                            "Y430_pos_2_S41",
-                            "Y111_neg_7_S30",
-                            "Y430_pos_13_S52",
-                            "PH029_pos_1_S37"]:
-            # resultsRow=pd.DataFrame([])
-            # if baseName in ["Y159_pos_2_S57"]:
-            print(baseName)
-            # os.system(scriptCMD)
-            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
-            # finalStatsDF=pd.concat([finalStatsDF,resultsRow])
 
-    # finalStatsDF=finalStatsDF.reset_index().drop("index",axis=1)
-    # finalStatsDF.to_csv(os.path.abspath(args.out)+"/results.csv")
+        print("Analyzing: ",baseName)
+        # os.system(scriptCMD)
+        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
+
+    allSamples(args.out)
 
 def main(argv):
 
