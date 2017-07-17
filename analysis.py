@@ -621,12 +621,12 @@ def wrapper(outDir,baseName,dirPath,fileName):
                     data=data.append(df2)
 
                 data=data.reset_index().drop("index",axis=1)
-            dataLocalPosDiff=dataPosLocal[(dataPosLocal['split'].isin(diff))]
+            dataLocalPosDiff=dataPosLocal[(dataPosLocal['comb'].isin(diff))]
             if len(dataLocalPosDiff)>0:
                 dataLocalPosDiff["readsLocal"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
             # dataLocalPosDiff=dataLocalPosDiff.drop(["set"],axis=1)
             dataLocalPosDiff["prim"]=1
-            dataFullPosDiff=dataPosFull[(dataPosFull['split'].isin(diff))]
+            dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
             if len(dataFullPosDiff)>0:
                 dataFullPosDiff["readsLocal"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
             # dataFullPosDiff=dataFullPosDiff.drop(["set"],axis=1)
