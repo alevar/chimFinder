@@ -611,26 +611,28 @@ def wrapper(outDir,baseName,dirPath,fileName):
             setLocalPos=set(dataPosLocal["comb"])
             setFullPos=set(dataPosFull["comb"])
             intersect=setFullPos.intersection(setLocalPos)
+            diff=setFullPos.symmetric_difference(setLocalPos)
             if len(intersect)>0:
                 for el in intersect:
                     l1=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsLocal"])[0])
                     l2=set(list(dataPosFull[dataPosFull["comb"]==el]["readsLocal"])[0])
                     newSet=l1.union(l2)
-                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["comb"]==el]["Read:orient"].iloc[0],10]],columns=['split','count','readsLocal','Read:orient','prim'])
+                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["comb"]==el]["Read:orient"].iloc[0],10,dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],dataPosLocal[dataPosLocal["comb"]==el]["comb"].iloc[0]]],columns=['split','count','readsLocal','Read:orient','prim',"chr","comb"])
                     data=data.append(df2)
 
                 data=data.reset_index().drop("index",axis=1)
-            dataLocalPosDiff=dataPosLocal[~(dataPosLocal['split'].isin(intersect))]
+            dataLocalPosDiff=dataPosLocal[(dataPosLocal['split'].isin(diff))]
             if len(dataLocalPosDiff)>0:
                 dataLocalPosDiff["readsLocal"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
             # dataLocalPosDiff=dataLocalPosDiff.drop(["set"],axis=1)
             dataLocalPosDiff["prim"]=1
-            dataFullPosDiff=dataPosFull[~(dataPosFull['split'].isin(intersect))]
+            dataFullPosDiff=dataPosFull[(dataPosFull['split'].isin(diff))]
             if len(dataFullPosDiff)>0:
                 dataFullPosDiff["readsLocal"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
             # dataFullPosDiff=dataFullPosDiff.drop(["set"],axis=1)
             dataFullPosDiff["prim"]=0
             data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
+            data.reset_index().drop("index",axis=1)
             data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
@@ -639,21 +641,21 @@ def wrapper(outDir,baseName,dirPath,fileName):
             childPIDS=[]
             #==================================================
 
-            for index, row in data.iterrows():
-                if len(childPIDS) >= 20:
-                    childPIDS[0].join()
-                    childPIDS.remove(childPIDS[0])
-                else:
-                    p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
-                    childPIDS.append(p)
-                    p.start()
-            while(len(childPIDS)>0):
-                childPIDS[-1].join()
-                childPIDS.remove(childPIDS[-1])
+            # for index, row in data.iterrows():
+            #     if len(childPIDS) >= 20:
+            #         childPIDS[0].join()
+            #         childPIDS.remove(childPIDS[0])
+            #     else:
+            #         p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
+            #         childPIDS.append(p)
+            #         p.start()
+            # while(len(childPIDS)>0):
+            #     childPIDS[-1].join()
+            #     childPIDS.remove(childPIDS[-1])
 
             #===================================================
                 
-            # data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
 
         else:
             if len(dataPosLocal)>0:
@@ -661,28 +663,29 @@ def wrapper(outDir,baseName,dirPath,fileName):
             # dataPosLocal=dataPosLocal.drop(["set"],axis=1)
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
+            data.reset_index().drop("index",axis=1)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
             #==================================================
 
-            for index, row in data.iterrows():
-                if len(childPIDS) >= 20:
-                    childPIDS[0].join()
-                    childPIDS.remove(childPIDS[0])
-                else:
-                    p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
-                    childPIDS.append(p)
-                    p.start()
-            while(len(childPIDS)>0):
-                childPIDS[-1].join()
-                childPIDS.remove(childPIDS[-1])
+            # for index, row in data.iterrows():
+            #     if len(childPIDS) >= 20:
+            #         childPIDS[0].join()
+            #         childPIDS.remove(childPIDS[0])
+            #     else:
+            #         p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
+            #         childPIDS.append(p)
+            #         p.start()
+            # while(len(childPIDS)>0):
+            #     childPIDS[-1].join()
+            #     childPIDS.remove(childPIDS[-1])
 
             #===================================================
                 
-            # data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
+            # data.to_csv(outDir+"/"+baseName+"_Pos.csv")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         # extract flag information
@@ -723,28 +726,29 @@ def wrapper(outDir,baseName,dirPath,fileName):
                 # dataPosFull=dataPosFull.drop(["set"],axis=1)
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
+            data.reset_index().drop("index",axis=1)
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
             #==================================================
 
-            for index, row in data.iterrows():
-                if len(childPIDS) >= 20:
-                    childPIDS[0].join()
-                    childPIDS.remove(childPIDS[0])
-                else:
-                    p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
-                    childPIDS.append(p)
-                    p.start()
-            while(len(childPIDS)>0):
-                childPIDS[-1].join()
-                childPIDS.remove(childPIDS[-1])
+            # for index, row in data.iterrows():
+            #     if len(childPIDS) >= 20:
+            #         childPIDS[0].join()
+            #         childPIDS.remove(childPIDS[0])
+            #     else:
+            #         p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
+            #         childPIDS.append(p)
+            #         p.start()
+            # while(len(childPIDS)>0):
+            #     childPIDS[-1].join()
+            #     childPIDS.remove(childPIDS[-1])
 
             #===================================================
                 
-            # data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
 
     # return getStats(data,baseName,outDir)
     return 1
@@ -765,6 +769,8 @@ def mainRun(args):
         resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
 
     allSamples(args.out)
+
+    scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
 
 def main(argv):
 
