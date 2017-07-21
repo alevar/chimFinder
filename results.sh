@@ -64,7 +64,11 @@ for file in ${outDir}/krakenOut/*.report ; do
                 echo "1.1.1.chimericBowtie"
                 chimericBowtie="$(awk -F ',' '$4==0.0' ${outDir}/${sample}.full.csv | wc -l | awk -F ' ' '{print $1}')"
                 echo "1.1.1.numSpliceJunctionsHIV"
-                numSpliceJunctionsHIV="$(wc -l ${outDir}/hisat/${sample}.junctions | awk -F ' ' '{print $1}')"
+                if [ -f ${outDir}/hisat/${sample}.junctions ]; then 
+                    numSpliceJunctionsHIV="$(wc -l ${outDir}/hisat/${sample}.junctions | awk -F ' ' '{print $1}')"
+                else
+                    numSpliceJunctionsHIV="0"
+                fi
             else
                 echo "1.1.2chimericBowtie=0"
                 chimericBowtie="0"
@@ -91,7 +95,11 @@ for file in ${outDir}/krakenOut/*.report ; do
                 echo "2.1.1.chimericBowtie"
                 chimericBowtie="$(awk -F ',' '$4==0.0' ${outDir}/${sample}.full.csv | wc -l | awk -F ' ' '{print $1}')"
                 echo "2.1.1.numSpliceJunctionsHIV"
-                numSpliceJunctionsHIV="$(wc -l ${outDir}/hisat/${sample}.junctions | awk -F ' ' '{print $1}')"
+                if [ -f ${outDir}/hisat/${sample}.junctions ]; then 
+                    numSpliceJunctionsHIV="$(wc -l ${outDir}/hisat/${sample}.junctions | awk -F ' ' '{print $1}')"
+                else
+                    numSpliceJunctionsHIV="0"
+                fi
                 echo "2.1.1.numSplits"
                 numSplits="$(wc -l ${outDir}/${sample}_Pos.csv | awk -F ' ' '{print $1}')"
                 echo "2.1.1.numreads"

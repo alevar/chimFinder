@@ -3,12 +3,14 @@
 inputDir=$1
 file=$2
 pathChimReads=$3
-outPath=$4
+outPath1=$4
+outPath2=$5
 
 sampleR1Base=$(basename ${file})
 sampleR1="${sampleR1Base%.*.*}"
 sample="${sampleR1%_R1*}"
-sampleR2Base="${sampleR1%_R1*}"_R2"${sampleR1##*_R1}".fastq.gz
+sampleR2Base="${sampleR1%_R1*}"_R2"${sampleR1##*_R1}".fastq
+sampleR1Base="${sampleR1%_R1*}"_R1"${sampleR1##*_R1}".fastq
 
-zcat ${inputDir}/${sampleR1Base} | grep -A 3 --no-group-separator -Ff ${pathChimReads} - > ${outPath}
-zcat ${inputDir}/${sampleR2Base} | grep -A 3 --no-group-separator -Ff ${pathChimReads} - > ${outPath}
+grep -A 3 --no-group-separator -Ff ${pathChimReads} ${inputDir}/${sampleR1Base} > ${outPath1}
+grep -A 3 --no-group-separator -Ff ${pathChimReads} ${inputDir}/${sampleR2Base} > ${outPath2}
