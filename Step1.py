@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#./post2.py -o ./out -i ./data/YHo060517 -k ./customDB -v ./refs/hiv89.6/hiv89.6 -g ./refs/bowtie2/hg38
 import pandas as pd
 import numpy as np
 import numba
@@ -13,13 +11,6 @@ import time
 import itertools
 import argparse
 import scipy
-pd.set_option('display.max_columns', None)
-import matplotlib as mpl
-mpl.use('Agg')
-# from mpl_toolkits.axes_grid1 import host_subplot
-# import mpl_toolkits.axisartist as AA
-import matplotlib.pyplot as plt
-# %matplotlib inline
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -64,7 +55,6 @@ def calcAlignmentTemplateStart(cigar,reversedCurr,lenSeq,res):
     for i in cigar:
         cigarListRAW.append(chr(i))
     cigarTxt=''.join(cigarListRAW)
-#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
     it=itertools.groupby(cigarTxt, key=str.isdigit)
     cigarList=[]
     for _,x in it:
@@ -87,7 +77,6 @@ def calcAlignmentTemplateEnd(cigar,reversedCurr,lenSeq,res):
     for i in cigar:
         cigarListRAW.append(chr(i))
     cigarTxt=''.join(cigarListRAW)
-#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
     it=itertools.groupby(cigarTxt, key=str.isdigit)
     cigarList=[]
     for _,x in it:
@@ -110,7 +99,6 @@ def calcAlignmentReferenceStart(cigar,reversedCurr,lenSeq,pos,res):
     for i in cigar:
         cigarListRAW.append(chr(i))
     cigarTxt=''.join(cigarListRAW)
-#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
     it=itertools.groupby(cigarTxt, key=str.isdigit)
     cigarList=[]
     for _,x in it:
@@ -130,7 +118,6 @@ def calcAlignmentReferenceEnd(cigar,reversedCurr,lenSeq,pos,res):
     for i in cigar:
         cigarListRAW.append(chr(i))
     cigarTxt=''.join(cigarListRAW)
-#     cigarList=["".join(x) for _, x in itertools.groupby(cigarTxt, key=str.isdigit)]
     it=itertools.groupby(cigarTxt, key=str.isdigit)
     cigarList=[]
     for _,x in it:
@@ -171,7 +158,7 @@ def alMap(row,data1,data2):
 # mark reads that have HIV on the right side
 def leftRight(row):
     t=[]
-    if not row["R1HUM_ID"]==0:            
+    if not row["R1HUM_ID"]==0:
         if not row["R1HIV_ID"]==0:
             if row["R1HIV_TS"]>row["R1HUM_TS"]:
                 t.append("R1:right")
@@ -251,8 +238,8 @@ def extractStartEnd(data):
     data0["Reference_start"]=data0.POS
     data0["Reference_end"]=data0.END+data0.POS
 
-    data=pd.concat([data16,data0]).reset_index()
-    data.drop(["index","SEQ_LEN","CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
+    data=pd.concat([data16,data0]).reset_index(drop=True)
+    data.drop(["SEQ_LEN","CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
     return data
 
 # filtering the reads based on the flags:
@@ -278,155 +265,164 @@ def createData(data,dataHUM,dataHIV):
     data["HUM_AL_MAP"]=data.apply(lambda row: alMap(row,dataHUM,dataHIV),axis=1)
     data["HIV_AL_MAP"]=data.apply(lambda row: alMap(row,dataHIV,dataHUM),axis=1)
 
-def findSupportOld(data): # deprecated
-    # get all local chimeric reads where both hiv and hum are on the R1 strand the R2 is empty for HIV
-    dataR1=data[~(data["R1HUM_TE"]==0)&~(data["R1HIV_TE"]==0)&(data["R2HIV_TE"]==0)]
-    dataR2=data[~(data["R2HUM_TE"]==0)&~(data["R2HIV_TE"]==0)&(data["R1HIV_TE"]==0)]
-    dataSepHivR1=data[~(data["R2HUM_TE"]==0)&~(data["R1HIV_TE"]==0)&(data["R2HIV_TE"]==0)&(data["R1HUM_TE"]==0)]
-    dataSepHivR2=data[~(data["R1HUM_TE"]==0)&~(data["R2HIV_TE"]==0)&(data["R1HIV_TE"]==0)&(data["R2HUM_TE"]==0)]
-    allSep=list(dataR1["QNAME"])+list(dataR2["QNAME"])+list(dataSepHivR1["QNAME"])+list(dataSepHivR2["QNAME"])
-    dataOther=data[data["QNAME"].isin(set(data["QNAME"]).difference(set(allSep)))]
-
-    # find support for R1 right
-    dataR1Right=dataR1[dataR1["HIV"].str.contains("R1:right")]
-    dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
-    dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right["ins"].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
-    dataPosR1Right=pd.DataFrame([])
-    dataPosR1Right[["split","count"]]=pd.DataFrame(dataR1Right.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR1Right)==0:
-        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: list(dataR1Right[dataR1Right["split"]==row["split"]]["QNAME"]),axis=1)
-        dataPosR1Right["Read:orient"]="R1:right"
-
-    # find support for R1 left
-    dataR1Left=dataR1[dataR1["HIV"].str.contains("R1:left")]
-    dataR1Left
-    dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
-    dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left["ins"].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
-    dataPosR1Left=pd.DataFrame([])
-    dataPosR1Left[["split","count"]]=pd.DataFrame(dataR1Left.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR1Left)==0:
-        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: list(dataR1Left[dataR1Left["split"]==row["split"]]["QNAME"]),axis=1)
-        dataPosR1Left["Read:orient"]="R1:left"
-
-    # find support for R2 right
-    dataR2Right=dataR2[dataR2["HIV"].str.contains("R2:right")]
-    dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
-    dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right["ins"].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
-    dataPosR2Right=pd.DataFrame([])
-    dataPosR2Right[["split","count"]]=pd.DataFrame(dataR2Right.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR2Right)==0:
-        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: list(dataR2Right[dataR2Right["split"]==row["split"]]["QNAME"]),axis=1)
-        dataPosR2Right["Read:orient"]="R2:right"
-
-    # find support for R2 left
-    dataR2Left=dataR2[dataR2["HIV"].str.contains("R2:left")]
-    dataR2Left
-    dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
-    dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left["ins"].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
-    dataPosR2Left=pd.DataFrame([])
-    dataPosR2Left[["split","count"]]=pd.DataFrame(dataR2Left.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR2Left)==0:
-        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: list(dataR2Left[dataR2Left["split"]==row["split"]]["QNAME"]),axis=1)
-        dataPosR2Left["Read:orient"]="R2:left"
-
-    frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
-    return pd.concat(frames).reset_index()
-
-def findSupportOverlap(data): # current method
-
-    # find support for R1 right
+def filterOverlapCombine(data,minLenHUM,minLenHIV):
+    # this function filters by overlap and flanking alignment length
+    # further it removes unnecessary data and combines into a single full dataframe with unified naming avoiding R1/R2 conventions
+    # output can be saved as .full.csv and then grouped by split position all at once
+    
+    # this function allows identifying best reads
+    # However, since greater minLen values for HIV and HUM alignments will yield fewer reads but at higher confidence
+    # support reads could ignore the min len requirement as long as the split position is identical
+    # or perhaps the minLen requirement for the support reads should be lower
+    
+    # so the pipeline here should be as follows:
+    # 1. Run this function with lower minLenHUM and minLenHIV parameters in order to identfy all possible support reads
+    # 2. Run this function with greater minLenHUM and minLenHIV parameters on the dataframe generated in step 1 
+    #    in order to identify split positions
+    # 3. For each split position from df with higher minLen threshold - find all support reads from both dfs
+    # 4. Perhaps find high confidence and low confidence reads separately
+    
+    dropList=["R1HUM_TS",
+              "R1HUM_TE",
+              "R1HUM_ID",
+              "R1HUM_RS",
+              "R1HUM_RE",
+              "R2HUM_TS",
+              "R2HUM_TE",
+              "R2HUM_ID",
+              "R2HUM_RS",
+              "R2HUM_RE",
+              "R1HIV_TS",
+              "R1HIV_TE",
+              "R1HIV_ID",
+              "R1HIV_RS",
+              "R1HIV_RE",
+              "R2HIV_TS",
+              "R2HIV_TE",
+              "R2HIV_ID",
+              "R2HIV_RS",
+              "R2HIV_RE",
+              "HUM_AL_MAP",
+              "HIV_AL_MAP",
+              "overlapR1",
+              "overlapR2",
+              "HIV"]
+    
+    # R1 right
     dataR1Right=data[data["HIV"].str.contains("R1:right")]
-    dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
-    dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right["ins"].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
-    dataPosR1Right=pd.DataFrame([])
-    dataPosR1Right[["split","count"]]=pd.DataFrame(dataR1Right.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR1Right)==0:
-        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: set(list(dataR1Right[dataR1Right["split"]==row["split"]]["QNAME"])),axis=1)
-        dataPosR1Right["Read:orient"]="R1:right"
-
-    # find support for R1 left
-    dataR1Left=data[data["HIV"].str.contains("R1:left")]
-    dataR1Left
-    dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
-    dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left["ins"].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
-    dataPosR1Left=pd.DataFrame([])
-    dataPosR1Left[["split","count"]]=pd.DataFrame(dataR1Left.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR1Left)==0:
-        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: set(list(dataR1Left[dataR1Left["split"]==row["split"]]["QNAME"])),axis=1)
-        dataPosR1Left["Read:orient"]="R1:left"
-
-    # find support for R2 right
-    dataR2Right=data[data["HIV"].str.contains("R2:right")]
-    dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
-    dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right["ins"].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
-    dataPosR2Right=pd.DataFrame([])
-    dataPosR2Right[["split","count"]]=pd.DataFrame(dataR2Right.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR2Right)==0:
-        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: set(list(dataR2Right[dataR2Right["split"]==row["split"]]["QNAME"])),axis=1)
-        dataPosR2Right["Read:orient"]="R2:right"
-
-    # find support for R2 left
-    dataR2Left=data[data["HIV"].str.contains("R2:left")]
-    dataR2Left
-    dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
-    dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left["ins"].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
-    dataPosR2Left=pd.DataFrame([])
-    dataPosR2Left[["split","count"]]=pd.DataFrame(dataR2Left.groupby(by=["split"])["QNAME"].count()).reset_index()
-    if not len(dataPosR2Left)==0:
-        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: set(list(dataR2Left[dataR2Left["split"]==row["split"]]["QNAME"])),axis=1)
-        dataPosR2Left["Read:orient"]="R2:left"
-
-    frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
-    return pd.concat(frames).reset_index()
-
-def findSupport(data): # current method
-    # find support for R1 right
-    dataR1Right=data[data["HIV"].str.contains("R1:right")]
+    dataR1Right=dataR1Right[~((dataR1Right["R1HUM_TS"]<dataR1Right["R1HIV_TS"])&(dataR1Right["R1HUM_TE"]>dataR1Right["R1HIV_TE"]))]
+    dataR1Right=dataR1Right[~((dataR1Right["R1HIV_TS"]<dataR1Right["R1HUM_TS"])&(dataR1Right["R1HIV_TE"]>dataR1Right["R1HUM_TE"]))]
     dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
     dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
     dataR1Right["comb"]=dataR1Right.split+"@"+dataR1Right.R1HUM_ID
-    dataPosR1Right=pd.DataFrame([])
-    dataPosR1Right[["comb","split","chr","count"]]=pd.DataFrame(dataR1Right.groupby(by=["comb","split","R1HUM_ID"])["QNAME"].count()).reset_index()
-    if not len(dataPosR1Right)==0:
-        dataPosR1Right["readsLocal"]=dataPosR1Right.apply(lambda row: set(list(dataR1Right[(dataR1Right["split"]==row["split"])&(dataR1Right["R1HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
-        dataPosR1Right["Read:orient"]="R1:right"
+    dataR1Right["orient"]="R1-hum:hiv"
+    dataR1Right["overlap"]=dataR1Right["overlapR1"]
+    dataR1Right["HUM_TS"]=dataR1Right["R1HUM_TS"]
+    dataR1Right["HUM_TE"]=dataR1Right["R1HUM_TE"]
+    dataR1Right["HUM_RS"]=dataR1Right["R1HUM_RS"]
+    dataR1Right["HUM_RE"]=dataR1Right["R1HUM_RE"]
+    dataR1Right["HIV_TS"]=dataR1Right["R1HIV_TS"]
+    dataR1Right["HIV_TE"]=dataR1Right["R1HIV_TE"]
+    dataR1Right["HIV_RS"]=dataR1Right["R1HIV_RS"]
+    dataR1Right["HIV_RE"]=dataR1Right["R1HIV_RE"]
+    dataR1Right["HUM_ID"]=dataR1Right["R1HUM_ID"]
+    dataR1Right["HIV_ID"]=dataR1Right["R1HIV_ID"]
+    dataR1Right=dataR1Right[(dataR1Right["HIV_TE"]-dataR1Right["HIV_TS"]-dataR1Right["overlap"])>minLenHIV]
+    dataR1Right=dataR1Right[(dataR1Right["HUM_TE"]-dataR1Right["HUM_TS"]-dataR1Right["overlap"])>minLenHUM]
+    dataR1Right["R"]="R1"
+    dataR1Right.drop(dropList,axis=1,inplace=True)
 
-    # find support for R1 left
+    # R1 left
     dataR1Left=data[data["HIV"].str.contains("R1:left")]
+    dataR1Left=dataR1Left[~((dataR1Left["R1HUM_TS"]<dataR1Left["R1HIV_TS"])&(dataR1Left["R1HUM_TE"]>dataR1Left["R1HIV_TE"]))]
+    dataR1Left=dataR1Left[~((dataR1Left["R1HIV_TS"]<dataR1Left["R1HUM_TS"])&(dataR1Left["R1HIV_TE"]>dataR1Left["R1HUM_TE"]))]
     dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
     dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
     dataR1Left["comb"]=dataR1Left.split+"@"+dataR1Left.R1HUM_ID
-    dataPosR1Left=pd.DataFrame([])
-    dataPosR1Left[["comb","split","chr","count"]]=pd.DataFrame(dataR1Left.groupby(by=["comb","split","R1HUM_ID"])["QNAME"].count()).reset_index()
-    if not len(dataPosR1Left)==0:
-        dataPosR1Left["readsLocal"]=dataPosR1Left.apply(lambda row: set(list(dataR1Left[(dataR1Left["split"]==row["split"])&(dataR1Left["R1HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
-        dataPosR1Left["Read:orient"]="R1:left"
+    dataR1Left["orient"]="R1-hiv:hum"
+    dataR1Left["overlap"]=dataR1Left["overlapR1"]
+    dataR1Left["HUM_TS"]=dataR1Left["R1HUM_TS"]
+    dataR1Left["HUM_TE"]=dataR1Left["R1HUM_TE"]
+    dataR1Left["HUM_RS"]=dataR1Left["R1HUM_RS"]
+    dataR1Left["HUM_RE"]=dataR1Left["R1HUM_RE"]
+    dataR1Left["HIV_TS"]=dataR1Left["R1HIV_TS"]
+    dataR1Left["HIV_TE"]=dataR1Left["R1HIV_TE"]
+    dataR1Left["HIV_RS"]=dataR1Left["R1HIV_RS"]
+    dataR1Left["HIV_RE"]=dataR1Left["R1HIV_RE"]
+    dataR1Left["HUM_ID"]=dataR1Left["R1HUM_ID"]
+    dataR1Left["HIV_ID"]=dataR1Left["R1HIV_ID"]
+    dataR1Left=dataR1Left[(dataR1Left["HIV_TE"]-dataR1Left["HIV_TS"]-dataR1Left["overlap"])>minLenHIV]
+    dataR1Left=dataR1Left[(dataR1Left["HUM_TE"]-dataR1Left["HUM_TS"]-dataR1Left["overlap"])>minLenHUM]
+    dataR1Left["R"]="R1"
+    dataR1Left.drop(dropList,axis=1,inplace=True)
 
-    # find support for R2 right
+    # R2 right
     dataR2Right=data[data["HIV"].str.contains("R2:right")]
+    dataR2Right=dataR2Right[~((dataR2Right["R2HUM_TS"]<dataR2Right["R2HIV_TS"])&(dataR2Right["R2HUM_TE"]>dataR2Right["R2HIV_TE"]))]
+    dataR2Right=dataR2Right[~((dataR2Right["R2HIV_TS"]<dataR2Right["R2HUM_TS"])&(dataR2Right["R2HIV_TE"]>dataR2Right["R2HUM_TE"]))]
     dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
     dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
     dataR2Right["comb"]=dataR2Right.split+"@"+dataR2Right.R2HUM_ID
-    dataPosR2Right=pd.DataFrame([])
-    dataPosR2Right[["comb","split","chr","count"]]=pd.DataFrame(dataR2Right.groupby(by=["comb","split","R2HUM_ID"])["QNAME"].count()).reset_index()
-    if not len(dataPosR2Right)==0:
-        dataPosR2Right["readsLocal"]=dataPosR2Right.apply(lambda row: set(list(dataR2Right[(dataR2Right["split"]==row["split"])&(dataR2Right["R2HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
-        dataPosR2Right["Read:orient"]="R2:right"
+    dataR2Right["orient"]="R2-hum:hiv"
+    dataR2Right["overlap"]=dataR2Right["overlapR2"]
+    dataR2Right["HUM_TS"]=dataR2Right["R2HUM_TS"]
+    dataR2Right["HUM_TE"]=dataR2Right["R2HUM_TE"]
+    dataR2Right["HUM_RS"]=dataR2Right["R2HUM_RS"]
+    dataR2Right["HUM_RE"]=dataR2Right["R2HUM_RE"]
+    dataR2Right["HIV_TS"]=dataR2Right["R2HIV_TS"]
+    dataR2Right["HIV_TE"]=dataR2Right["R2HIV_TE"]
+    dataR2Right["HIV_RS"]=dataR2Right["R2HIV_RS"]
+    dataR2Right["HIV_RE"]=dataR2Right["R2HIV_RE"]
+    dataR2Right["HUM_ID"]=dataR2Right["R2HUM_ID"]
+    dataR2Right["HIV_ID"]=dataR2Right["R2HIV_ID"]
+    dataR2Right=dataR2Right[(dataR2Right["HIV_TE"]-dataR2Right["HIV_TS"]-dataR2Right["overlap"])>minLenHIV]
+    dataR2Right=dataR2Right[(dataR2Right["HUM_TE"]-dataR2Right["HUM_TS"]-dataR2Right["overlap"])>minLenHUM]
+    dataR2Right["R"]="R2"
+    dataR2Right.drop(dropList,axis=1,inplace=True)
 
-    # find support for R2 left
+    # R2 left
     dataR2Left=data[data["HIV"].str.contains("R2:left")]
-    dataR2Left
+    dataR2Left=dataR2Left[~((dataR2Left["R2HUM_TS"]<dataR2Left["R2HIV_TS"])&(dataR2Left["R2HUM_TE"]>dataR2Left["R2HIV_TE"]))]
+    dataR2Left=dataR2Left[~((dataR2Left["R2HIV_TS"]<dataR2Left["R2HUM_TS"])&(dataR2Left["R2HIV_TE"]>dataR2Left["R2HUM_TE"]))]
     dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
     dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
     dataR2Left["comb"]=dataR2Left.split+"@"+dataR2Left.R2HUM_ID
-    dataPosR2Left=pd.DataFrame([])
-    dataPosR2Left[["comb","split","chr","count"]]=pd.DataFrame(dataR2Left.groupby(by=["comb","split","R2HUM_ID"])["QNAME"].count()).reset_index()
-    if not len(dataPosR2Left)==0:
-        dataPosR2Left["readsLocal"]=dataPosR2Left.apply(lambda row: set(list(dataR2Left[(dataR2Left["split"]==row["split"])&(dataR2Left["R2HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
-        dataPosR2Left["Read:orient"]="R2:left"
+    dataR2Left["orient"]="R2-hiv:hum"
+    dataR2Left["overlap"]=dataR2Left["overlapR2"]
+    dataR2Left["HUM_TS"]=dataR2Left["R2HUM_TS"]
+    dataR2Left["HUM_TE"]=dataR2Left["R2HUM_TE"]
+    dataR2Left["HUM_RS"]=dataR2Left["R2HUM_RS"]
+    dataR2Left["HUM_RE"]=dataR2Left["R2HUM_RE"]
+    dataR2Left["HIV_TS"]=dataR2Left["R2HIV_TS"]
+    dataR2Left["HIV_TE"]=dataR2Left["R2HIV_TE"]
+    dataR2Left["HIV_RS"]=dataR2Left["R2HIV_RS"]
+    dataR2Left["HIV_RE"]=dataR2Left["R2HIV_RE"]
+    dataR2Left["HUM_ID"]=dataR2Left["R2HUM_ID"]
+    dataR2Left["HIV_ID"]=dataR2Left["R2HIV_ID"]
+    dataR2Left=dataR2Left[(dataR2Left["HIV_TE"]-dataR2Left["HIV_TS"]-dataR2Left["overlap"])>minLenHIV]
+    dataR2Left=dataR2Left[(dataR2Left["HUM_TE"]-dataR2Left["HUM_TS"]-dataR2Left["overlap"])>minLenHUM]
+    dataR2Left["R"]="R2"
+    dataR2Left.drop(dropList,axis=1,inplace=True)
 
-    frames=[dataPosR1Right,dataPosR1Left,dataPosR2Right,dataPosR2Left]
-    return pd.concat(frames).reset_index()
+    frames=[dataR1Right,dataR1Left,dataR2Right,dataR2Left]
+    df=pd.concat(frames).reset_index(drop=True)
+    # data["overlap"]=data.apply(lambda row: 0-row["ins"] if row["overlap"]==0 else row["overlap"],axis=1)
+    return df
+
+def findSupport(dataHC, dataLC):
+    # this function should do the following:
+    # 1. group data by split position
+    # 2. add a column of high confidence support reads from the first parameter DF
+    # 3. add a column of low confidence support reads from the second parameter DF
+    
+    # First group by split and extract high confidence support reads
+    dataPos=pd.DataFrame([])
+    dataPos[["comb","split","chr","R","orient","countHC"]]=pd.DataFrame(dataHC.groupby(by=["comb","split","HUM_ID","R","orient"])["QNAME"].count()).reset_index()
+    if not len(dataPos)==0:
+        dataPos["readsHC"]=dataPos.apply(lambda row: set(list(dataHC[(dataHC["comb"]==row["comb"])&(dataHC["HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
+        dataPos["readsLC"]=dataPos.apply(lambda row: set(list(dataLC[(dataLC["comb"]==row["comb"])&(dataLC["HUM_ID"]==row["chr"])]["QNAME"])).symmetric_difference(row["readsHC"]),axis=1)
+        dataPos["countLC"]=dataPos.readsLC.str.len()
+    return dataPos
 
 def approxCloseness(split1,split2):
     res=abs(int(split1.split(":")[0])-int(split2.split(":")[0]))+abs(int(split1.split(":")[2])-int(split2.split(":")[2]))
@@ -437,10 +433,10 @@ def approxCloseness(split1,split2):
     return res2
 
 def getSet(row):
-    tmpLocalQNAME=list(row["readsLocal"])
+    tmpLocalQNAME=list(row["reads"])
     return tmpLocalQNAME
 
-def writeReadNames(path,dataPos,dirPath,fileName,outPath):
+def writeReadNames(path,dataPos,dirPath,fileName,outPath1,outPath2):
     readsFile=open(path,'w+')
     readsList=[]
     if ";" in dataPos:
@@ -453,7 +449,7 @@ def writeReadNames(path,dataPos,dirPath,fileName,outPath):
         readsFile.write(QNAME+"\n")
     readsFile.close()
 
-    scriptCMD="./extractReadsPerSplit.sh "+dirPath+" "+fileName+" "+path+" "+outPath
+    scriptCMD="./extractReadsPerSplit.sh "+dirPath+" "+fileName+" "+path+" "+outPath1+" "+outPath2
     os.system(scriptCMD)
 
 def getStats(data,baseName,outDir):
@@ -467,12 +463,6 @@ def getStats(data,baseName,outDir):
     return pd.DataFrame([[baseName,numSplits,numReads,numSpliceJunctions]],columns=["name","numSplits","numReads","numSpliceHIV"])
 
 def allSamples(out):
-    # all Pos.csv results should be included in this analysis
-    # How:
-    # 1. concatenate all the sampleFiles together
-    # 2. groupby splits
-    # 3 compute the rest of statistics from there
-
     paths=glob.glob(os.path.abspath(out)+"/*Pos.csv")
     patientCodes=set([x.split("/")[-1].split('.')[0].split("_")[0] for x in paths])
 
@@ -484,25 +474,27 @@ def allSamples(out):
             dfT["patientName"]=patient
             dfT["sampleName"]=sampleFile.split("/")[-1].split(".")[0]
             data=pd.concat([data,dfT])
-    data=data.reset_index().drop(["Unnamed: 0","level_0","index","chr","split"],axis=1)
+    data=data.reset_index(drop=True).drop(["chr","split","reads"],axis=1)
+    data.replace(np.nan,"",inplace=True)
+    data["count"]=data["countLC"]+data["countHC"]
 
     aggregations = {
-        'count': { # work on the "duration" column
-            'numSamples': 'count',  # get the sum, and call this result 'total_duration'
-            'numReads': 'sum', # get mean, call result 'average_duration'
+        'count': {
+            'numSamples': 'count',
+            'numReads': 'sum',
             'median': 'median',
             'mean': 'mean'
         }
     }
 
-    df=pd.DataFrame(data.groupby(by=["comb","Read:orient"])["count"].agg(aggregations)).reset_index()
+    df=pd.DataFrame(data.groupby(by=["comb","orient"])["count"].agg(aggregations)).reset_index()
     df.columns=df.columns.droplevel(0)
     columns=list(df)
     columns[0]="split"
-    columns[1]="Read:orient"
+    columns[1]="orient"
     df.columns=columns
     df[["mean","median","numReads","numSamples"]]=df[["mean","median","numReads","numSamples"]].astype(int)
-    df=df.sort_values(by="numSamples",ascending=False).reset_index()
+    df=df.sort_values(by="numSamples",ascending=False).reset_index(drop=True)
     df["sampleNames"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["sampleName"]))),axis=1)
     df["patientNames"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["patientName"]))),axis=1)
     def countNegPos(row):
@@ -516,10 +508,9 @@ def allSamples(out):
                 countPos=countPos+1
         return [countNeg,countPos]
     df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
-    df.drop("index",axis=1)
-    df.to_csv(os.path.abspath(out)+"/allSamples.csv")
+    df.to_csv(os.path.abspath(out)+"/allSamples.csv",index=False)
 
-def wrapper(outDir,baseName,dirPath,fileName):
+def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV):
 
     # load data from local alignments
     dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
@@ -537,7 +528,7 @@ def wrapper(outDir,baseName,dirPath,fileName):
     if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
         return
 
-    data=pd.DataFrame([],columns=['comb','split','readsLocal','count','Read:orient','prim'])
+    data=pd.DataFrame([],columns=['comb','split','reads','count','orient','prim'])
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
 
@@ -560,132 +551,117 @@ def wrapper(outDir,baseName,dirPath,fileName):
         #calculate the percent aligned (num bp aligned/total read length bp)
         dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
         dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
-        dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index().drop("index",axis=1)
-        dataLocalHUM=dataLocalHUM.reset_index().drop("index",axis=1)
-        dataLocalHIV=dataLocalHIV.reset_index().drop("index",axis=1)
+        dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index(drop=True)
+        dataLocalHUM=dataLocalHUM.reset_index(drop=True)
+        dataLocalHIV=dataLocalHIV.reset_index(drop=True)
         createData(dataLocal,dataLocalHUM,dataLocalHIV)
-        dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum.csv")
-        dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.csv")
+        dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum.csv",index=False)
+        dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.csv",index=False)
 
         dataLocal.replace('', np.nan,inplace=True)
         dataLocal.fillna(0,inplace=True)
         dataLocal["overlapR1"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR1(row),axis=1))
         dataLocal["overlapR2"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR2(row),axis=1))
         dataLocal["HIV"]=dataLocal.apply(lambda row: leftRight(row),axis=1)
-        dataLocal.to_csv(outDir+"/"+baseName+".chim.csv")
+        dataLocal.to_csv(outDir+"/"+baseName+".chim.csv",index=False)
         # drop duplicated reads - preserve first occurence
         dataLocal.drop_duplicates(inplace=True)
-        dataPosLocal=findSupport(dataLocal)
-        dataPosLocal=dataPosLocal.drop("index",axis=1)
+        dataLocalHC=filterOverlapCombine(dataLocal,minLenHC_HUM,minLenHC_HIV)
+        dataLocalLC=filterOverlapCombine(dataLocal,minLenLC_HUM,minLenLC_HIV)
+        dataPosLocal=findSupport(dataLocalHC,dataLocalLC)
 
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-            # dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
-            #calculate the percent aligned (num bp aligned/total read length bp)
-            # dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
-            # dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
-            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
-            dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
-            dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
+            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
+            dataFullHUM=dataFullHUM.reset_index(drop=True)
+            dataFullHIV=dataFullHIV.reset_index(drop=True)
             createData(dataFull,dataFullHUM,dataFullHIV)
-            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv")
-            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv")
+            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv",index=False)
+            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv",index=False)
 
             dataFull.replace('', np.nan,inplace=True)
             dataFull.fillna(0,inplace=True)
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
-            dataFull.to_csv(outDir+"/"+baseName+".full.csv")
+            dataFull.to_csv(outDir+"/"+baseName+".full.csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
-            dataPosFull=findSupport(dataFull)
-            dataPosFull=dataPosFull.drop("index",axis=1)
-            # dataPosLocal["set"]=np.nan
-            # if len(dataPosLocal)>0:
-            #     dataPosLocal["set"]=dataPosLocal.apply(lambda row: getSet(row),axis=1)
-            # dataPosFull["set"]=np.nan
-            # if len(dataPosFull)>0:
-            #     dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
+            dataFullHC=filterOverlapCombine(dataFull,minLenHC_HUM,minLenHC_HIV)
+            dataFullLC=filterOverlapCombine(dataFull,minLenLC_HUM,minLenLC_HIV)
+            dataPosFull=findSupport(dataFullHC,dataFullLC)
             setLocalPos=set(dataPosLocal["comb"])
             setFullPos=set(dataPosFull["comb"])
             intersect=setFullPos.intersection(setLocalPos)
             diff=setFullPos.symmetric_difference(setLocalPos)
             if len(intersect)>0:
                 for el in intersect:
-                    l1=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsLocal"])[0])
-                    l2=set(list(dataPosFull[dataPosFull["comb"]==el]["readsLocal"])[0])
-                    newSet=l1.union(l2)
-                    df2 = pd.DataFrame([[el,len(newSet),";".join(list(newSet)),dataPosLocal[dataPosLocal["comb"]==el]["Read:orient"].iloc[0],10,dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],dataPosLocal[dataPosLocal["comb"]==el]["comb"].iloc[0]]],columns=['split','count','readsLocal','Read:orient','prim',"chr","comb"])
+                    # new set of high confidence/support reads
+                    l1HC=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsHC"])[0])
+                    l2HC=set(list(dataPosFull[dataPosFull["comb"]==el]["readsHC"])[0])
+                    setHC=l1HC.union(l2HC)
+                    #new set of low confidence/support reads
+                    l1LC=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsLC"])[0])
+                    l2LC=set(list(dataPosFull[dataPosFull["comb"]==el]["readsLC"])[0])
+                    setLC=l1LC.union(l2LC)
+                    df2 = pd.DataFrame([[el,
+                                        len(setHC),
+                                        ";".join(list(setHC)),
+                                        len(setLC),
+                                        ";".join(list(setLC)),
+                                        dataPosLocal[dataPosLocal["comb"]==el]["orient"].iloc[0],
+                                        10,
+                                        dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],
+                                        dataPosLocal[dataPosLocal["comb"]==el]["split"].iloc[0],
+                                        dataPosLocal[dataPosLocal["comb"]==el]["R"].iloc[0]]],columns=['comb','countHC','readsHC','countLC','readsLC','orient','prim','chr','split','R'])
                     data=data.append(df2)
 
-                data=data.reset_index().drop("index",axis=1)
+                data=data.reset_index(drop=True)
             dataLocalPosDiff=dataPosLocal[(dataPosLocal['comb'].isin(diff))]
             if len(dataLocalPosDiff)>0:
-                dataLocalPosDiff["readsLocal"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
-            # dataLocalPosDiff=dataLocalPosDiff.drop(["set"],axis=1)
+                dataLocalPosDiff["readsHC"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
+                dataLocalPosDiff["readsLC"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
             dataLocalPosDiff["prim"]=1
             dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
             if len(dataFullPosDiff)>0:
-                dataFullPosDiff["readsLocal"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
-            # dataFullPosDiff=dataFullPosDiff.drop(["set"],axis=1)
+                dataFullPosDiff["readsHC"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
+                dataFullPosDiff["readsLC"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
             dataFullPosDiff["prim"]=0
             data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
-            data.reset_index().drop("index",axis=1)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
+            data.reset_index(drop=True)
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
-            #==================================================
-
-            # for index, row in data.iterrows():
-            #     if len(childPIDS) >= 20:
-            #         childPIDS[0].join()
-            #         childPIDS.remove(childPIDS[0])
-            #     else:
-            #         p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
-            #         childPIDS.append(p)
-            #         p.start()
-            # while(len(childPIDS)>0):
-            #     childPIDS[-1].join()
-            #     childPIDS.remove(childPIDS[-1])
-
-            #===================================================
-                
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
-
+            cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            os.system(cmdR1)
+            os.system(cmdR2)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
+            os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
+            os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            
         else:
             if len(dataPosLocal)>0:
-                dataPosLocal["readsLocal"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
-            # dataPosLocal=dataPosLocal.drop(["set"],axis=1)
+                dataPosLocal["readsHC"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
+                dataPosLocal["readsLC"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
-            data.reset_index().drop("index",axis=1)
+            data.reset_index(drop=True)
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
-            #==================================================
-
-            # for index, row in data.iterrows():
-            #     if len(childPIDS) >= 20:
-            #         childPIDS[0].join()
-            #         childPIDS.remove(childPIDS[0])
-            #     else:
-            #         p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
-            #         childPIDS.append(p)
-            #         p.start()
-            # while(len(childPIDS)>0):
-            #     childPIDS[-1].join()
-            #     childPIDS.remove(childPIDS[-1])
-
-            #===================================================
-                
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
-            # data.to_csv(outDir+"/"+baseName+"_Pos.csv")
+            cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            os.system(cmdR1)
+            os.system(cmdR2)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
+            os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
+            os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         # extract flag information
@@ -702,110 +678,63 @@ def wrapper(outDir,baseName,dirPath,fileName):
             #calculate the percent aligned (num bp aligned/total read length bp)
             dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
             dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
-            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index().drop("index",axis=1)
-            dataFullHUM=dataFullHUM.reset_index().drop("index",axis=1)
-            dataFullHIV=dataFullHIV.reset_index().drop("index",axis=1)
+            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
+            dataFullHUM=dataFullHUM.reset_index(drop=True)
+            dataFullHIV=dataFullHIV.reset_index(drop=True)
             createData(dataFull,dataFullHUM,dataFullHIV)
-            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv")
-            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv")
+            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv",index=False)
+            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv",index=False)
 
             dataFull.replace('', np.nan,inplace=True)
             dataFull.fillna(0,inplace=True)
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
-            dataFull.to_csv(outDir+"/"+baseName+".full.csv")
+            dataFull.to_csv(outDir+"/"+baseName+".full.csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
-            dataPosFull=findSupport(dataFull)
+            dataFullHC=filterOverlapCombine(dataFull,minLenHC_HUM,minLenHC_HIV)
+            dataFullLC=filterOverlapCombine(dataFull,minLenLC_HUM,minLenLC_HIV)
+            dataPosFull=findSupport(dataFullHC,dataFullLC)
 
-            # dataPosFull["set"]=np.nan
             if len(dataPosFull)>0:
-                # dataPosFull["set"]=dataPosFull.apply(lambda row: getSet(row),axis=1)
-                dataPosFull["readsLocal"]=dataPosFull.apply(lambda row: ";".join(list(row['readsLocal'])),axis=1)
-                # dataPosFull=dataPosFull.drop(["set"],axis=1)
+                dataPosFull["readsHC"]=dataPosFull.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
+                dataPosFull["readsLC"]=dataPosFull.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
-            data.reset_index().drop("index",axis=1)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv")
+            data.reset_index(drop=True)
+            data.to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
-            #==================================================
-
-            # for index, row in data.iterrows():
-            #     if len(childPIDS) >= 20:
-            #         childPIDS[0].join()
-            #         childPIDS.remove(childPIDS[0])
-            #     else:
-            #         p = multiprocessing.Process(target=writeReadNames, args=(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq",))
-            #         childPIDS.append(p)
-            #         p.start()
-            # while(len(childPIDS)>0):
-            #     childPIDS[-1].join()
-            #     childPIDS.remove(childPIDS[-1])
-
-            #===================================================
-                
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["count"]))+".txt",row["readsLocal"],dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["count"]))+".fq"),axis=1)
-
-    # return getStats(data,baseName,outDir)
+            cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            os.system(cmdR1)
+            os.system(cmdR2)
+            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
+            os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
+            os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
     return 1
 
-def mainRun(args):
+def main(args):
+    minLenHC_HUM=int(args.minLen1.split(":")[0])
+    minLenLC_HUM=int(args.minLen1.split(":")[1])
+    minLenHC_HIV=int(args.minLen2.split(":")[0])
+    minLenLC_HIV=int(args.minLen2.split(":")[1])
 
-    # finalStatsDF=pd.DataFrame([],columns=["name","numSplits","numReads","numSpliceHIV"])
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
-        scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB
+        scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
 
         print("Analyzing: ",baseName)
         # os.system(scriptCMD)
-        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName)
+        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV)
 
     allSamples(args.out)
 
     scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
-
-def main(argv):
-
-    parser = argparse.ArgumentParser(description='''Help Page''')
-
-    parser.add_argument('-i',
-                                '--input',
-                                required=True,
-                                type=str,
-                                help="directory which contains fastq.gz files")
-    parser.add_argument('-o',
-                                '--out',
-                                required=False,
-                                type=str,
-                                default="./out",
-                                help="output directory")
-    parser.add_argument('-k',
-                                '--krakenDB',
-                                required=True,
-                                type=str,
-                                help="path to kraken database")
-    parser.add_argument('-v',
-                                '--hivDB',
-                                required=True,
-                                type=str,
-                                help="path to the hiv reference")
-    parser.add_argument('-g',
-                                '--humDB',
-                                required=True,
-                                type=str,
-                                help="path to the hg38 reference")
-
-    parser.set_defaults(func=mainRun)
-    args=parser.parse_args()
-    args.func(args)
-
-if __name__=="__main__":
-    main(sys.argv[1:])
