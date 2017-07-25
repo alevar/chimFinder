@@ -65,7 +65,7 @@ def hiv(argv):
                               type=str,
                               help="the minimum number of nucleotides in alignment to keep a read. REF1:REF2")
     parser_step1.add_argument('-a',
-                              '--minLen2',
+                              '--annotation',
                               required=True,
                               type=str,
                               help="annotation for the human genome")
@@ -82,7 +82,31 @@ def hiv(argv):
                                 required=True,
                                 type=str,
                                 nargs="*",
-                                help="path to the CRAM allignment which is to be used in coverage efficacy analysis by downsampling")
+                                help="path to the fastq.gz files")
+    parser_step2.add_argument('-o',
+                                '--out',
+                                required=False,
+                                default="./out",
+                                type=str,
+                                help="path to the output directory")
+    parser_step2.add_argument('-m',
+                              '--minLen',
+                              type=int,
+                              required=False,
+                              default=50,
+                              help="minimum length of the n segment")
+    parser_step2.add_argument('-l',
+                              '--len',
+                              type=int,
+                              required=False,
+                              default=140,
+                              help="maximum of contigs to consider")
+    parser_step2.add_argument('-c',
+                              '--cLen',
+                              type=int,
+                              required=False,
+                              default=50,
+                              help="minimum length of contig to consider")
     parser_step2.set_defaults(func=Step2.main)
 
 #=========================================

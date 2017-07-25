@@ -629,7 +629,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataFullPosDiff["prim"]=0
             data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
             data.reset_index(drop=True)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
+            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -650,7 +650,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
             data.reset_index(drop=True)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
+            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
@@ -703,7 +703,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
             data.reset_index(drop=True)
-            data.to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
+            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
@@ -738,3 +738,4 @@ def main(args):
     allSamples(args.out)
 
     scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
+    scriptCMD
