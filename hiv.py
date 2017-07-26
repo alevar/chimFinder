@@ -81,7 +81,6 @@ def hiv(argv):
                                 '--input',
                                 required=True,
                                 type=str,
-                                nargs="*",
                                 help="path to the fastq.gz files")
     parser_step2.add_argument('-o',
                                 '--out',
