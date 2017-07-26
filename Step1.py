@@ -236,7 +236,7 @@ def extractStartEnd(data):
     data16["Reference_start"]=data16.SEQ_LEN-data16.END+data16.POS-data16.Template_start
     data16["Reference_end"]=data16.SEQ_LEN-data16.CIGAR_PRE-1+data16.POS-data16.Template_start
     data0["Reference_start"]=data0.POS
-    data0["Reference_end"]=data0.END+data0.POS
+    data0["Reference_end"]=data0.END+data0.POS-data0.CIGAR_PRE
 
     data=pd.concat([data16,data0]).reset_index(drop=True)
     data.drop(["SEQ_LEN","CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
@@ -463,20 +463,21 @@ def getStats(data,baseName,outDir):
     return pd.DataFrame([[baseName,numSplits,numReads,numSpliceJunctions]],columns=["name","numSplits","numReads","numSpliceHIV"])
 
 def allSamples(out):
-    paths=glob.glob(os.path.abspath(out)+"/*Pos.csv")
+    paths=glob.glob(os.path.abspath(out)+"/*Pos.csv.up")
     patientCodes=set([x.split("/")[-1].split('.')[0].split("_")[0] for x in paths])
 
     data=pd.DataFrame([])
 
     for patient in patientCodes:
-        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos.csv"):
+        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos.csv.up"):
             dfT=pd.read_csv(sampleFile)
             dfT["patientName"]=patient
             dfT["sampleName"]=sampleFile.split("/")[-1].split(".")[0]
             data=pd.concat([data,dfT])
-    data=data.reset_index(drop=True).drop(["chr","split","reads"],axis=1)
+    data=data.reset_index(drop=True).drop(["readsHC","readsLC"],axis=1)
     data.replace(np.nan,"",inplace=True)
     data["count"]=data["countLC"]+data["countHC"]
+    data=data.drop(["countHC","countLC"],axis=1)
 
     aggregations = {
         'count': {
@@ -497,6 +498,8 @@ def allSamples(out):
     df=df.sort_values(by="numSamples",ascending=False).reset_index(drop=True)
     df["sampleNames"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["sampleName"]))),axis=1)
     df["patientNames"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["patientName"]))),axis=1)
+    df["hum_nearest_3SS"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["hum_nearest_3SS"]))),axis=1)
+    df["hum_nearest_5SS"]=df.apply(lambda row: ";".join(list(set(data[data["comb"]==row["split"]]["hum_nearest_5SS"]))),axis=1)
     def countNegPos(row):
         l=list(data[data["comb"]==row["split"]]["sampleName"])
         countNeg=0
@@ -509,7 +512,7 @@ def allSamples(out):
         return [countNeg,countPos]
     df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
     df.to_csv(os.path.abspath(out)+"/allSamples.csv",index=False)
-
+    
 def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV):
 
     # load data from local alignments
@@ -546,11 +549,11 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
         if len(dataLocalHUM)==0:
             return
 
-        dataLocalHIV["lenAlign"]=dataLocalHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-        dataLocalHUM["lenAlign"]=dataLocalHUM.apply(lambda row: len(row["SEQ"]),axis=1)
+        # dataLocalHIV["lenAlign"]=dataLocalHIV.apply(lambda row: len(row["SEQ"]),axis=1)
+        # dataLocalHUM["lenAlign"]=dataLocalHUM.apply(lambda row: len(row["SEQ"]),axis=1)
         #calculate the percent aligned (num bp aligned/total read length bp)
-        dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
-        dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
+        # dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
+        # dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
         dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index(drop=True)
         dataLocalHUM=dataLocalHUM.reset_index(drop=True)
         dataLocalHIV=dataLocalHIV.reset_index(drop=True)
@@ -673,11 +676,11 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
 
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-            dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
+            # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
+            # dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
             #calculate the percent aligned (num bp aligned/total read length bp)
-            dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
-            dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
+            # dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
+            # dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
             dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)

@@ -40,7 +40,8 @@ for file in ${outDir}/krakenOut/*.report ; do
     sample="${sampleBase%.*}"
 
     echo "totalNumberReads"
-    totalNumberReads="$(zcat ${inDir}/${sample}_R1_001.fastq.gz | echo $((`wc -l`/4)))"
+    # totalNumberReads="$(zcat ${inDir}/${sample}_R1_001.fastq.gz | echo $((`wc -l`/4)))"
+    totalNumberReads=""
 
     HIVP="$(grep 'Human immunodeficiency' ${file} | awk -F '\t' '{print $1}')"
     HUMP="$(grep 'Homo sapiens' ${file} | awk -F '\t' '{print $1}')"
