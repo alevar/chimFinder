@@ -16,4 +16,5 @@ bowtie2-build ${spliceRefs}/u-${pos}_${posS}.fa ${spliceRefs}/u-${pos}_${posS}
 
 bowtie2 --no-unal --local --phred33 -p 12 -x ${spliceRefs}/i-1_${pos} -1 ${sampleOut}/R1.fq -2 ${sampleOut}/R2.fq -S ${sampleOut}/i-1_${pos}.sam
 bowtie2 --no-unal --local --phred33 -p 12 -x ${spliceRefs}/i-2_${pos} -1 ${sampleOut}/R1.fq -2 ${sampleOut}/R2.fq -S ${sampleOut}/i-2_${pos}.sam
-bowtie2 --no-unal --phred33 -p 12 -x ${spliceRefs}/u-${pos}_${posS} -1 ${sampleOut}/R1.fq -2 ${sampleOut}/R2.fq -S ${sampleOut}/u-${pos}_${posS}.sam
+bowtie2 --no-unal --local --phred33 -p 12 -x ${spliceRefs}/u-${pos}_${posS} -1 ${sampleOut}/R1.fq -2 ${sampleOut}/R2.fq -S ${sampleOut}/u-${pos}_${posS}.sam
+bowtie2 --no-unal --phred33 -p 12 -x ${spliceRefs}/u-${pos}_${posS} -1 ${sampleOut}/R1.fq -2 ${sampleOut}/R2.fq -S ${sampleOut}/u-${pos}_${posS}.f.sam

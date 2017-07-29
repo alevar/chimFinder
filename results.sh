@@ -20,8 +20,8 @@
 outDir=$1
 inDir=$2
 
-touch ./results.csv
-echo "sample,krakenHiv%,krakenHum%,chimericReadsExtracted,chimericReadsFiltered,bowtie2HIV,bowtie2HUM,chimericBowtie,numSplits,numReads,numSpliceJunctionsHIV,totalNumberReads" > ./results.csv
+touch ${outDir}/results.csv
+echo "sample,krakenHiv%,krakenHum%,chimericReadsExtracted,chimericReadsFiltered,bowtie2HIV,bowtie2HUM,chimericBowtie,numSplits,numReads,numSpliceJunctionsHIV,totalNumberReads" > ${outDir}/results.csv
 
 for file in ${outDir}/krakenOut/*.report ; do
     sample=""
@@ -65,7 +65,7 @@ for file in ${outDir}/krakenOut/*.report ; do
                 echo "1.1.1.chimericBowtie"
                 chimericBowtie="$(awk -F ',' '$4==0.0' ${outDir}/${sample}.full.csv | wc -l | awk -F ' ' '{print $1}')"
                 echo "1.1.1.numSpliceJunctionsHIV"
-                if [ -f ${outDir}/hisat/${sample}.junctions ]; then 
+                if [ -f ${outDir}/hisat/${sample}.junctions ]; then
                     numSpliceJunctionsHIV="$(wc -l ${outDir}/hisat/${sample}.junctions | awk -F ' ' '{print $1}')"
                 else
                     numSpliceJunctionsHIV="0"
@@ -96,7 +96,7 @@ for file in ${outDir}/krakenOut/*.report ; do
                 echo "2.1.1.chimericBowtie"
                 chimericBowtie="$(awk -F ',' '$4==0.0' ${outDir}/${sample}.full.csv | wc -l | awk -F ' ' '{print $1}')"
                 echo "2.1.1.numSpliceJunctionsHIV"
-                if [ -f ${outDir}/hisat/${sample}.junctions ]; then 
+                if [ -f ${outDir}/hisat/${sample}.junctions ]; then
                     numSpliceJunctionsHIV="$(wc -l ${outDir}/hisat/${sample}.junctions | awk -F ' ' '{print $1}')"
                 else
                     numSpliceJunctionsHIV="0"
@@ -128,5 +128,5 @@ for file in ${outDir}/krakenOut/*.report ; do
             numReads="0"
         fi
     fi
-    echo "${sample},${HIVP},${HUMP},${nReadsKraken},${postFiltKraken},${bowtieReadsHIV},${bowtieReadsHUM},${chimericBowtie},${numSplits},${numReads},${numSpliceJunctionsHIV},${totalNumberReads}" >> ./results.csv
+    echo "${sample},${HIVP},${HUMP},${nReadsKraken},${postFiltKraken},${bowtieReadsHIV},${bowtieReadsHUM},${chimericBowtie},${numSplits},${numReads},${numSpliceJunctionsHIV},${totalNumberReads}" >> ${outDir}/results.csv
 done

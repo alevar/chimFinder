@@ -1,4 +1,4 @@
-#!/usr/bin/ebv bash
+#!/usr/bin/env bash
 
 outDir=$1
 sample=$2

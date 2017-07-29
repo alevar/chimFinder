@@ -27,7 +27,7 @@ def getFromSplits(dataHIV,dataHUM):
     setHIV_First=set(cleanHIV_First["QNAME"])
     setHUM_First=set(cleanHUM_First["QNAME"])
     splitMates=setHIV_First.intersection(setHUM_First)
-    
+
 # the function below will calculate and return start:end of the alignment within template read
 def calcAlignmentStartEnd(row,reference,start):
     # first, break cigar into parseable entities
@@ -47,7 +47,7 @@ def calcAlignmentStartEnd(row,reference,start):
     else:
         pass
 
-@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),()->()')    
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),()->()')
 def calcAlignmentTemplateStart(cigar,reversedCurr,lenSeq,res):
     start=0
     end=0
@@ -68,8 +68,8 @@ def calcAlignmentTemplateStart(cigar,reversedCurr,lenSeq,res):
         if (reversedCurr==16):
             start=lenSeq-1-end
     res[0]=start
-    
-@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),()->()')    
+
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),()->()')
 def calcAlignmentTemplateEnd(cigar,reversedCurr,lenSeq,res):
     start=0
     end=0
@@ -91,7 +91,7 @@ def calcAlignmentTemplateEnd(cigar,reversedCurr,lenSeq,res):
             end=lenSeq-1-start
     res[0]=end
 
-@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),(),()->()')    
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),(),()->()')
 def calcAlignmentReferenceStart(cigar,reversedCurr,lenSeq,pos,res):
     start=pos
     end=0
@@ -109,8 +109,8 @@ def calcAlignmentReferenceStart(cigar,reversedCurr,lenSeq,pos,res):
         idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
         end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
     res[0]=start
-    
-@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),(),()->()')    
+
+@numba.guvectorize([(numba.int32[:], numba.uint32[:],numba.uint32[:],numba.uint32[:],numba.int32[:])], '(n),(),(),()->()')
 def calcAlignmentReferenceEnd(cigar,reversedCurr,lenSeq,pos,res):
     start=pos
     end=0
@@ -128,7 +128,7 @@ def calcAlignmentReferenceEnd(cigar,reversedCurr,lenSeq,pos,res):
         idxlM=len(cigarList)-1-cigarList[::-1].index("M") #index of the last M
         end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
     res[0]=end
-    
+
 def alMap(row,data1,data2):
     dataTMP_1=data1[data1['QNAME']==row["QNAME"]]
     dataTMP_2=data2[data2['QNAME']==row["QNAME"]]
@@ -137,22 +137,22 @@ def alMap(row,data1,data2):
         flag|=2
         if(dataTMP_2["firstRead"].iloc[0]==64): #hum and hiv on the same first read
             flag|=4
-        
+
             meanTMP_1=(dataTMP_1["Template_start"].iloc[0]+dataTMP_1["Template_end"].iloc[0])/2
             meanTMP_2=(dataTMP_2["Template_start"].iloc[0]+dataTMP_2["Template_end"].iloc[0])/2
             if(meanTMP_1<meanTMP_2): # hiv to the right
                 flag|=8
-        
+
     if(dataTMP_1["lastRead"].iloc[0]==128): #hum aligns on last read
         flag|=16
         if(dataTMP_2["lastRead"].iloc[0]==128): #hum and hiv on the same second read
             flag|=32
-            
+
             meanTMP_1=(dataTMP_1["Template_start"].iloc[0]+dataTMP_1["Template_end"].iloc[0])/2
             meanTMP_2=(dataTMP_2["Template_start"].iloc[0]+dataTMP_2["Template_end"].iloc[0])/2
             if(meanTMP_1<meanTMP_2): # hiv to the right
                 flag|=64
-                
+
     return flag
 
 # mark reads that have HIV on the right side
@@ -166,9 +166,9 @@ def leftRight(row):
                 t.append("R1:left")
         else:
             t.append("sep:2")
-            
-        
-    if not row["R2HUM_ID"]==0:            
+
+
+    if not row["R2HUM_ID"]==0:
         if not row["R2HIV_ID"]==0:
             if row['R2HIV_TS']>row["R2HUM_TS"]:
                 t.append("R2:right")
@@ -176,7 +176,7 @@ def leftRight(row):
                 t.append("R2:left")
         else:
             t.append("sep:1")
-            
+
     return "-".join(t)
 
 def overlapR1(row):
@@ -269,19 +269,19 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
     # this function filters by overlap and flanking alignment length
     # further it removes unnecessary data and combines into a single full dataframe with unified naming avoiding R1/R2 conventions
     # output can be saved as .full.csv and then grouped by split position all at once
-    
+
     # this function allows identifying best reads
     # However, since greater minLen values for HIV and HUM alignments will yield fewer reads but at higher confidence
     # support reads could ignore the min len requirement as long as the split position is identical
     # or perhaps the minLen requirement for the support reads should be lower
-    
+
     # so the pipeline here should be as follows:
     # 1. Run this function with lower minLenHUM and minLenHIV parameters in order to identfy all possible support reads
-    # 2. Run this function with greater minLenHUM and minLenHIV parameters on the dataframe generated in step 1 
+    # 2. Run this function with greater minLenHUM and minLenHIV parameters on the dataframe generated in step 1
     #    in order to identify split positions
     # 3. For each split position from df with higher minLen threshold - find all support reads from both dfs
     # 4. Perhaps find high confidence and low confidence reads separately
-    
+
     dropList=["R1HUM_TS",
               "R1HUM_TE",
               "R1HUM_ID",
@@ -307,7 +307,7 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
               "overlapR1",
               "overlapR2",
               "HIV"]
-    
+
     # R1 right
     dataR1Right=data[data["HIV"].str.contains("R1:right")]
     dataR1Right=dataR1Right[~((dataR1Right["R1HUM_TS"]<dataR1Right["R1HIV_TS"])&(dataR1Right["R1HUM_TE"]>dataR1Right["R1HIV_TE"]))]
@@ -414,7 +414,7 @@ def findSupport(dataHC, dataLC):
     # 1. group data by split position
     # 2. add a column of high confidence support reads from the first parameter DF
     # 3. add a column of low confidence support reads from the second parameter DF
-    
+
     # First group by split and extract high confidence support reads
     dataPos=pd.DataFrame([])
     dataPos[["comb","split","chr","R","orient","countHC"]]=pd.DataFrame(dataHC.groupby(by=["comb","split","HUM_ID","R","orient"])["QNAME"].count()).reset_index()
@@ -463,13 +463,13 @@ def getStats(data,baseName,outDir):
     return pd.DataFrame([[baseName,numSplits,numReads,numSpliceJunctions]],columns=["name","numSplits","numReads","numSpliceHIV"])
 
 def allSamples(out):
-    paths=glob.glob(os.path.abspath(out)+"/*Pos.csv.up")
+    paths=glob.glob(os.path.abspath(out)+"/*Pos.csv")
     patientCodes=set([x.split("/")[-1].split('.')[0].split("_")[0] for x in paths])
 
     data=pd.DataFrame([])
 
     for patient in patientCodes:
-        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos.csv.up"):
+        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos.csv"):
             dfT=pd.read_csv(sampleFile)
             dfT["patientName"]=patient
             dfT["sampleName"]=sampleFile.split("/")[-1].split(".")[0]
@@ -512,7 +512,7 @@ def allSamples(out):
         return [countNeg,countPos]
     df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
     df.to_csv(os.path.abspath(out)+"/allSamples.csv",index=False)
-    
+
 def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV):
 
     # load data from local alignments
@@ -521,7 +521,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
     # load data from full alignments
     dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    
+
     outDirPOS=outDir+"/Positions/"+baseName
     if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
         os.mkdir(os.path.abspath(outDir+"/Positions/"))
@@ -645,7 +645,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
             os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
             os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
-            
+
         else:
             if len(dataPosLocal)>0:
                 dataPosLocal["readsHC"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
@@ -726,19 +726,33 @@ def main(args):
     minLenHC_HIV=int(args.minLen2.split(":")[0])
     minLenLC_HIV=int(args.minLen2.split(":")[1])
 
+    fileList=["154_neg_2_S9",
+    "154_neg_3_S10",
+    "154_pos_18_S6",
+    "154_pos_21_S7",
+    "154_pos_7_S2",
+    "218_neg_1_S17",
+    "218_pos_1_S13",
+    "218_pos_3_S15",
+    "256_pos_1_S11",
+    "348_pos_1_S20"]
+
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
 
         baseName="_R1".join(fileName.split("_R1")[:-1])
-        scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
 
-        print("Analyzing: ",baseName)
-        # os.system(scriptCMD)
-        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV)
+        if not baseName in fileList:
+            scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
 
+            print("Analyzing: ",baseName)
+            # os.system(scriptCMD)
+            # resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV)
+
+    # os.system("./add.sh "+os.path.abspath(args.out))
     allSamples(args.out)
 
     scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
-    scriptCMD
+    os.system(scriptCMD)

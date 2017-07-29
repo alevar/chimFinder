@@ -38,7 +38,7 @@ def filterDistances(contigPairs,threshold):
 
 # filter contigs smaller in length than set by a parameter
 def filterLength(contigs,length):
-	return [contig for contig in contigs if contig[1]-contig[0]>length]
+    return [contig for contig in contigs if contig[1]-contig[0]>length]
 
 # build all possible forward pairs of positions which could be potential links between splices
 def buildPairs(contigs):
@@ -83,7 +83,7 @@ def writeRefs(finalOut,finalOutUni,header,outDir,baseName):
         os.mkdir(outDir)
 
     outDir=outDir+baseName
-	# create a directory for the sample
+    # create a directory for the sample
     # in the directory save each possible splice fasta as endPosPre:startPosPost
     if not os.path.exists(os.path.abspath(outDir)):
         os.mkdir(os.path.abspath(outDir))
@@ -141,6 +141,45 @@ def confirmSplice(baseName,filePath,args):
         indexAlign(args,finalOut,baseName,str(pos[1])+":"+str(pos[2]),str(pos[3]))
     return [(x[1],x[2]) for x in finalOutUni]
 
+def extractFlagBits(data):
+    data["paired"]=data["FLAG"]               &1 #template having multiple segments in sequencing
+    data["aligned2Mates"]=data["FLAG"]        &2 #each segment properly aligned according to the aligner
+    data["unmappedCurr"]=data["FLAG"]         &4 #segment unmapped
+    data["unmappedMate"]=data["FLAG"]         &8 #next segment in the template unmapped
+    data["reversedCurr"]=data["FLAG"]         &16 #SEQ being reverse complemented
+    data["reversedMate"]=data["FLAG"]         &32 #SEQ of the next segment in the template being reverse complemented
+    data["firstRead"]=data["FLAG"]            &64 #the first segment in the template
+    data["lastRead"]=data["FLAG"]             &128 #the last segment in the template
+    data["secondaryAlignment"]=data["FLAG"]   &256 #secondary alignment
+    data["noPassFilter"]=data["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
+    data["PCRdup"]=data["FLAG"]               &1024 #PCR or optical duplicate
+    data["suppAl"]=data["FLAG"]               &2048 #supplementary alignment
+
+def extractStartEnd(data):
+    data["CIGAR"].replace("*",np.nan,inplace=True)
+    data.dropna(axis=0,inplace=True)
+
+    data["SEQ_LEN"]=data.SEQ.str.len()
+    data["CIGAR_POST"]=data.CIGAR.str.extract("[M]([0-9]+)[A-Z]$").replace(np.nan,0).astype(int)
+    data["END"]=data.SEQ_LEN-data.CIGAR_POST
+    data["CIGAR_PRE"]=data.CIGAR.str.extract("^([0-9]+)[S]").replace(np.nan,0).astype(int)
+
+    data16=data[data["reversedCurr"]==16]
+    data0=data[data["reversedCurr"]==0]
+    data16["Template_start"]=data16.SEQ_LEN-data16.END
+    data16["Template_end"]=data16.SEQ_LEN-data16.CIGAR_PRE-1
+    data0["Template_start"]=data0.CIGAR_PRE
+    data0["Template_end"]=data0.END
+
+    data16["Reference_start"]=data16.SEQ_LEN-data16.END+data16.POS-data16.Template_start
+    data16["Reference_end"]=data16.SEQ_LEN-data16.CIGAR_PRE-1+data16.POS-data16.Template_start
+    data0["Reference_start"]=data0.POS
+    data0["Reference_end"]=data0.END+data0.POS-data0.CIGAR_PRE
+
+    data=pd.concat([data16,data0]).reset_index(drop=True)
+    data.drop(["SEQ_LEN","CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
+    return data
+
 def overlapLR(sample,base,outDir,pos,s):
     dataL=pd.read_csv(os.path.abspath(outDir)+"/splicing/"+sample+"/i-1_"+base+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     extractFlagBits(dataL)
@@ -150,13 +189,24 @@ def overlapLR(sample,base,outDir,pos,s):
     dataR=extractStartEnd(dataR)
     sL=set(list(dataL[pos-dataL["Reference_end"]<s]["QNAME"]))
     sR=set(list(dataR[(dataR["Reference_start"]-1)<s]["QNAME"]))
-    return len(setL.intersection(sR))
+    sI=sL.intersection(sR)
+    dataL=dataL[dataL["QNAME"].isin(sI)]
+    dataR=dataR[dataR["QNAME"].isin(sI)]
+    data=pd.merge(dataL,dataR,on="QNAME")
+    return len(set(list(data[abs(data["Template_end_x"]-data["Template_start_y"])<5]["QNAME"])))
 
-def overlapU(sample,base,outDir,pos):
+def overlapUF(sample,base,outDir,pos):
     dataU=pd.read_csv(os.path.abspath(outDir)+"/splicing/"+sample+"/u-"+base+"_"+str(pos)+".f.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     extractFlagBits(dataU)
     dataU=extractStartEnd(dataU)
     return len(dataU[(dataU["Reference_start"]<pos)&(pos-dataU["Reference_start"]>20)&(dataU["Reference_end"]>pos)&(dataU["Reference_end"]-pos>20)])
+
+def overlapUL(sample,base,outDir,pos):
+    dataU=pd.read_csv(os.path.abspath(outDir)+"/splicing/"+sample+"/u-"+base+"_"+str(pos)+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    extractFlagBits(dataU)
+    dataU=extractStartEnd(dataU)
+    return len(dataU[(dataU["Reference_start"]<pos)&(pos-dataU["Reference_start"]>20)&(dataU["Reference_end"]>pos)&(dataU["Reference_end"]-pos>20)])
+
 
 # read .sam files and compare results
 def confirm(args):
@@ -169,12 +219,13 @@ def confirm(args):
         data=pd.DataFrame({"spliceSite":[x[0] for x in globList],"pos":[int(x[1]) for x in globList]})
         data["sample"]=sample
         if len(data)>0:
-            data["supportLR"]=data.apply(lambda row: overlapLR(sample,row["spliceSite"],outDir,row["pos"],5),axis=1) 
-            data["supportU"]=data.apply(lambda row: overlapU(sample,row["spliceSite"],outDir,row["pos"]),axis=1) 
+            data["supportLR"]=data.apply(lambda row: overlapLR(sample,row["spliceSite"],outDir,row["pos"],2),axis=1)
+            data["supportUF"]=data.apply(lambda row: overlapUF(sample,row["spliceSite"],outDir,row["pos"]),axis=1)
+            data["supportUL"]=data.apply(lambda row: overlapUL(sample,row["spliceSite"],outDir,row["pos"]),axis=1)
             df=pd.concat([df,data])
 
     # df.dropna(axis=0,inplace=True)
-    df=df[(df["supportLR"]>0)|(df["supportU"]>0)]
+    df=df[(df["supportLR"]>0)|(df["supportUF"]>0)|(df["supportUL"]>0)]
     df.to_csv(os.path.abspath(outDir)+"/splicing/splicePos.csv")
 
 def main(args):
@@ -184,10 +235,8 @@ def main(args):
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         print("Working on: "+baseName)
-        consensusPath=os.path.abspath(args.out)+"/consensusHIV/"+baseName+".fq.fa"
+        consensusPath=os.path.abspath(args.out)+"/consensusHIV/"+baseName+".fa"
         if os.path.exists(consensusPath):
             poss=confirmSplice(baseName,consensusPath,args)
 
     confirm(args)
-
-
