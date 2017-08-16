@@ -61,7 +61,7 @@ def hiv(argv):
     parser_step1.add_argument('-y',
                               '--minLen2',
                               required=False,
-                              default="0:0",
+                              default="30:30",
                               type=str,
                               help="the minimum number of nucleotides in alignment to keep a read. REF1:REF2")
     parser_step1.add_argument('-a',
@@ -69,6 +69,18 @@ def hiv(argv):
                               required=True,
                               type=str,
                               help="annotation for the human genome")
+    parser_step1.add_argument('-s',
+                              '--shell',
+                              action="store_true",
+                              help="run shell scripts")
+    parser_step1.add_argument('-e',
+                              '--end',
+                              action="store_true",
+                              help="remove duplicates")
+    parser_step1.add_argument('-w',
+                              '--writeReads',
+                              action="store_true",
+                              help="write reads to fasta files")
     parser_step1.set_defaults(func=Step1.main)
 
 #========================================

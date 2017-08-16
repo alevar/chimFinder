@@ -180,10 +180,10 @@ def leftRight(row):
     return "-".join(t)
 
 def overlapR1(row):
-    return len(set(range(row["R1HUM_TS"],row["R1HUM_TE"])).intersection(set(range(row["R1HIV_TS"],row["R1HIV_TE"]))))
+    return len(set(range(int(row["R1HUM_TS"]),int(row["R1HUM_TE"]))).intersection(set(range(int(row["R1HIV_TS"]),int(row["R1HIV_TE"])))))
 
 def overlapR2(row):
-    return len(set(range(row["R2HUM_TS"],row["R2HUM_TE"])).intersection(set(range(row["R2HIV_TS"],row["R2HIV_TE"]))))
+    return len(set(range(int(row["R2HUM_TS"]),int(row["R2HUM_TE"]))).intersection(set(range(int(row["R2HIV_TS"]),int(row["R2HIV_TE"])))))
 
 # extract flag information
 def extractFlagBits(data):
@@ -258,12 +258,19 @@ def filterReads(dataHUM,dataHIV):
     return dataHUM, dataHIV
 
 def createData(data,dataHUM,dataHIV):
-    data[["R1HUM_TS","R1HUM_TE","R1HUM_ID","R1HUM_RS","R1HUM_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)][["Template_start","Template_end","RNAME","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["firstRead"]==64)])>0 else [0,0,"",0,0],axis=1)])
-    data[["R2HUM_TS","R2HUM_TE","R2HUM_ID","R2HUM_RS","R2HUM_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)][["Template_start","Template_end","RNAME","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHUM[(dataHUM["QNAME"]==row["QNAME"])&(dataHUM["lastRead"]==128)])>0 else [0,0,"",0,0],axis=1)])
-    data[["R1HIV_TS","R1HIV_TE","R1HIV_ID","R1HIV_RS","R1HIV_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)][["Template_start","Template_end","RNAME","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["firstRead"]==64)])>0 else [0,0,"",0,0],axis=1)])
-    data[["R2HIV_TS","R2HIV_TE","R2HIV_ID","R2HIV_RS","R2HIV_RE"]] = pd.DataFrame([x for x in data.apply(lambda row: dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)][["Template_start","Template_end","RNAME","Reference_start","Reference_end"]].values.tolist()[0] if len(dataHIV[(dataHIV["QNAME"]==row["QNAME"])&(dataHIV["lastRead"]==128)])>0 else [0,0,"",0,0],axis=1)])
-    data["HUM_AL_MAP"]=data.apply(lambda row: alMap(row,dataHUM,dataHIV),axis=1)
-    data["HIV_AL_MAP"]=data.apply(lambda row: alMap(row,dataHIV,dataHUM),axis=1)
+    df=pd.DataFrame([])
+    dataHUM=dataHUM[dataHUM['QNAME'].isin(set(data['QNAME']))]
+    dataHUMR1=dataHUM[dataHUM['firstRead']==64][["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    dataHUMR2=dataHUM[dataHUM['lastRead']==128][["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    dataHIVR1=dataHIV[dataHIV['firstRead']==64][["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    dataHIVR2=dataHIV[dataHIV['lastRead']==128][["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    df[["QNAME","R1HUM_TS","R1HUM_TE","R1HUM_ID","R1HUM_RS","R1HUM_RE"]]=pd.DataFrame(pd.merge(data,dataHUMR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    df[["QNAME","R2HUM_TS","R2HUM_TE","R2HUM_ID","R2HUM_RS","R2HUM_RE"]]=pd.DataFrame(pd.merge(data,dataHUMR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    df[["QNAME","R1HIV_TS","R1HIV_TE","R1HIV_ID","R1HIV_RS","R1HIV_RE"]]=pd.DataFrame(pd.merge(data,dataHIVR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    df[["QNAME","R2HIV_TS","R2HIV_TE","R2HIV_ID","R2HIV_RS","R2HIV_RE"]]=pd.DataFrame(pd.merge(data,dataHIVR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME","Template_start","Template_end","RNAME","Reference_start","Reference_end"]]
+    df[["R1HUM_ID","R2HUM_ID","R1HIV_ID","R2HIV_ID"]].fillna('',inplace=True)
+    df.fillna(0,inplace=True)
+    return df
 
 def filterOverlapCombine(data,minLenHUM,minLenHIV):
     # this function filters by overlap and flanking alignment length
@@ -302,8 +309,6 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
               "R2HIV_ID",
               "R2HIV_RS",
               "R2HIV_RE",
-              "HUM_AL_MAP",
-              "HIV_AL_MAP",
               "overlapR1",
               "overlapR2",
               "HIV"]
@@ -462,14 +467,13 @@ def getStats(data,baseName,outDir):
     numSpliceJunctions=numSpliceJunctions+1
     return pd.DataFrame([[baseName,numSplits,numReads,numSpliceJunctions]],columns=["name","numSplits","numReads","numSpliceHIV"])
 
-def allSamples(out):
-    paths=glob.glob(os.path.abspath(out)+"/*Pos.csv")
+def allSamples(out,paths,end):
     patientCodes=set([x.split("/")[-1].split('.')[0].split("_")[0] for x in paths])
 
     data=pd.DataFrame([])
 
     for patient in patientCodes:
-        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos.csv"):
+        for sampleFile in glob.glob(os.path.abspath(out)+"/"+patient+"*Pos"+end+".csv"):
             dfT=pd.read_csv(sampleFile)
             dfT["patientName"]=patient
             dfT["sampleName"]=sampleFile.split("/")[-1].split(".")[0]
@@ -511,17 +515,17 @@ def allSamples(out):
                 countPos=countPos+1
         return [countNeg,countPos]
     df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
-    df.to_csv(os.path.abspath(out)+"/allSamples.csv",index=False)
+    df.to_csv(os.path.abspath(out)+"/allSamples"+end+".csv",index=False)
 
-def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV):
-
+def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV,end):
+    print(">>>>>>>>>>>>>   Begin analyses")
     # load data from local alignments
-    dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    dataLocalHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataLocalHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hum"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     # load data from full alignments
-    dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-
+    dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    print("<<<<<<<<<<<<<   Done reading in") 
     outDirPOS=outDir+"/Positions/"+baseName
     if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
         os.mkdir(os.path.abspath(outDir+"/Positions/"))
@@ -536,15 +540,20 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
 
         # extract flag information
+        print("begin extracting flags local")
         extractFlagBits(dataLocalHIV)
         extractFlagBits(dataLocalHUM)
+        print("begin extracting flags full")
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
         # extract start and end for both template and reference
+        print("begin extracting start end local")
         dataLocalHIV=extractStartEnd(dataLocalHIV)
         dataLocalHUM=extractStartEnd(dataLocalHUM)
+        print("begin extracting start end full")
         dataFullHIV=extractStartEnd(dataFullHIV)
         dataFullHUM=extractStartEnd(dataFullHUM)
+        print("filter reads local")
         dataLocalHUM,dataLocalHIV=filterReads(dataLocalHUM,dataLocalHIV)
         if len(dataLocalHUM)==0:
             return
@@ -554,44 +563,55 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
         #calculate the percent aligned (num bp aligned/total read length bp)
         # dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
         # dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
-        dataLocal=pd.DataFrame(dataLocalHUM["QNAME"]).reset_index(drop=True)
+        dataLocal=pd.DataFrame(dataLocalHIV["QNAME"]).reset_index(drop=True)
         dataLocalHUM=dataLocalHUM.reset_index(drop=True)
         dataLocalHIV=dataLocalHIV.reset_index(drop=True)
-        createData(dataLocal,dataLocalHUM,dataLocalHIV)
-        dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum.csv",index=False)
-        dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.csv",index=False)
+        print("create data local")
+        dataLocal=createData(dataLocal,dataLocalHUM,dataLocalHIV)
+        dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum"+end+".csv",index=False)
+        dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv"+end+".csv",index=False)
 
         dataLocal.replace('', np.nan,inplace=True)
         dataLocal.fillna(0,inplace=True)
+        print("overlap local")
         dataLocal["overlapR1"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR1(row),axis=1))
         dataLocal["overlapR2"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR2(row),axis=1))
+        print("left right local")
         dataLocal["HIV"]=dataLocal.apply(lambda row: leftRight(row),axis=1)
-        dataLocal.to_csv(outDir+"/"+baseName+".chim.csv",index=False)
+        dataLocal.to_csv(outDir+"/"+baseName+".chim"+end+".csv",index=False)
         # drop duplicated reads - preserve first occurence
         dataLocal.drop_duplicates(inplace=True)
+        print("filter overlap combine local")
         dataLocalHC=filterOverlapCombine(dataLocal,minLenHC_HUM,minLenHC_HIV)
         dataLocalLC=filterOverlapCombine(dataLocal,minLenLC_HUM,minLenLC_HIV)
+        print("find support local")
         dataPosLocal=findSupport(dataLocalHC,dataLocalLC)
 
+        print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
+            dataFull=pd.DataFrame(dataFullHIV["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
-            createData(dataFull,dataFullHUM,dataFullHIV)
-            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv",index=False)
-            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv",index=False)
+            print("create data full")
+            dataFull=createData(dataFull,dataFullHUM,dataFullHIV)
+            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum"+end+".csv",index=False)
+            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv"+end+".csv",index=False)
 
             dataFull.replace('', np.nan,inplace=True)
             dataFull.fillna(0,inplace=True)
+            print("overlap full")
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
+            print("left right full")
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
-            dataFull.to_csv(outDir+"/"+baseName+".full.csv",index=False)
+            dataFull.to_csv(outDir+"/"+baseName+".full"+end+".csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
+            print("filter overlap combine full")
             dataFullHC=filterOverlapCombine(dataFull,minLenHC_HUM,minLenHC_HIV)
             dataFullLC=filterOverlapCombine(dataFull,minLenLC_HUM,minLenLC_HIV)
+            print("find support full")
             dataPosFull=findSupport(dataFullHC,dataFullLC)
             setLocalPos=set(dataPosLocal["comb"])
             setFullPos=set(dataPosFull["comb"])
@@ -632,19 +652,20 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataFullPosDiff["prim"]=0
             data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
             data.reset_index(drop=True)
-            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
+            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
-            cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            os.system(cmdR1)
-            os.system(cmdR2)
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
-            os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
-            os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            #  os.system(cmdR1)
+            #  os.system(cmdR2)
+            #  print("write read names")
+            #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
+            #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
+            #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
         else:
             if len(dataPosLocal)>0:
@@ -653,27 +674,31 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
             data.reset_index(drop=True)
-            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
+            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
-            cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            os.system(cmdR1)
-            os.system(cmdR2)
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
-            os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
-            os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            #  os.system(cmdR1)
+            #  os.system(cmdR2)
+            #  print("write read names")
+            #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
+            #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
+            #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         # extract flag information
+        print("extract flags full")
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
         # extract start and end for both template and reference
+        print("extract start end full")
         dataFullHIV=extractStartEnd(dataFullHIV)
         dataFullHUM=extractStartEnd(dataFullHUM)
 
+        print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
             # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
@@ -684,20 +709,25 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
-            createData(dataFull,dataFullHUM,dataFullHIV)
-            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum.csv",index=False)
-            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.csv",index=False)
+            print("create data full")
+            dataFull=createData(dataFull,dataFullHUM,dataFullHIV)
+            dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum"+end+".csv",index=False)
+            dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv"+end+".csv",index=False)
 
             dataFull.replace('', np.nan,inplace=True)
             dataFull.fillna(0,inplace=True)
+            print("overlap full")
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
+            print("left right full")
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
-            dataFull.to_csv(outDir+"/"+baseName+".full.csv",index=False)
+            dataFull.to_csv(outDir+"/"+baseName+".full"+end+".csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
+            print("filter overlap combine full")
             dataFullHC=filterOverlapCombine(dataFull,minLenHC_HUM,minLenHC_HIV)
             dataFullLC=filterOverlapCombine(dataFull,minLenLC_HUM,minLenLC_HIV)
+            print("find support full")
             dataPosFull=findSupport(dataFullHC,dataFullLC)
 
             if len(dataPosFull)>0:
@@ -706,18 +736,19 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
             data.reset_index(drop=True)
-            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos.csv",index=False)
+            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
             childPIDS=[]
-            cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            os.system(cmdR1)
-            os.system(cmdR2)
-            data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
-            os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
-            os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            #  os.system(cmdR1)
+            #  os.system(cmdR2)
+            #  print("write read names")
+            #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+end+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
+            #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
+            #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
     return 1
 
 def main(args):
@@ -725,34 +756,26 @@ def main(args):
     minLenLC_HUM=int(args.minLen1.split(":")[1])
     minLenHC_HIV=int(args.minLen2.split(":")[0])
     minLenLC_HIV=int(args.minLen2.split(":")[1])
-
-    fileList=["154_neg_2_S9",
-    "154_neg_3_S10",
-    "154_pos_18_S6",
-    "154_pos_21_S7",
-    "154_pos_7_S2",
-    "218_neg_1_S17",
-    "218_pos_1_S13",
-    "218_pos_3_S15",
-    "256_pos_1_S11",
-    "348_pos_1_S20"]
+    end=""
+    if args.end==True:
+        end='.no_dup'
 
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
-
         baseName="_R1".join(fileName.split("_R1")[:-1])
-
-        if not baseName in fileList:
-            scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
-
+        scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
+        if baseName not in ['218_pos_1_S13','218_pos_3_S15']:
             print("Analyzing: ",baseName)
-            # os.system(scriptCMD)
-            # resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV)
+            if args.shell==True:
+                print("Running main shell script")
+                os.system(scriptCMD)
+            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV,end)
 
-    # os.system("./add.sh "+os.path.abspath(args.out))
-    allSamples(args.out)
+    os.system("./add.sh "+os.path.abspath(args.out))
+    paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
+    allSamples(args.out,paths,end)
 
     scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
     os.system(scriptCMD)
