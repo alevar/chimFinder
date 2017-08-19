@@ -272,7 +272,7 @@ def createData(data,dataHUM,dataHIV):
     df.fillna(0,inplace=True)
     return df
 
-def filterOverlapCombine(data,minLenHUM,minLenHIV):
+def filterOverlapCombine(data,minLen):
     # this function filters by overlap and flanking alignment length
     # further it removes unnecessary data and combines into a single full dataframe with unified naming avoiding R1/R2 conventions
     # output can be saved as .full.csv and then grouped by split position all at once
@@ -332,8 +332,8 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
     dataR1Right["HIV_RE"]=dataR1Right["R1HIV_RE"]
     dataR1Right["HUM_ID"]=dataR1Right["R1HUM_ID"]
     dataR1Right["HIV_ID"]=dataR1Right["R1HIV_ID"]
-    dataR1Right=dataR1Right[(dataR1Right["HIV_TE"]-dataR1Right["HIV_TS"]-dataR1Right["overlap"])>minLenHIV]
-    dataR1Right=dataR1Right[(dataR1Right["HUM_TE"]-dataR1Right["HUM_TS"]-dataR1Right["overlap"])>minLenHUM]
+    dataR1Right=dataR1Right[(dataR1Right["HIV_TE"]-dataR1Right["HIV_TS"]-dataR1Right["overlap"])>minLen]
+    dataR1Right=dataR1Right[(dataR1Right["HUM_TE"]-dataR1Right["HUM_TS"]-dataR1Right["overlap"])>minLen]
     dataR1Right["R"]="R1"
     dataR1Right.drop(dropList,axis=1,inplace=True)
 
@@ -356,8 +356,8 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
     dataR1Left["HIV_RE"]=dataR1Left["R1HIV_RE"]
     dataR1Left["HUM_ID"]=dataR1Left["R1HUM_ID"]
     dataR1Left["HIV_ID"]=dataR1Left["R1HIV_ID"]
-    dataR1Left=dataR1Left[(dataR1Left["HIV_TE"]-dataR1Left["HIV_TS"]-dataR1Left["overlap"])>minLenHIV]
-    dataR1Left=dataR1Left[(dataR1Left["HUM_TE"]-dataR1Left["HUM_TS"]-dataR1Left["overlap"])>minLenHUM]
+    dataR1Left=dataR1Left[(dataR1Left["HIV_TE"]-dataR1Left["HIV_TS"]-dataR1Left["overlap"])>minLen]
+    dataR1Left=dataR1Left[(dataR1Left["HUM_TE"]-dataR1Left["HUM_TS"]-dataR1Left["overlap"])>minLen]
     dataR1Left["R"]="R1"
     dataR1Left.drop(dropList,axis=1,inplace=True)
 
@@ -380,8 +380,8 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
     dataR2Right["HIV_RE"]=dataR2Right["R2HIV_RE"]
     dataR2Right["HUM_ID"]=dataR2Right["R2HUM_ID"]
     dataR2Right["HIV_ID"]=dataR2Right["R2HIV_ID"]
-    dataR2Right=dataR2Right[(dataR2Right["HIV_TE"]-dataR2Right["HIV_TS"]-dataR2Right["overlap"])>minLenHIV]
-    dataR2Right=dataR2Right[(dataR2Right["HUM_TE"]-dataR2Right["HUM_TS"]-dataR2Right["overlap"])>minLenHUM]
+    dataR2Right=dataR2Right[(dataR2Right["HIV_TE"]-dataR2Right["HIV_TS"]-dataR2Right["overlap"])>minLen]
+    dataR2Right=dataR2Right[(dataR2Right["HUM_TE"]-dataR2Right["HUM_TS"]-dataR2Right["overlap"])>minLen]
     dataR2Right["R"]="R2"
     dataR2Right.drop(dropList,axis=1,inplace=True)
 
@@ -404,8 +404,8 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
     dataR2Left["HIV_RE"]=dataR2Left["R2HIV_RE"]
     dataR2Left["HUM_ID"]=dataR2Left["R2HUM_ID"]
     dataR2Left["HIV_ID"]=dataR2Left["R2HIV_ID"]
-    dataR2Left=dataR2Left[(dataR2Left["HIV_TE"]-dataR2Left["HIV_TS"]-dataR2Left["overlap"])>minLenHIV]
-    dataR2Left=dataR2Left[(dataR2Left["HUM_TE"]-dataR2Left["HUM_TS"]-dataR2Left["overlap"])>minLenHUM]
+    dataR2Left=dataR2Left[(dataR2Left["HIV_TE"]-dataR2Left["HIV_TS"]-dataR2Left["overlap"])>minLen]
+    dataR2Left=dataR2Left[(dataR2Left["HUM_TE"]-dataR2Left["HUM_TS"]-dataR2Left["overlap"])>minLen]
     dataR2Left["R"]="R2"
     dataR2Left.drop(dropList,axis=1,inplace=True)
 
@@ -414,19 +414,55 @@ def filterOverlapCombine(data,minLenHUM,minLenHIV):
     # data["overlap"]=data.apply(lambda row: 0-row["ins"] if row["overlap"]==0 else row["overlap"],axis=1)
     return df
 
-def findSupport(dataHC, dataLC):
+def findSupport(dataOrig, minLenList):
+    minLenList_tmp=list(minLenList)
     # this function should do the following:
     # 1. group data by split position
     # 2. add a column of high confidence support reads from the first parameter DF
     # 3. add a column of low confidence support reads from the second parameter DF
 
     # First group by split and extract high confidence support reads
+    minLenList_tmp.sort(reverse=True)
+    data=pd.DataFrame([])
+    # if there are multiple minLen in the minLenList then check the the highest does yild more than one
+    # if not, then discard and check the next minLen before constructing the dataPos
+
+    while len(data)==0 and minLenList_tmp:
+        minLen=minLenList_tmp.pop(0)
+        data=filterOverlapCombine(dataOrig,minLen)
     dataPos=pd.DataFrame([])
-    dataPos[["comb","split","chr","R","orient","countHC"]]=pd.DataFrame(dataHC.groupby(by=["comb","split","HUM_ID","R","orient"])["QNAME"].count()).reset_index()
+    dataPos[["comb","split","chr","R","orient","count_"+str(minLen)]]=pd.DataFrame(data.groupby(by=["comb","split","HUM_ID","R","orient"])["QNAME"].count()).reset_index()
+    
     if not len(dataPos)==0:
-        dataPos["readsHC"]=dataPos.apply(lambda row: set(list(dataHC[(dataHC["comb"]==row["comb"])&(dataHC["HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
-        dataPos["readsLC"]=dataPos.apply(lambda row: set(list(dataLC[(dataLC["comb"]==row["comb"])&(dataLC["HUM_ID"]==row["chr"])]["QNAME"])).symmetric_difference(row["readsHC"]),axis=1)
-        dataPos["countLC"]=dataPos.readsLC.str.len()
+        dataPos["reads_"+str(minLen)]=dataPos.apply(lambda row: set(list(data[(data["comb"]==row["comb"])&(data["HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
+        pastMinLens=[minLen]
+        for minLen in minLenList_tmp:
+            data=filterOverlapCombine(dataOrig,minLen)
+
+            def getPreviousReadNames(data,row,pastLens):
+                pastReads=[]
+                for pastMinLen in pastLens:
+                    pastReads=pastReads+list(row['reads_'+str(pastMinLen)])
+
+                return(set(list(data[(data["comb"]==row["comb"])&(data["HUM_ID"]==row["chr"])]["QNAME"]))-set(pastReads))
+
+            dataPos["reads_"+str(minLen)]=dataPos.apply(lambda row: getPreviousReadNames(data,row,pastMinLens),axis=1)
+            dataPos["count_"+str(minLen)]=dataPos["reads_"+str(minLen)].str.len()
+            
+            # if the data at lower minLens contains some splices which are not contained in the dataPos
+            # already the current version discards them. However, the new algorithm should account for
+            # them as well and append them to the dataframe and mark higher minLens as empty
+            setCombCurr=set(list(dataPos['comb']))
+            dataDiffPos=pd.DataFrame([])
+            if len(dataDiffPos)>0:
+                dataDiffPos[["comb","split","chr","R","orient","count_"+str(minLen)]]=pd.DataFrame(dataDiff.groupby(by=["comb","split","HUM_ID","R","orient"])["QNAME"].count()).reset_index()
+                for pastLen in pastMinLens:
+                    dataDiffPos['reads_'+str(pastLen)]=''
+                    dataDiffPos['count_'+str(pastLen)]=0
+                dataDiffPos["reads_"+str(minLen)]=dataDiffPos.apply(lambda row: set(list(dataDiff[(dataDiff["comb"]==row["comb"])&(dataDiff["HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
+                dataPos=pd.concat([dataPos,dataDiffPos])
+            pastMinLens.append(minLen)
+            
     return dataPos
 
 def approxCloseness(split1,split2):
@@ -517,7 +553,63 @@ def allSamples(out,paths,end):
     df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
     df.to_csv(os.path.abspath(out)+"/allSamples"+end+".csv",index=False)
 
-def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV,end):
+# the following function is designed to combine the two dataframes together
+def combineLocalFull(dataPosLocal,dataPosFull,minLens):
+    def generateColumnsList(minLens):
+        colList=['comb']
+        for minLen in minLens:
+            colList=colList+["count_"+str(minLen),"reads_"+str(minLen)]
+        colList=colList+['orient','prim','chr','split','R']
+        return colList
+
+    colList=generateColumnsList(minLens)
+
+    data=pd.DataFrame([],columns=colList)
+
+    setLocalPos=set(dataPosLocal["comb"])
+    setFullPos=set(dataPosFull["comb"])
+    intersect=setFullPos.intersection(setLocalPos)
+    diff=setFullPos.symmetric_difference(setLocalPos)
+
+    if len(intersect)>0:
+        print("if len(intersect)>0")
+        for el in intersect:
+            df2=pd.DataFrame([],columns=colList)
+            df2[['comb','orient','prim','chr','split','R']]=[el,
+                                                            dataPosLocal[dataPosLocal["comb"]==el]["orient"].iloc[0],
+                                                            10,
+                                                            dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],
+                                                            dataPosLocal[dataPosLocal["comb"]==el]["split"].iloc[0],
+                                                            dataPosLocal[dataPosLocal["comb"]==el]["R"].iloc[0]]
+            for minLen in minLens:
+                l1=set(list(dataPosLocal[dataPosLocal['comb']==el]['reads_'+str(minLen)])[0])
+                l2=set(list(dataPosFull[dataPosFull['comb']==el]['reads_'+str(minLen)])[0])
+                setL=l1.union(l2)
+                df2[['count_'+str(minLen),'reads_'+str(minLen)]]=[en(setL),";".join(list(setL))]
+
+            data=data.append(df2)
+        data=data.reset_index(drop=True)
+
+    dataLocalPosDiff=dataPosLocal[(dataPosLocal['comb'].isin(diff))]
+    if len(dataLocalPosDiff)>0:
+        for minLen in minLens:
+            dataLocalPosDiff["reads_"+str(minLen)]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+    dataLocalPosDiff["prim"]=1
+    dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
+    if len(dataFullPosDiff)>0:
+        for minLen in minLens:
+            dataFullPosDiff["reads_"+str(minLen)]=dataFullPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+    dataFullPosDiff["prim"]=0
+    data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
+    data.reset_index(drop=True)
+    return data
+
+# this function will produce a dataframe with information grouped by the SpliceSites
+# those reads that do not contain a valid spliceSite shall be discarded
+def groupBySpliceSites(data):
+    pass
+
+def wrapper(outDir,baseName,dirPath,fileName,minLenList,end):
     print(">>>>>>>>>>>>>   Begin analyses")
     # load data from local alignments
     dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
@@ -538,7 +630,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
     data=pd.DataFrame([],columns=['comb','split','reads','count','orient','prim'])
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
-
+        print("if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0")
         # extract flag information
         print("begin extracting flags local")
         extractFlagBits(dataLocalHIV)
@@ -581,15 +673,13 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
         dataLocal.to_csv(outDir+"/"+baseName+".chim"+end+".csv",index=False)
         # drop duplicated reads - preserve first occurence
         dataLocal.drop_duplicates(inplace=True)
-        print("filter overlap combine local")
-        dataLocalHC=filterOverlapCombine(dataLocal,minLenHC_HUM,minLenHC_HIV)
-        dataLocalLC=filterOverlapCombine(dataLocal,minLenLC_HUM,minLenLC_HIV)
         print("find support local")
-        dataPosLocal=findSupport(dataLocalHC,dataLocalLC)
+        dataPosLocal=findSupport(dataLocal,minLenList)
 
         print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
+            print("if not len(dataFullHUM)==0")
             dataFull=pd.DataFrame(dataFullHIV["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
@@ -609,50 +699,18 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
             print("filter overlap combine full")
-            dataFullHC=filterOverlapCombine(dataFull,minLenHC_HUM,minLenHC_HIV)
-            dataFullLC=filterOverlapCombine(dataFull,minLenLC_HUM,minLenLC_HIV)
             print("find support full")
-            dataPosFull=findSupport(dataFullHC,dataFullLC)
-            setLocalPos=set(dataPosLocal["comb"])
-            setFullPos=set(dataPosFull["comb"])
-            intersect=setFullPos.intersection(setLocalPos)
-            diff=setFullPos.symmetric_difference(setLocalPos)
-            if len(intersect)>0:
-                for el in intersect:
-                    # new set of high confidence/support reads
-                    l1HC=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsHC"])[0])
-                    l2HC=set(list(dataPosFull[dataPosFull["comb"]==el]["readsHC"])[0])
-                    setHC=l1HC.union(l2HC)
-                    #new set of low confidence/support reads
-                    l1LC=set(list(dataPosLocal[dataPosLocal["comb"]==el]["readsLC"])[0])
-                    l2LC=set(list(dataPosFull[dataPosFull["comb"]==el]["readsLC"])[0])
-                    setLC=l1LC.union(l2LC)
-                    df2 = pd.DataFrame([[el,
-                                        len(setHC),
-                                        ";".join(list(setHC)),
-                                        len(setLC),
-                                        ";".join(list(setLC)),
-                                        dataPosLocal[dataPosLocal["comb"]==el]["orient"].iloc[0],
-                                        10,
-                                        dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],
-                                        dataPosLocal[dataPosLocal["comb"]==el]["split"].iloc[0],
-                                        dataPosLocal[dataPosLocal["comb"]==el]["R"].iloc[0]]],columns=['comb','countHC','readsHC','countLC','readsLC','orient','prim','chr','split','R'])
-                    data=data.append(df2)
+            dataPosFull=findSupport(dataFull,minLenList)
 
-                data=data.reset_index(drop=True)
-            dataLocalPosDiff=dataPosLocal[(dataPosLocal['comb'].isin(diff))]
-            if len(dataLocalPosDiff)>0:
-                dataLocalPosDiff["readsHC"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
-                dataLocalPosDiff["readsLC"]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
-            dataLocalPosDiff["prim"]=1
-            dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
-            if len(dataFullPosDiff)>0:
-                dataFullPosDiff["readsHC"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
-                dataFullPosDiff["readsLC"]=dataFullPosDiff.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
-            dataFullPosDiff["prim"]=0
-            data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
-            data.reset_index(drop=True)
-            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            data=combineLocalFull(dataPosLocal,dataPosFull,minLenList)
+            print("697 save")
+
+            colList=[]
+            for minLen in minLenList:
+                colList=colList+["count_"+str(minLen)]
+            data['totalCount']=data[colList].sum(axis=1).astype(int)
+
+            data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -668,13 +726,21 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
         else:
+            print("714>>>else:")
             if len(dataPosLocal)>0:
-                dataPosLocal["readsHC"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
-                dataPosLocal["readsLC"]=dataPosLocal.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
+                for minLen in minLenList:
+                    dataPosLocal["reads_"+str(minLen)]=dataPosLocal.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
             data.reset_index(drop=True)
-            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            print("721 save")
+
+            colList=[]
+            for minLen in minLenList:
+                colList=colList+["count_"+str(minLen)]
+            data['totalCount']=data[colList].sum(axis=1).astype(int)
+
+            data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
@@ -689,6 +755,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
+        print("695>>>if len(dataLocalHIV)==0 and len(dataFullHIV)>0")
         # extract flag information
         print("extract flags full")
         extractFlagBits(dataFullHIV)
@@ -701,6 +768,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
         print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
+            print("750>>>if not len(dataFullHUM)==0")
             # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
             # dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
             #calculate the percent aligned (num bp aligned/total read length bp)
@@ -725,18 +793,23 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
             print("filter overlap combine full")
-            dataFullHC=filterOverlapCombine(dataFull,minLenHC_HUM,minLenHC_HIV)
-            dataFullLC=filterOverlapCombine(dataFull,minLenLC_HUM,minLenLC_HIV)
             print("find support full")
-            dataPosFull=findSupport(dataFullHC,dataFullLC)
+            dataPosFull=findSupport(dataFull,minLenList)
 
             if len(dataPosFull)>0:
-                dataPosFull["readsHC"]=dataPosFull.apply(lambda row: ";".join(list(row['readsHC'])),axis=1)
-                dataPosFull["readsLC"]=dataPosFull.apply(lambda row: ";".join(list(row['readsLC'])),axis=1)
+                for minLen in minLenList:
+                    dataPosFull["reads_"+str(minLen)]=dataPosFull.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
             dataPosFull["prim"]=0
             data=pd.concat([data,dataPosFull])
             data.reset_index(drop=True)
-            data.drop(["count","reads","split","chr"],axis=1).sort_values(by='countHC',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            print("784 save")
+
+            colList=[]
+            for minLen in minLenList:
+                colList=colList+["count_"+str(minLen)]
+            data['totalCount']=data[colList].sum(axis=1).astype(int)
+
+            data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
@@ -751,11 +824,17 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
     return 1
 
+# 1. add HIV strain information along the chromosome to the comb column of the final dataframe
+# 2. group by the splice site
+# 3. incorporate splice site information gathering into the main script instead of running perl separately
+# 4. currently novel sites with lower minLen of alignment are discarded/not included as part of the final dataframe
+#       need to be included and higher minLen where absent needs to be approprietaly marked as such
+# 5. have a logger ready for the following tasks:
+#       - log which minLen values were discarded
+#       - log general stats
+
 def main(args):
-    minLenHC_HUM=int(args.minLen1.split(":")[0])
-    minLenLC_HUM=int(args.minLen1.split(":")[1])
-    minLenHC_HIV=int(args.minLen2.split(":")[0])
-    minLenLC_HIV=int(args.minLen2.split(":")[1])
+    print(args.minLen)
     end=""
     if args.end==True:
         end='.no_dup'
@@ -766,12 +845,12 @@ def main(args):
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
-        if baseName not in ['218_pos_1_S13','218_pos_3_S15']:
+        if baseName not in ['218_neg_1_S17','154_neg_3_S10']:
             print("Analyzing: ",baseName)
             if args.shell==True:
                 print("Running main shell script")
                 os.system(scriptCMD)
-            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,minLenHC_HUM,minLenLC_HUM,minLenHC_HIV,minLenLC_HIV,end)
+            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end)
 
     os.system("./add.sh "+os.path.abspath(args.out))
     paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
