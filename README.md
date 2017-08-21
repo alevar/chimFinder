@@ -20,3 +20,10 @@
 
 ## Distant Future:
 1. build an efficient standalone computational tool to replace this pipeline. Given two different references the tool will identify integration sites.
+
+## Proper project:
+1. build some form of a graph datastructure
+2. similar to how it is implemented in centrifuge remove low complexity - also similar to dusting
+3. look at bedtools and how they implement set intersection
+4. one part of the application should accept two alignments and produce a sam/bam output for the reads which are in both alignments
+5. another part can take annotations and add that information to the output
