@@ -597,7 +597,7 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
         colList=['comb']
         for minLen in minLens:
             colList=colList+["count_"+str(minLen),"reads_"+str(minLen)]
-        colList=colList+['orient','prim','chr','split','R']
+        colList=colList+['orient','prim','chr','split','R','spanR1-R2','spanCount']
         return colList
     
     #the first thing to do is to add any missing reads and counts column and populate them with blank {} and 0 respectively
@@ -630,33 +630,45 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
     diff=setFullPos.symmetric_difference(setLocalPos)
 
     if len(intersect)>0:
-        print("if len(intersect)>0")
         for el in intersect:
             df2=pd.DataFrame([],columns=colList)
-            df2[['comb','orient','prim','chr','split','R']]=[el,
+            l1=set(list(dataPosLocal[dataPosLocal['comb']==el]['spanR1-R2'])[0])
+            l2=set(list(dataPosFull[dataPosFull['comb']==el]['spanR1-R2'])[0])
+            setL=l1.union(l2)
+            df2[['comb','orient','prim','chr','split','R','spanR1-R2','spanCount']]=[el,
                                                             dataPosLocal[dataPosLocal["comb"]==el]["orient"].iloc[0],
                                                             10,
                                                             dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],
                                                             dataPosLocal[dataPosLocal["comb"]==el]["split"].iloc[0],
-                                                            dataPosLocal[dataPosLocal["comb"]==el]["R"].iloc[0]]
+                                                            dataPosLocal[dataPosLocal["comb"]==el]["R"].iloc[0],
+                                                            ";".join(list(setL)),
+                                                            len(setL)]
+            #first combine and sum all the reads and count columns
             for minLen in minLens:
                 l1=set(list(dataPosLocal[dataPosLocal['comb']==el]['reads_'+str(minLen)])[0])
                 l2=set(list(dataPosFull[dataPosFull['comb']==el]['reads_'+str(minLen)])[0])
                 setL=l1.union(l2)
                 df2[['count_'+str(minLen),'reads_'+str(minLen)]]=[len(setL),";".join(list(setL))]
+                
+            #now we can combine anything in the span and spancount columns respectively
+            
+#             df2[['spanR1-R2','spanCount']]=[";".join(list(setL)),len(setL)]
 
             data=data.append(df2)
+            
         data=data.reset_index(drop=True)
 
     dataLocalPosDiff=dataPosLocal[(dataPosLocal['comb'].isin(diff))]
     if len(dataLocalPosDiff)>0:
         for minLen in minLens:
             dataLocalPosDiff["reads_"+str(minLen)]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+        dataLocalPosDiff['spanR1-R2']=dataLocalPosDiff.apply(lambda row: ";".join(list(row['spanR1-R2'])),axis=1)
     dataLocalPosDiff["prim"]=1
     dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
     if len(dataFullPosDiff)>0:
         for minLen in minLens:
             dataFullPosDiff["reads_"+str(minLen)]=dataFullPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+        dataFullPosDiff['spanR1-R2']=dataFullPosDiff.apply(lambda row: ";".join(list(row['spanR1-R2'])),axis=1)
     dataFullPosDiff["prim"]=0
     data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
     data.reset_index(drop=True)
@@ -682,25 +694,53 @@ def addSpan(row,dataSep):
         hivR='R2'
     if 'hiv:hum' in row['orient']:
         #&(dataSep[r+'HIV_RE']>row['HUM_RE'])&(dataSep[r+'HUM_RE']>row['HUM_RE'])
-        dataSpan=dataSep[dataSep['HIV'].str.contains(humR)]  #check that the hum alignment is on the same side
+        dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
-        dataSpan=dataSpan[dataSep[hivR+'HIV_RS']<row['HIV_RS']] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
-        dataSpan=dataSpan[dataSep[humR+'HUM_RE']>row['HUM_RE']] # check that the end of the hum is after the end of the hum in the grouped dataframe
+        dataSpan=dataSpan[(dataSpan[hivR+'HIV_RS']-row['HIV_RS']>-500)&(dataSpan[hivR+'HIV_RS']-row['HIV_RS']<0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
+        dataSpan=dataSpan[(dataSpan[humR+'HUM_RE']-row['HUM_RE']<500)&(dataSpan[humR+'HUM_RE']-row['HUM_RE']>0)] # check that the end of the hum is after the end of the hum in the grouped dataframe
 #         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
         if len(dataSpan)>0:
             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
     if 'hum:hiv' in row['orient']:
-        dataSpan=dataSep[dataSep['HIV'].str.contains(humR)]  #check that the hum alignment is on the same side
+        dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
-        dataSpan=dataSpan[dataSep[hivR+'HIV_RE']<row['HIV_RE']] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
-        dataSpan=dataSpan[dataSep[humR+'HUM_RS']>row['HUM_RS']] # check that the end of the hum is after the end of the hum in the grouped dataframe
+        dataSpan=dataSpan[(dataSpan[hivR+'HIV_RE']-row['HIV_RE']<500)&(dataSpan[hivR+'HIV_RE']-row['HIV_RE']>0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
+        dataSpan=dataSpan[(dataSpan[humR+'HUM_RS']-row['HUM_RS']>-500)&(dataSpan[humR+'HUM_RS']-row['HUM_RS']<0)] # check that the end of the hum is after the end of the hum in the grouped dataframe
 #         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
         if len(dataSpan)>0:
             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
 
-    return [0,0]
+    return [{''},0]
+
+# def addSpan(row,dataSep):
+#     dataSpan=pd.DataFrame([])
+#     humR=row['R']
+#     hivR='R1'
+#     if humR=='R1':
+#         hivR='R2'
+#     if 'hiv:hum' in row['orient']:
+#         #&(dataSep[r+'HIV_RE']>row['HUM_RE'])&(dataSep[r+'HUM_RE']>row['HUM_RE'])
+#         dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
+#         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
+#         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
+#         dataSpan=dataSpan[dataSep[hivR+'HIV_RS']<row['HIV_RS']] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
+#         dataSpan=dataSpan[dataSep[humR+'HUM_RE']>row['HUM_RE']] # check that the end of the hum is after the end of the hum in the grouped dataframe
+# #         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
+#         if len(dataSpan)>0:
+#             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
+#     if 'hum:hiv' in row['orient']:
+#         dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
+#         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
+#         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
+#         dataSpan=dataSpan[dataSep[hivR+'HIV_RE']>row['HIV_RE']] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
+#         dataSpan=dataSpan[dataSep[humR+'HUM_RS']<row['HUM_RS']] # check that the end of the hum is after the end of the hum in the grouped dataframe
+# #         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
+#         if len(dataSpan)>0:
+#             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
+
+#     return [{''},0]
 
 # this function will produce a dataframe with information grouped by the SpliceSites
 # those reads that do not contain a valid spliceSite shall be discarded
@@ -970,22 +1010,11 @@ def main(args):
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
-        if baseName not in ['154_neg_2_S9',
-                            '218_pos_3_S15',
-                            '154_neg_3_S10',
-                            '256_pos_1_S11',
-                            '154_pos_18_S6',
-                            '256_pos_2_S12',
-                            '154_pos_21_S7',
-                            '154_pos_7_S2',
-                            '348_pos_1_S20',
-                            '218_neg_1_S17',
-                            '218_pos_1_S13',
-                            '218_pos_2_S14']:
+        if baseName in ['154_pos_12_S4']:
             print("Analyzing: ",baseName)
             if args.shell==True:
                 print("Running main shell script")
-                os.system(scriptCMD)
+                # os.system(scriptCMD)
             resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
 
     #once the add.sh is replaced by the actual function - do one run with both included in order to

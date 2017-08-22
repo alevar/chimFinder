@@ -27,3 +27,9 @@
 3. look at bedtools and how they implement set intersection
 4. one part of the application should accept two alignments and produce a sam/bam output for the reads which are in both alignments
 5. another part can take annotations and add that information to the output
+
+## I need to compare the resequencing runs to the originals in terms of the following parameters (produce plots):
+1. kraken HIV
+2. kraken HUM
+3. Bowtie full hiv
+4. bowtie full hum
