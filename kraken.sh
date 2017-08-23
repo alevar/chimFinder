@@ -49,7 +49,7 @@ echo DONE IN ${DUR}
 TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 SECONDS=0
-align with bowtie2 to hg38
+# align with bowtie2 to hg38
 echo ALIGNING TO HG38
 bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.chim.hum.sam
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"

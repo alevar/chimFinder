@@ -119,18 +119,19 @@ def getChimericBowtie(baseName,outDir):
     return chimericBowtie
 
 def main(args):
-    data=pd.DataFrame([],columns=["sample",
-                                  "krakenHiv%",
-                                  "krakenHum%",
-                                  "chimericReadsExtracted",
-                                  "chimericReadsFiltered",
-                                  "bowtie2HIV",
-                                  "bowtie2HUM",
+    data=pd.DataFrame([],columns=["sample",#
+                                  "krakenHiv%",#
+                                  "krakenHum%",#
+                                  "chimericReadsExtracted",#
+                                  "chimericReadsFiltered",#
+                                  "numBowtieHivFull",#
+                                  "numBowtieHivLocal",#
+                                  "numBowtieHumFull",#
+                                  "numBowtieHumLocal",#
                                   "chimericBowtie",
-                                  "numSplits",
-                                  "numReads",
-                                  "numSpliceJunctionsHIV",
-                                  "totalNumberReads"])
+                                  "numSplits",#
+                                  "numReads",#
+                                  "numSpliceJunctionsHIV"])
     for fileN in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(fileN)
         fileName=fullPath.split('/')[-1]
@@ -151,17 +152,17 @@ def main(args):
                                   "numSplits",#
                                   "numReads",#
                                   "numSpliceJunctionsHIV"])
-        row['sample']=baseName
-        row[['krakenHiv%','krakenHum%']]=getKrakenP(baseName,args.out)
-        row['chimericReadsExtracted']=getNumChimericExtracted(baseName,args.out)
-        row['chimericReadsFiltered']=getPostFiltKraken(baseName,args.out)
-        row['numBowtieHivFull']=getBowtieReadsHivFull(baseName,args.out)
-        row['numBowtieHivLocal']=getBowtieReadsHivLocal(baseName,args.out)
-        row['numBowtieHumFull']=getBowtieReadsHumFull(baseName,args.out)
-        row['numBowtieHumLocal']=getBowtieReadsHumLocal(baseName,args.out)
-        row['chimericBowtie']=getChimericBowtie(baseName,args.out)
-        row[["numSplits","numReads"]]=getFromPos(baseName,args.out)
+        row['sample']=[baseName]
+        row[['krakenHiv%','krakenHum%']]=[getKrakenP(baseName,args.out)]
+        row['chimericReadsExtracted']=[getNumChimericExtracted(baseName,args.out)]
+        row['chimericReadsFiltered']=[getPostFiltKraken(baseName,args.out)]
+        row['numBowtieHivFull']=[getBowtieReadsHivFull(baseName,args.out)]
+        row['numBowtieHivLocal']=[getBowtieReadsHivLocal(baseName,args.out)]
+        row['numBowtieHumFull']=[getBowtieReadsHumFull(baseName,args.out)]
+        row['numBowtieHumLocal']=[getBowtieReadsHumLocal(baseName,args.out)]
+        row['chimericBowtie']=[getChimericBowtie(baseName,args.out)]
+        row[["numSplits","numReads"]]=[getFromPos(baseName,args.out)]
         row['numSpliceJunctionsHIV']=0 #none detected since no consensus sequence is built properly from the multiple reference files
         data=pd.concat([data,row])
 
-    data.to_csv(os.path.abspath(args.outDir)+'/sampleSummary.csv')
+    data.to_csv(os.path.abspath(args.out)+'/sampleSummary.csv')

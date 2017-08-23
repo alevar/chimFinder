@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import numba
 import os
+import subprocess
 import signal
 import multiprocessing
 import shutil
@@ -716,34 +717,6 @@ def addSpan(row,dataSep):
 
     return [{''},0]
 
-# def addSpan(row,dataSep):
-#     dataSpan=pd.DataFrame([])
-#     humR=row['R']
-#     hivR='R1'
-#     if humR=='R1':
-#         hivR='R2'
-#     if 'hiv:hum' in row['orient']:
-#         #&(dataSep[r+'HIV_RE']>row['HUM_RE'])&(dataSep[r+'HUM_RE']>row['HUM_RE'])
-#         dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
-#         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
-#         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
-#         dataSpan=dataSpan[dataSep[hivR+'HIV_RS']<row['HIV_RS']] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
-#         dataSpan=dataSpan[dataSep[humR+'HUM_RE']>row['HUM_RE']] # check that the end of the hum is after the end of the hum in the grouped dataframe
-# #         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
-#         if len(dataSpan)>0:
-#             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
-#     if 'hum:hiv' in row['orient']:
-#         dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
-#         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
-#         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
-#         dataSpan=dataSpan[dataSep[hivR+'HIV_RE']>row['HIV_RE']] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
-#         dataSpan=dataSpan[dataSep[humR+'HUM_RS']<row['HUM_RS']] # check that the end of the hum is after the end of the hum in the grouped dataframe
-# #         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
-#         if len(dataSpan)>0:
-#             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
-
-#     return [{''},0]
-
 # this function will produce a dataframe with information grouped by the SpliceSites
 # those reads that do not contain a valid spliceSite shall be discarded
 def groupBySpliceSites(data):
@@ -751,8 +724,36 @@ def groupBySpliceSites(data):
 
 # this function is to replace the add.sh script
 def addAnnotation(row,baseName,outDir):
+    #need to add joint reads column to each dataframe which will contain all reads from reads_40 ..30..etc and spanReads
+    #then can use this column below to find the first read (first read must always be with the greatest available minLen)
 
-    return 1
+    firstRead=row['allReads'].split(';')[0]
+    hum_nearest_5SS='-'
+    hum_nearest_3SS='-'
+    if row['prim']==0 or row['prim']==10:
+        if row['R']=='R1':
+            SS5_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".full.txt"+" | awk -F '\t' '{print $4}'"
+            hum_nearest_5SS=subprocess.check_output(SS5_CMD,shell=True)
+            SS3_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".full.txt"+" | awk -F '\t' '{print $5}'"
+            hum_nearest_3SS=subprocess.check_output(SS3_CMD,shell=True)
+        else:
+            SS5_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".full.txt"+" | awk -F '\t' '{print $9}'"
+            hum_nearest_5SS=subprocess.check_output(SS5_CMD,shell=True)
+            SS3_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".full.txt"+" | awk -F '\t' '{print $10}'"
+            hum_nearest_3SS=subprocess.check_output(SS3_CMD,shell=True)
+    else:
+        if row['R']=='R1':
+            SS5_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".chim.txt"+" | awk -F '\t' '{print $4}'"
+            hum_nearest_5SS=subprocess.check_output(SS5_CMD,shell=True)
+            SS3_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".chim.txt"+" | awk -F '\t' '{print $5}'"
+            hum_nearest_3SS=subprocess.check_output(SS3_CMD,shell=True)
+        else:
+            SS5_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".chim.txt"+" | awk -F '\t' '{print $9}'"
+            hum_nearest_5SS=subprocess.check_output(SS5_CMD,shell=True)
+            SS3_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+".chim.txt"+" | awk -F '\t' '{print $10}'"
+            hum_nearest_3SS=subprocess.check_output(SS3_CMD,shell=True)
+
+    return [hum_nearest_5SS,hum_nearest_3SS]
 
 def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     print(">>>>>>>>>>>>>   Begin analyses")
@@ -860,6 +861,22 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             data['totalCount']=data[colList].sum(axis=1).astype(int)
 
             data['totalCount']=data['totalCount']+data['spanCount']
+            
+            #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
+            def joinReads(row,colList):
+                colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
+                reads=[]
+                for col in colList:
+                    if not pd.isnull(row[col]):
+                        reads.append(row[col])
+                return ';'.join(reads)
+
+            colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
+            colList.sort(reverse=True)
+            data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
+
+            #Now add the nearest human splice site for each chimeric position
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
             data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
@@ -891,6 +908,22 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             data['totalCount']=data[colList].sum(axis=1).astype(int)
 
             data['totalCount']=data['totalCount']+data['spanCount']
+            
+            #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
+            def joinReads(row,colList):
+                colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
+                reads=[]
+                for col in colList:
+                    if not pd.isnull(row[col]):
+                        reads.append(row[col])
+                return ';'.join(reads)
+
+            colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
+            colList.sort(reverse=True)
+            data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
+
+            #Now add the nearest human splice site for each chimeric position
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
             data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -968,6 +1001,22 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             # os.system(bedCMD)
 
             data['totalCount']=data['totalCount']+data['spanCount']
+
+            #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
+            def joinReads(row,colList):
+                colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
+                reads=[]
+                for col in colList:
+                    if not pd.isnull(row[col]):
+                        reads.append(row[col])
+                return ';'.join(reads)
+
+            colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
+            colList.sort(reverse=True)
+            data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
+
+            #Now add the nearest human splice site for each chimeric position
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
             data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -982,7 +1031,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
     
-    data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
     return 1
 
 #this function is responsible for identifying the relevant annotation line from the bedtoold intersect output for each position in the dataPos
@@ -1013,28 +1061,49 @@ def findAnnotation(row,intersection):
 #       - create a new column in the dataPos for R1-R2 support
 #       - add read names from the subset DataFrame to this new column in case the split position happens to be somewhere within the region spanned by the R1-R2 split
 
+def testT(outDir,baseName,dirPath,fileName,minLenList,end,args):
+    data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
+    #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
+    def joinReads(row,colList):
+        colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
+        reads=[]
+        for col in colList:
+            if not pd.isnull(row[col]):
+                reads.append(row[col])
+        return ';'.join(reads)
+
+    colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
+    colList.sort(reverse=True)
+    data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
+
+    #Now add the nearest human splice site for each chimeric position
+    data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+    data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+
 def main(args):
     print(args.minLen)
     end=""
     if args.end==True:
         end='.no_dup'
 
-    test=False
+    test=True
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
-        if not baseName=='348_pos_1_S14' and not test:
-            test=False
-        else:
-            test=True
+        # if not baseName=='348_pos_1_S14' and not test:
+        #     test=False
+        # else:
+        #     test=True
         if test:
             print("Analyzing: ",baseName)
             if args.shell==True:
                 print("Running main shell script")
-                # os.system(scriptCMD)
+                os.system(scriptCMD)
+            # if os.path.exists(os.path.abspath(os.path.abspath(args.out)+"/"+baseName+"_Pos"+end+".csv")):
+                # testT(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
             resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
 
     #once the add.sh is replaced by the actual function - do one run with both included in order to
@@ -1043,9 +1112,10 @@ def main(args):
     #1. check if anything that is identified in the add.sh column is also present in the same way in the custom column
     #2. if any differences are observed - check why - likely a mistake
     #3. then check for any which are identified by the custom method but not by the add.sh
-    os.system("./add.sh "+os.path.abspath(args.out),args.minLen)
-    paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
-    allSamples(args.out,paths,end)
+    
+    # os.system("./add.sh "+os.path.abspath(args.out),args.minLen)
+    # paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
+    # allSamples(args.out,paths,end)
 
-    scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
-    os.system(scriptCMD)
+    # scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
+    # os.system(scriptCMD)
