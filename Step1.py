@@ -552,10 +552,12 @@ def allSamples(out,paths,end):
             dfT["patientName"]=patient
             dfT["sampleName"]=sampleFile.split("/")[-1].split(".")[0]
             data=pd.concat([data,dfT])
-    data=data.reset_index(drop=True).drop(["readsHC","readsLC"],axis=1)
+    dropList=[x for x in list(data) if 'reads' in x]
+    data=data.reset_index(drop=True).drop(dropList,axis=1)
     data.replace(np.nan,"",inplace=True)
-    data["count"]=data["countLC"]+data["countHC"]
-    data=data.drop(["countHC","countLC"],axis=1)
+    dropList=[x for x in list(data) if 'count' in x]
+    data["count"]=data["totalCount"]
+    data=data.drop(dropList,axis=1)
 
     aggregations = {
         'count': {
@@ -747,6 +749,11 @@ def addSpan(row,dataSep):
 def groupBySpliceSites(data):
     pass
 
+# this function is to replace the add.sh script
+def addAnnotation(row,baseName,outDir):
+
+    return 1
+
 def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     print(">>>>>>>>>>>>>   Begin analyses")
     # load data from local alignments
@@ -813,7 +820,8 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
         dataLocal.drop_duplicates(inplace=True)
         print("find support local")
         dataPosLocal=findSupport(dataLocal,minLenList)
-        dataPosLocal[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosLocal.apply(lambda row: addSpan(row,dataLocal[dataLocal['HIV'].str.contains('sep')]),axis=1)])
+        if len(dataPosLocal)>0:
+            dataPosLocal[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosLocal.apply(lambda row: addSpan(row,dataLocal[dataLocal['HIV'].str.contains('sep')]),axis=1)])
 
         print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
@@ -840,7 +848,8 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             print("filter overlap combine full")
             print("find support full")
             dataPosFull=findSupport(dataFull,minLenList)
-            dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
+            if len(dataPosFull)>0:
+                dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
 
             data=combineLocalFull(dataPosLocal,dataPosFull,minLenList)
             print("697 save")
@@ -850,6 +859,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
                 colList=colList+["count_"+str(minLen)]
             data['totalCount']=data[colList].sum(axis=1).astype(int)
 
+            data['totalCount']=data['totalCount']+data['spanCount']
             data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
@@ -880,6 +890,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
                 colList=colList+["count_"+str(minLen)]
             data['totalCount']=data[colList].sum(axis=1).astype(int)
 
+            data['totalCount']=data['totalCount']+data['spanCount']
             data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -935,7 +946,8 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             print("filter overlap combine full")
             print("find support full")
             dataPosFull=findSupport(dataFull,minLenList)
-            dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
+            if len(dataPosFull)>0:
+                dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
 
             if len(dataPosFull)>0:
                 for minLen in minLenList:
@@ -952,9 +964,10 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
 
             #save the bed file of the positions
             data[['chr','HUM_RS','HUM_RE']].to_csv(outDir+"/beds/"+baseName+".bed",sep='\t',header=False,index=False)
-            bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
-            os.system(bedCMD)
+            # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
+            # os.system(bedCMD)
 
+            data['totalCount']=data['totalCount']+data['spanCount']
             data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -968,6 +981,8 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+end+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
             #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+    
+    data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
     return 1
 
 #this function is responsible for identifying the relevant annotation line from the bedtoold intersect output for each position in the dataPos
@@ -1004,13 +1019,18 @@ def main(args):
     if args.end==True:
         end='.no_dup'
 
+    test=False
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
-        if baseName in ['154_pos_12_S4']:
+        if not baseName=='348_pos_1_S14' and not test:
+            test=False
+        else:
+            test=True
+        if test:
             print("Analyzing: ",baseName)
             if args.shell==True:
                 print("Running main shell script")
@@ -1023,7 +1043,7 @@ def main(args):
     #1. check if anything that is identified in the add.sh column is also present in the same way in the custom column
     #2. if any differences are observed - check why - likely a mistake
     #3. then check for any which are identified by the custom method but not by the add.sh
-    os.system("./add.sh "+os.path.abspath(args.out))
+    os.system("./add.sh "+os.path.abspath(args.out),args.minLen)
     paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
     allSamples(args.out,paths,end)
 

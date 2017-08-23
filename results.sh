@@ -36,6 +36,13 @@ for file in ${outDir}/krakenOut/*.report ; do
     numReads="0"
     numSpliceJunctionsHIV="0"
 
+    name1="totalCount"
+    # totalCountT="$(awk -v totalCountN=${name1} -F ',' '{
+    #           for(i=1;i<=NF;i++) {
+    #             if($i == totalCountN)
+    #               printf(i)
+    #           } exit 0 }' ${file})"
+
     sampleBase=$(basename ${file})
     sample="${sampleBase%.*}"
 
@@ -56,7 +63,13 @@ for file in ${outDir}/krakenOut/*.report ; do
         echo "1.numSplits"
         numSplits="$(wc -l ${outDir}/${sample}_Pos.csv | awk -F ' ' '{print $1}')"
         echo "1.numReads"
-        numReads="$(awk -F ',' '{sum += $5} END {print sum}' ${outDir}/${sample}_Pos.csv)"
+        # numReads="$(awk -F ',' '{sum += $5} END {print sum}' ${outDir}/${sample}_Pos.csv)"
+        numReads="$(awk -v totalCountN=${name1} -F ',' '{
+              for(i=1;i<=NF;i++) {
+                if($i == totalCountN)
+                  printf(i)
+              } exit 0 }'
+              '{sum +=$primIdx} END {print sum}' ${outDir}/${sample}_Pos.csv)"
         echo "${numReads}"
         if [ -f ${outDir}/fullAlignments/${sample}.full.hiv.csv ] && [ "$(wc -l ${outDir}/fullAlignments/${sample}.full.hiv.csv | awk -F ' ' '{print $1}')" > 0 ]; then
             echo "1.1.bowtieHIV"
@@ -104,7 +117,8 @@ for file in ${outDir}/krakenOut/*.report ; do
                 echo "2.1.1.numSplits"
                 numSplits="$(wc -l ${outDir}/${sample}_Pos.csv | awk -F ' ' '{print $1}')"
                 echo "2.1.1.numreads"
-                numReads="$(awk -F ',' '{sum += $5} END {print sum}' ${outDir}/${sample}_Pos.csv)"
+                # numReads="$(awk -F ',' '{sum += $5} END {print sum}' ${outDir}/${sample}_Pos.csv)"
+                numReads="$(awk -v primIdx=${totalCountT} -F ',' '{sum +=$primIdx} END {print sum}' ${outDir}/${sample}_Pos.csv)"
             else
                 echo "2.1.2.chimericBowtie=0"
                 chimericBowtie="0"

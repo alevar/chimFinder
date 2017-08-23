@@ -4,6 +4,7 @@ import sys
 import argparse
 import Step1
 import Step2
+import Step3
 
 def hiv(argv):
 
@@ -113,6 +114,25 @@ def hiv(argv):
                               default=50,
                               help="minimum length of contig to consider")
     parser_step2.set_defaults(func=Step2.main)
+
+#========================================
+#==================STEP3=================
+#========================================
+
+    parser_step3 = subparsers.add_parser('step3',
+                                help='step3 help')
+    parser_step3.add_argument('-i',
+                                '--input',
+                                required=True,
+                                type=str,
+                                help="path to the fastq.gz files")
+    parser_step3.add_argument('-o',
+                                '--out',
+                                required=False,
+                                default="./out",
+                                type=str,
+                                help="path to the output directory")
+    parser_step3.set_defaults(func=Step3.main)
 
     args=parser.parse_args()
     args.func(args)
