@@ -415,6 +415,36 @@ def filterOverlapCombine(data,minLen):
     # data["overlap"]=data.apply(lambda row: 0-row["ins"] if row["overlap"]==0 else row["overlap"],axis=1)
     return df
 
+def addSpan(data,dataPos):
+    def testR1(row,dataHIV):
+        dataHIVR1=dataHIV[(dataHIV['R1HIV_RS']-row['HIV_RS']>-500)&(dataHIV['R1HIV_RS']-row['HIV_RS']<0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
+        dataHIVR1=dataHIVR1[(dataHIVR1['R2HUM_RE']-row['HUM_RE']<500)&(dataHIVR1['R2HUM_RE']-row['HUM_RE']>0)]
+        if len(dataHIVR1)>0:
+            return [set(dataHIVR1["QNAME"]),len(dataHIVR1)] # return set of reads and count of reads
+        return [{''},0]
+    def testR2(row,dataHIV):
+        dataHIVR2=dataHIV[(dataHIV['R2HIV_RE']-row['HIV_RE']<500)&(dataHIV['R2HIV_RE']-row['HIV_RE']>0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
+        dataHIVR2=dataHIVR2[(dataHIVR2['R1HUM_RS']-row['HUM_RS']>-500)&(dataHIVR2['R1HUM_RS']-row['HUM_RS']<0)]
+        if len(dataHIVR2)>0:
+            return [set(dataHIVR2["QNAME"]),len(dataHIVR2)] # return set of reads and count of reads
+        return [{''},0]
+
+    dataHIVR1=data[data['HIV'].str.contains('sepR2:1')]
+    dataHIVR1=dataHIVR1[~(dataHIVR1['R1HIV_ID']==0)] # check that the hiv is on the same side
+    dataPosR1=dataPos[dataPos['orient'].str.contains('hiv:hum')]
+    if len(dataPosR1)>0:
+        dataPosR1[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosR1.apply(lambda row: testR1(row,dataHIVR1),axis=1)])
+
+    dataHIVR2=data[data['HIV'].str.contains('sepR1:2')]
+    dataHIVR2=dataHIVR2[~(dataHIVR2['R2HIV_ID']==0)] # check that the hiv is on the same side
+    dataPosR2=dataPos[dataPos['orient'].str.contains('hum:hiv')]
+    if len(dataPosR2)>0:
+        dataPosR2[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosR2.apply(lambda row: testR2(row,dataHIVR2),axis=1)])
+
+    frames=[dataPosR1,dataPosR2]
+    df=pd.concat(frames).reset_index(drop=True)
+    return df
+
 def findSupport(dataOrig, minLenList):
     minLenList_tmp=list(minLenList)
     # this function should do the following:
@@ -432,10 +462,11 @@ def findSupport(dataOrig, minLenList):
         minLen=minLenList_tmp.pop(0)
         data=filterOverlapCombine(dataOrig,minLen)
     dataPos=pd.DataFrame([])
-
+    
     aggregations={
         'QNAME':{
-            'count_'+str(minLen):'count'
+            'count_'+str(minLen):'count',
+            'reads_'+str(minLen): lambda x: set(x)
         },
         'HUM_RS':{
             'HUM_RS':'min'
@@ -454,53 +485,62 @@ def findSupport(dataOrig, minLenList):
     dataPos=pd.DataFrame(data.groupby(by=["comb","split","HUM_ID","R","orient"])[["QNAME","HUM_RS","HUM_RE","HIV_RS","HIV_RE"]].agg(aggregations)).reset_index()
     dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)
     if not len(dataPos)==0:
-        dataPos["reads_"+str(minLen)]=dataPos.apply(lambda row: set(list(data[(data["comb"]==row["comb"])&(data["HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
+        dataPos['allReads']=dataPos['reads_'+str(minLen)]
+        
+        pastMinLen=minLen
         pastMinLens=[minLen]
+        
         for minLen in minLenList_tmp:
-            data=filterOverlapCombine(dataOrig,minLen)
-
-            def getPreviousReadNames(data,row,pastLens):
-                pastReads=[]
-                for pastMinLen in pastLens:
-                    pastReads=pastReads+list(row['reads_'+str(pastMinLen)])
-
-                return(set(list(data[(data["comb"]==row["comb"])&(data["HUM_ID"]==row["chr"])]["QNAME"]))-set(pastReads))
-
-            dataPos["reads_"+str(minLen)]=dataPos.apply(lambda row: getPreviousReadNames(data,row,pastMinLens),axis=1)
-            dataPos["count_"+str(minLen)]=dataPos["reads_"+str(minLen)].str.len()
-            
-            # if the data at lower minLens contains some splices which are not contained in the dataPos
-            # already the current version discards them. However, the new algorithm should account for
-            # them as well and append them to the dataframe and mark higher minLens as empty
-            setCombCurr=set(list(dataPos['comb']))
-            dataDiffPos=pd.DataFrame([])
-            if len(dataDiffPos)>0:
-                aggregations={
-                    'QNAME':{
-                        'count_'+str(minLen):'count'
-                    },
-                    'HUM_RS':{
-                        'HUM_RS':'min'
-                    },
-                    'HUM_RE':{
-                        'HUM_RE':'max'
-                    },
-                    'HIV_RS':{
-                        'HIV_RS':'min'
-                    },
-                    'HIV_RE':{
-                        'HIV_RE':'max'
-                    }
+            aggregations={
+                'QNAME':{
+                    'count_'+str(minLen):'count',
+                    'reads_'+str(minLen): lambda x: set(x)
+                },
+                'HUM_RS':{
+                    'HUM_RS':'min'
+                },
+                'HUM_RE':{
+                    'HUM_RE':'max'
+                },
+                'HIV_RS':{
+                    'HIV_RS':'min'
+                },
+                'HIV_RE':{
+                    'HIV_RE':'max'
                 }
-
-                dataDiffPos=pd.DataFrame(dataDiff.groupby(by=["comb","split","HUM_ID","R","orient"])[["QNAME","HUM_RS","HUM_RE","HIV_RS","HIV_RE"]].agg(aggregations)).reset_index()
-                dataDiffPos.rename(columns={'HUM_ID':'chr'}, inplace=True)
-                for pastLen in pastMinLens:
-                    dataDiffPos['reads_'+str(pastLen)]=''
-                    dataDiffPos['count_'+str(pastLen)]=0
-                dataDiffPos["reads_"+str(minLen)]=dataDiffPos.apply(lambda row: set(list(dataDiff[(dataDiff["comb"]==row["comb"])&(dataDiff["HUM_ID"]==row["chr"])]["QNAME"])),axis=1)
-                dataPos=pd.concat([dataPos,dataDiffPos])
+            }
+            
+            
+            data=filterOverlapCombine(dataOrig,minLen)
+            dataPosT=pd.DataFrame([])
+            dataPosT=pd.DataFrame(data.groupby(by=["comb","split","HUM_ID","R","orient"])[["QNAME","HUM_RS","HUM_RE","HIV_RS","HIV_RE"]].agg(aggregations)).reset_index()
+            dataPosT.rename(columns={'HUM_ID':'chr'}, inplace=True)
+            dataPosT['allReads']=dataPosT['reads_'+str(minLen)]
+            dataPos=pd.merge(left=dataPos,right=dataPosT, how='right', on=["comb",
+                                                                          "split",
+                                                                          "chr",
+                                                                          "R",
+                                                                          "orient",
+                                                                          "HUM_RE",
+                                                                          "HIV_RS",
+                                                                          "HUM_RS",
+                                                                          "HIV_RE"],copy=True)
+            
+            dataPos.loc[dataPos['allReads_x'].isnull(),['allReads_x']]=dataPos.loc[dataPos['allReads_x'].isnull(),'allReads_x'].apply(lambda x: set())
+            dataPos['allReads']=pd.Series([set1.union(set2) for set1, set2 in zip(dataPos['allReads_x'], dataPos['allReads_y'])])
+            dataPos['tmp_reads_'+str(minLen)]=dataPos['reads_'+str(minLen)]-dataPos['allReads_x']
+            dataPos.drop('reads_'+str(minLen),axis=1,inplace=True)
+            dataPos.rename(columns={'tmp_reads_'+str(minLen):'reads_'+str(minLen)}, inplace=True)
+            dataPos.loc[dataPos['reads_'+str(pastMinLen)].isnull(),['reads_'+str(pastMinLen)]]=dataPos.loc[dataPos['reads_'+str(pastMinLen)].isnull(),'reads_'+str(pastMinLen)].apply(lambda x: set())
+            dataPos.loc[dataPos['count_'+str(pastMinLen)].isnull(),['count_'+str(pastMinLen)]]=dataPos.loc[dataPos['count_'+str(pastMinLen)].isnull(),'count_'+str(pastMinLen)].apply(lambda x: 0)
+            dataPos.drop(['allReads_x','allReads_y'],axis=1,inplace=True)
+            
+            pastMinLen=minLen
             pastMinLens.append(minLen)
+            
+        for pastMinLen in pastMinLens:
+            dataPos.loc[dataPos['reads_'+str(pastMinLen)].isnull(),['reads_'+str(pastMinLen)]]=dataPos.loc[dataPos['reads_'+str(pastMinLen)].isnull(),'reads_'+str(pastMinLen)].apply(lambda x: set())
+            dataPos.loc[dataPos['count_'+str(pastMinLen)].isnull(),['count_'+str(pastMinLen)]]=dataPos.loc[dataPos['count_'+str(pastMinLen)].isnull(),'count_'+str(pastMinLen)].apply(lambda x: 0)
             
     return dataPos
 
@@ -600,7 +640,7 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
         colList=['comb']
         for minLen in minLens:
             colList=colList+["count_"+str(minLen),"reads_"+str(minLen)]
-        colList=colList+['orient','prim','chr','split','R','spanR1-R2','spanCount']
+        colList=colList+['orient','prim','chr','split','R','spanR1-R2','allReads','spanCount']
         return colList
     
     #the first thing to do is to add any missing reads and counts column and populate them with blank {} and 0 respectively
@@ -634,28 +674,28 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
 
     if len(intersect)>0:
         for el in intersect:
-            df2=pd.DataFrame([],columns=colList)
+            df2=pd.DataFrame(0, index=np.arange(1), columns=colList)
             l1=set(list(dataPosLocal[dataPosLocal['comb']==el]['spanR1-R2'])[0])
             l2=set(list(dataPosFull[dataPosFull['comb']==el]['spanR1-R2'])[0])
             setL=l1.union(l2)
-            df2[['comb','orient','prim','chr','split','R','spanR1-R2','spanCount']]=[el,
+            l1a=set(list(dataPosLocal[dataPosLocal['comb']==el]['allReads'])[0])
+            l2a=set(list(dataPosFull[dataPosFull['comb']==el]['allReads'])[0])
+            setLa=l1a.union(l2a)
+            df2[['comb','orient','prim','chr','split','R','spanR1-R2','allReads','spanCount']]=[el,
                                                             dataPosLocal[dataPosLocal["comb"]==el]["orient"].iloc[0],
                                                             10,
                                                             dataPosLocal[dataPosLocal["comb"]==el]["chr"].iloc[0],
                                                             dataPosLocal[dataPosLocal["comb"]==el]["split"].iloc[0],
                                                             dataPosLocal[dataPosLocal["comb"]==el]["R"].iloc[0],
                                                             ";".join(list(setL)),
+                                                            ";".join(list(setLa)),
                                                             len(setL)]
-            #first combine and sum all the reads and count columns
+
             for minLen in minLens:
                 l1=set(list(dataPosLocal[dataPosLocal['comb']==el]['reads_'+str(minLen)])[0])
                 l2=set(list(dataPosFull[dataPosFull['comb']==el]['reads_'+str(minLen)])[0])
                 setL=l1.union(l2)
                 df2[['count_'+str(minLen),'reads_'+str(minLen)]]=[len(setL),";".join(list(setL))]
-                
-            #now we can combine anything in the span and spancount columns respectively
-            
-#             df2[['spanR1-R2','spanCount']]=[";".join(list(setL)),len(setL)]
 
             data=data.append(df2)
             
@@ -665,16 +705,33 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
     if len(dataLocalPosDiff)>0:
         for minLen in minLens:
             dataLocalPosDiff["reads_"+str(minLen)]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+            dataLocalPosDiff['count_'+str(minLen)]=dataLocalPosDiff['reads_'+str(minLen)].str.split(";").str.len()
+            dataLocalPosDiff.loc[(dataLocalPosDiff['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
         dataLocalPosDiff['spanR1-R2']=dataLocalPosDiff.apply(lambda row: ";".join(list(row['spanR1-R2'])),axis=1)
+        dataLocalPosDiff['allReads']=dataLocalPosDiff.apply(lambda row: ";".join(list(row['allReads'])),axis=1)
     dataLocalPosDiff["prim"]=1
     dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
     if len(dataFullPosDiff)>0:
         for minLen in minLens:
             dataFullPosDiff["reads_"+str(minLen)]=dataFullPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+            dataFullPosDiff['count_'+str(minLen)]=dataFullPosDiff['reads_'+str(minLen)].str.split(";").str.len()
+            dataFullPosDiff.loc[(dataFullPosDiff['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
         dataFullPosDiff['spanR1-R2']=dataFullPosDiff.apply(lambda row: ";".join(list(row['spanR1-R2'])),axis=1)
+        dataFullPosDiff['allReads']=dataFullPosDiff.apply(lambda row: ";".join(list(row['allReads'])),axis=1)
     dataFullPosDiff["prim"]=0
     data=pd.concat([data,dataLocalPosDiff,dataFullPosDiff])
     data.reset_index(drop=True)
+    
+    colList=[]
+    for minLen in minLens:
+        colList=colList+["count_"+str(minLen)]
+    data['totalCount']=data[colList].sum(axis=1)
+
+    data.replace("","-",inplace=True)
+    # for minLen in minLens:
+    #     data.replace({"reads_"+str(minLen): {set([]):"-"},
+    #                   "count_"+str(minLen): {set([]):0},
+    #                   "splitR1-R2": {set([]):'-'}} ,inplace=True)
     return data
 
 # after this step is done
@@ -689,7 +746,7 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
 #thus we are making the assumption that the references are roughly the same in terms of the positioning of genomic regions
 #however it would be best to add another note somewhere as to which particular gi number in the multiple reference the alignment belongs
 
-def addSpan(row,dataSep):
+def addSpanOld(row,dataSep):
     dataSpan=pd.DataFrame([])
     humR=row['R']
     hivR='R1'
@@ -720,7 +777,32 @@ def addSpan(row,dataSep):
 # this function will produce a dataframe with information grouped by the SpliceSites
 # those reads that do not contain a valid spliceSite shall be discarded
 def groupBySpliceSites(data):
-    pass
+    df=pd.read_csv('../../hiv/154_pos_12_S4_Pos.csv')
+    df.drop(['HIV_RE',
+             'HIV_RS',
+             'HUM_RE',
+             'HUM_RS',
+             'count_20',
+             'count_30',
+             'count_40',
+             'orient',
+             'prim',
+             'reads_20',
+             'reads_30',
+             'reads_40',
+             'spanCount',
+             'spanR1-R2'],axis=1,inplace=True)
+    aggregations={
+        'allReads':{
+            'groupsCount':'count',
+            'allReads': lambda x: set(x)
+        },
+        'totalCount':{
+            'allReads_count':'sum'
+        }
+    }
+    dfg=pd.DataFrame(df.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount"]].agg(aggregations)).reset_index()
+    dfg.sort_values(by='groupsCount',ascending=False)
 
 # this function is to replace the add.sh script
 def addAnnotation(row,baseName,outDir):
@@ -776,22 +858,17 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     data=pd.DataFrame([],columns=['comb','split','reads','count','orient','prim'])
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
-        print("if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0")
+        print('826')
         # extract flag information
-        print("begin extracting flags local")
         extractFlagBits(dataLocalHIV)
         extractFlagBits(dataLocalHUM)
-        print("begin extracting flags full")
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
         # extract start and end for both template and reference
-        print("begin extracting start end local")
         dataLocalHIV=extractStartEnd(dataLocalHIV)
         dataLocalHUM=extractStartEnd(dataLocalHUM)
-        print("begin extracting start end full")
         dataFullHIV=extractStartEnd(dataFullHIV)
         dataFullHUM=extractStartEnd(dataFullHUM)
-        print("filter reads local")
         dataLocalHUM,dataLocalHIV=filterReads(dataLocalHUM,dataLocalHIV)
         if len(dataLocalHUM)==0:
             return
@@ -804,80 +881,79 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
         dataLocal=pd.DataFrame(dataLocalHIV["QNAME"]).reset_index(drop=True)
         dataLocalHUM=dataLocalHUM.reset_index(drop=True)
         dataLocalHIV=dataLocalHIV.reset_index(drop=True)
-        print("create data local")
         dataLocal=createData(dataLocal,dataLocalHUM,dataLocalHIV)
         dataLocalHUM.to_csv(outDir+"/localAlignments/"+baseName+".chim.hum"+end+".csv",index=False)
         dataLocalHIV.to_csv(outDir+"/localAlignments/"+baseName+".chim.hiv"+end+".csv",index=False)
 
         dataLocal.replace('', np.nan,inplace=True)
         dataLocal.fillna(0,inplace=True)
-        print("overlap local")
         dataLocal["overlapR1"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR1(row),axis=1))
         dataLocal["overlapR2"]=pd.DataFrame(dataLocal.apply(lambda row: overlapR2(row),axis=1))
-        print("left right local")
         dataLocal["HIV"]=dataLocal.apply(lambda row: leftRight(row),axis=1)
         dataLocal.to_csv(outDir+"/"+baseName+".chim"+end+".csv",index=False)
         # drop duplicated reads - preserve first occurence
         dataLocal.drop_duplicates(inplace=True)
-        print("find support local")
         dataPosLocal=findSupport(dataLocal,minLenList)
         if len(dataPosLocal)>0:
-            dataPosLocal[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosLocal.apply(lambda row: addSpan(row,dataLocal[dataLocal['HIV'].str.contains('sep')]),axis=1)])
+            dataPosLocal=addSpan(dataLocal,dataPosLocal)
+            dataPosLocal.loc[dataPosLocal['spanCount'].isnull(),['spanCount']]=dataPosLocal.loc[dataPosLocal['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
+            dataPosLocal.loc[dataPosLocal['spanR1-R2'].isnull(),['spanR1-R2']]=dataPosLocal.loc[dataPosLocal['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
 
-        print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            print("if not len(dataFullHUM)==0")
+            print('867')
             dataFull=pd.DataFrame(dataFullHIV["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
-            print("create data full")
             dataFull=createData(dataFull,dataFullHUM,dataFullHIV)
             dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum"+end+".csv",index=False)
             dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv"+end+".csv",index=False)
 
             dataFull.replace('', np.nan,inplace=True)
             dataFull.fillna(0,inplace=True)
-            print("overlap full")
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
-            print("left right full")
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
             dataFull.to_csv(outDir+"/"+baseName+".full"+end+".csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
-            print("filter overlap combine full")
-            print("find support full")
             dataPosFull=findSupport(dataFull,minLenList)
             if len(dataPosFull)>0:
-                dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
-
-            data=combineLocalFull(dataPosLocal,dataPosFull,minLenList)
-            print("697 save")
-
-            colList=[]
-            for minLen in minLenList:
-                colList=colList+["count_"+str(minLen)]
-            data['totalCount']=data[colList].sum(axis=1).astype(int)
-
-            data['totalCount']=data['totalCount']+data['spanCount']
+                dataPosFull=addSpan(dataFull,dataPosFull)
+                # dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
+                dataPosFull.loc[dataPosFull['spanCount'].isnull(),['spanCount']]=dataPosFull.loc[dataPosFull['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
+                dataPosFull.loc[dataPosFull['spanR1-R2'].isnull(),['spanR1-R2']]=dataPosFull.loc[dataPosFull['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
             
-            #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
-            def joinReads(row,colList):
-                colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
-                reads=[]
-                for col in colList:
-                    if not pd.isnull(row[col]):
-                        reads.append(row[col])
-                return ';'.join(reads)
+            data=combineLocalFull(dataPosLocal,dataPosFull,minLenList)
 
-            colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
-            colList.sort(reverse=True)
-            data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
+            # colList=[]
+            # for minLen in minLenList:
+            #     colList=colList+["count_"+str(minLen)]
+            # data['totalCount']=data[colList].sum(axis=1).astype(int)
+
+            # data['totalCount']=data['totalCount']+data['spanCount']
+            
+            # #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
+            # def joinReads(row,colList):
+            #     colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
+            #     reads=[]
+            #     for col in colList:
+            #         if not pd.isnull(row[col]):
+            #             reads.append(row[col])
+            #     return ';'.join(reads)
+
+            # colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
+            # colList.sort(reverse=True)
+            # data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
+            # colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
+            # reads=[]
+            # for col in colList:
+            #     print(col)
+            #     data[col]=data[col].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
-            data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
@@ -893,38 +969,30 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
         else:
-            print("714>>>else:")
+            print('936')
             if len(dataPosLocal)>0:
                 for minLen in minLenList:
                     dataPosLocal["reads_"+str(minLen)]=dataPosLocal.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+                    dataPosLocal['count_'+str(minLen)]=dataPosLocal['reads_'+str(minLen)].str.split(";").str.len()
+                    dataPosLocal.loc[(dataPosLocal['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
+
             dataPosLocal["prim"]=1
             data=pd.concat([data,dataPosLocal])
             data.reset_index(drop=True)
-            print("721 save")
 
             colList=[]
             for minLen in minLenList:
                 colList=colList+["count_"+str(minLen)]
-            data['totalCount']=data[colList].sum(axis=1).astype(int)
+            data['totalCount']=data[colList].sum(axis=1)
 
-            data['totalCount']=data['totalCount']+data['spanCount']
-            
-            #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
-            def joinReads(row,colList):
-                colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
-                reads=[]
-                for col in colList:
-                    if not pd.isnull(row[col]):
-                        reads.append(row[col])
-                return ';'.join(reads)
-
-            colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
-            colList.sort(reverse=True)
-            data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
+            data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
+            data.loc[data['spanCount'].isnull(),['spanCount']]=0
+            data.loc[data['spanR1-R2'].isnull(),['spanR1-R2']]=data.loc[data['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
+            data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
-            data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
@@ -939,20 +1007,16 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
-        print("695>>>if len(dataLocalHIV)==0 and len(dataFullHIV)>0")
+        print('987')
         # extract flag information
-        print("extract flags full")
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
         # extract start and end for both template and reference
-        print("extract start end full")
         dataFullHIV=extractStartEnd(dataFullHIV)
         dataFullHUM=extractStartEnd(dataFullHUM)
 
-        print("filter reads full")
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            print("750>>>if not len(dataFullHUM)==0")
             # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
             # dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
             #calculate the percent aligned (num bp aligned/total read length bp)
@@ -961,67 +1025,53 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
-            print("create data full")
             dataFull=createData(dataFull,dataFullHUM,dataFullHIV)
             dataFullHUM.to_csv(outDir+"/fullAlignments/"+baseName+".full.hum"+end+".csv",index=False)
             dataFullHIV.to_csv(outDir+"/fullAlignments/"+baseName+".full.hiv"+end+".csv",index=False)
 
             dataFull.replace('', np.nan,inplace=True)
             dataFull.fillna(0,inplace=True)
-            print("overlap full")
             dataFull["overlapR1"]=pd.DataFrame(dataFull.apply(lambda row: overlapR1(row),axis=1))
             dataFull["overlapR2"]=pd.DataFrame(dataFull.apply(lambda row: overlapR2(row),axis=1))
-            print("left right full")
             dataFull["HIV"]=dataFull.apply(lambda row: leftRight(row),axis=1)
             dataFull.to_csv(outDir+"/"+baseName+".full"+end+".csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
-            print("filter overlap combine full")
-            print("find support full")
             dataPosFull=findSupport(dataFull,minLenList)
+            data=pd.DataFrame([])
             if len(dataPosFull)>0:
-                dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
+                data=addSpan(dataFull,dataPosFull)
 
-            if len(dataPosFull)>0:
-                for minLen in minLenList:
-                    dataPosFull["reads_"+str(minLen)]=dataPosFull.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
-            dataPosFull["prim"]=0
-            data=pd.concat([data,dataPosFull])
+            data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
+            data.loc[data['spanCount'].isnull(),['spanCount']]=0
+            data.loc[data['spanR1-R2'].isnull(),['spanR1-R2']]=data.loc[data['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
+            data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
+            
+            for minLen in minLenList:
+                data["reads_"+str(minLen)]=data.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
+                data['count_'+str(minLen)]=data['reads_'+str(minLen)].str.split(";").str.len()
+                data.loc[(data['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
+                
+            data.replace("","-",inplace=True)
             data.reset_index(drop=True)
-            print("784 save")
+            data["prim"]=0
 
             colList=[]
             for minLen in minLenList:
                 colList=colList+["count_"+str(minLen)]
-            data['totalCount']=data[colList].sum(axis=1).astype(int)
-
+            data['totalCount']=data[colList].sum(axis=1)
             #save the bed file of the positions
-            data[['chr','HUM_RS','HUM_RE']].to_csv(outDir+"/beds/"+baseName+".bed",sep='\t',header=False,index=False)
+            # data[['chr','HUM_RS','HUM_RE']].to_csv(outDir+"/beds/"+baseName+".bed",sep='\t',header=False,index=False)
             # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
             # os.system(bedCMD)
 
-            data['totalCount']=data['totalCount']+data['spanCount']
-
-            #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
-            def joinReads(row,colList):
-                colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
-                reads=[]
-                for col in colList:
-                    if not pd.isnull(row[col]):
-                        reads.append(row[col])
-                return ';'.join(reads)
-
-            colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
-            colList.sort(reverse=True)
-            data['allReads']=data.apply(lambda row: joinReads(row,colList),axis=1)
-
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
-            data.drop(["split","chr"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
             if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
                 os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
 
-            childPIDS=[]
+            # childPIDS=[]
             #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
             #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
             #  os.system(cmdR1)
@@ -1080,6 +1130,15 @@ def testT(outDir,baseName,dirPath,fileName,minLenList,end,args):
     data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
     data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
+#yet another idea:
+#do rum the remove duplication scripts on the alignments and perform the analysis on the cleaned data
+
+#it seems the add.sh is pretty slow as well
+#perhaps should timeit the execution of the custom python method against the add.sh
+#would be best not to apply any external methods or as little as possible
+
+#Theres something wrong with the total counts - spancounts seem to be included but some count_s are not
+
 def main(args):
     print(args.minLen)
     end=""
@@ -1093,18 +1152,26 @@ def main(args):
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
-        # if not baseName=='348_pos_1_S14' and not test:
-        #     test=False
-        # else:
-        #     test=True
-        if test:
+        setInter=['154_pos_12_S4',
+                 '154_pos_17_S5',
+                 '154_pos_18_S6',
+                 '154_pos_21_S7',
+                 '154_pos_6_S1',
+                 '154_pos_7_S2',
+                 '154_pos_8_S3']
+
+        if not baseName=='154_pos_6_S1':
+            test=False
+        else:
+            test=True
+        if True:
             print("Analyzing: ",baseName)
             if args.shell==True:
                 print("Running main shell script")
                 os.system(scriptCMD)
             # if os.path.exists(os.path.abspath(os.path.abspath(args.out)+"/"+baseName+"_Pos"+end+".csv")):
                 # testT(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
-            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
+            # resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
 
     #once the add.sh is replaced by the actual function - do one run with both included in order to
     #compare the results and make sure the new method is working properly
@@ -1113,9 +1180,9 @@ def main(args):
     #2. if any differences are observed - check why - likely a mistake
     #3. then check for any which are identified by the custom method but not by the add.sh
     
-    # os.system("./add.sh "+os.path.abspath(args.out),args.minLen)
+    os.system("./add.sh "+os.path.abspath(args.out))
     # paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
     # allSamples(args.out,paths,end)
 
-    # scriptCMD="./results.sh "+os.path.abspath(args.out)+" "+os.path.abspath(args.input)
-    # os.system(scriptCMD)
+
+repeat=['218_pos_3_S12_Pos.csv']
