@@ -777,12 +777,7 @@ def addSpanOld(row,dataSep):
 # this function will produce a dataframe with information grouped by the SpliceSites
 # those reads that do not contain a valid spliceSite shall be discarded
 def groupBySpliceSites(data):
-    df=pd.read_csv('../../hiv/154_pos_12_S4_Pos.csv')
-    df.drop(['HIV_RE',
-             'HIV_RS',
-             'HUM_RE',
-             'HUM_RS',
-             'count_20',
+    data.drop(['count_20',
              'count_30',
              'count_40',
              'orient',
@@ -801,8 +796,9 @@ def groupBySpliceSites(data):
             'allReads_count':'sum'
         }
     }
-    dfg=pd.DataFrame(df.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount"]].agg(aggregations)).reset_index()
+    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount"]].agg(aggregations)).reset_index()
     dfg.sort_values(by='groupsCount',ascending=False)
+    return dfg
 
 # this function is to replace the add.sh script
 def addAnnotation(row,baseName,outDir):
