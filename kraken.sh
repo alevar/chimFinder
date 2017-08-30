@@ -49,7 +49,7 @@ echo DONE IN ${DUR}
 TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 SECONDS=0
-# align with bowtie2 to hg38
+align with bowtie2 to hg38
 echo ALIGNING TO HG38
 bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.chim.hum.sam
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
@@ -71,13 +71,39 @@ bowtie2 --very-sensitive-local --no-unal --local --phred33 -p 12 -x ${humanDB} -
 
 bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}.full.hiv.sam
 
-samtools view -S -@ ${threads} -b ${outputDir}/fullAlignments/${sample}.full.hum.sam | samtools sort -o ${outputDir}/fullAlignments/${sample}.full.hum.bam -
-samtools index -@ ${threads} ${outputDir}/fullAlignments/${sample}.full.hum.bam
-samtools view -S -@ ${threads} -b ${outputDir}/fullAlignments/${sample}.full.hiv.sam | samtools sort -o ${outputDir}/fullAlignments/${sample}.full.hiv.bam -
-samtools index -@ ${threads} ${outputDir}/fullAlignments/${sample}.full.hiv.bam
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 echo DONE IN ${DUR}
 TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+
+SECONDS=0
+echo REMOVING DUPLICATES
+samtools view -S -@ ${threads} -b ${outputDir}/fullAlignments/${sample}.full.hum.sam | samtools sort -o ${outputDir}/fullAlignments/${sample}.full.hum.bam -
+samtools index -@ ${threads} ${outputDir}/fullAlignments/${sample}.full.hum.bam
+java -Xmx4g -jar /ccb/salz7-data/sw/packages/picard-tools-1.119/MarkDuplicates.jar INPUT=${outputDir}/fullAlignments/${sample}.full.hum.bam OUTPUT=${outputDir}/fullAlignments/${sample}.full.hum.no_dup.rem.bam METRICS_FILE=${outputDir}/fullAlignments/${sample}.full.hum.dup.txt VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=${outputDir}/tmp
+samtools view -S -@ ${threads} -h -o ${outputDir}/fullAlignments/${sample}.full.hum.sam ${outputDir}/fullAlignments/${sample}.full.hum.no_dup.rem.bam
+samtools index -@ ${threads} ${outputDir}/fullAlignments/${sample}.full.hum.bam
+
+samtools view -S -@ ${threads} -b ${outputDir}/fullAlignments/${sample}.full.hiv.sam | samtools sort -o ${outputDir}/fullAlignments/${sample}.full.hiv.bam -
+samtools index -@ ${threads} ${outputDir}/fullAlignments/${sample}.full.hiv.bam
+java -Xmx4g -jar /ccb/salz7-data/sw/packages/picard-tools-1.119/MarkDuplicates.jar INPUT=${outputDir}/fullAlignments/${sample}.full.hiv.bam OUTPUT=${outputDir}/fullAlignments/${sample}.full.hiv.no_dup.rem.bam METRICS_FILE=${outputDir}/fullAlignments/${sample}.full.hiv.dup.txt VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=${outputDir}/tmp
+samtools view -S -@ ${threads} -h -o ${outputDir}/fullAlignments/${sample}.full.hiv.sam ${outputDir}/fullAlignments/${sample}.full.hiv.no_dup.rem.bam
+samtools index -@ ${threads} ${outputDir}/fullAlignments/${sample}.full.hiv.bam
+
+samtools view -S -@ ${threads} -b ${outputDir}/localAlignments/${sample}.chim.hum.sam | samtools sort -o ${outputDir}/localAlignments/${sample}.chim.hum.bam -
+samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.chim.hum.bam
+java -Xmx4g -jar /ccb/salz7-data/sw/packages/picard-tools-1.119/MarkDuplicates.jar INPUT=${outputDir}/localAlignments/${sample}.chim.hum.bam OUTPUT=${outputDir}/localAlignments/${sample}.chim.hum.no_dup.rem.bam METRICS_FILE=${outputDir}/localAlignments/${sample}.chim.hum.dup.txt VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=${outputDir}/tmp
+samtools view -S -@ ${threads} -h -o ${outputDir}/localAlignments/${sample}.chim.hum.sam ${outputDir}/localAlignments/${sample}.chim.hum.no_dup.rem.bam
+samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.chim.hum.bam
+
+samtools view -S -@ ${threads} -b ${outputDir}/localAlignments/${sample}.chim.hiv.sam | samtools sort -o ${outputDir}/localAlignments/${sample}.chim.hiv.bam -
+samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.chim.hiv.bam
+java -Xmx4g -jar /ccb/salz7-data/sw/packages/picard-tools-1.119/MarkDuplicates.jar INPUT=${outputDir}/localAlignments/${sample}.chim.hiv.bam OUTPUT=${outputDir}/localAlignments/${sample}.chim.hiv.no_dup.rem.bam METRICS_FILE=${outputDir}/localAlignments/${sample}.chim.hiv.dup.txt VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=${outputDir}/tmp
+samtools view -S -@ ${threads} -h -o ${outputDir}/localAlignments/${sample}.chim.hiv.sam ${outputDir}/localAlignments/${sample}.chim.hiv.no_dup.rem.bam
+samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.full.hiv.bam
+
+DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+echo DONE IN ${DUR}
+TOTAL_TIME=$((TOTAL_TIME+${SECONDS}))
 
 SECONDS=0
 echo MAPPING AGAINST ANNOTATION

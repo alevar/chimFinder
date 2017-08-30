@@ -776,8 +776,12 @@ def addSpanOld(row,dataSep):
 
 # this function will produce a dataframe with information grouped by the SpliceSites
 # those reads that do not contain a valid spliceSite shall be discarded
-def groupBySpliceSites(data):
-    data.drop(['count_20',
+def groupBySpliceSites(df):
+    df.drop(['HIV_RE',
+             'HIV_RS',
+             'HUM_RE',
+             'HUM_RS',
+             'count_20',
              'count_30',
              'count_40',
              'orient',
@@ -796,9 +800,8 @@ def groupBySpliceSites(data):
             'allReads_count':'sum'
         }
     }
-    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount"]].agg(aggregations)).reset_index()
+    dfg=pd.DataFrame(df.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount"]].agg(aggregations)).reset_index()
     dfg.sort_values(by='groupsCount',ascending=False)
-    return dfg
 
 # this function is to replace the add.sh script
 def addAnnotation(row,baseName,outDir):
@@ -836,11 +839,11 @@ def addAnnotation(row,baseName,outDir):
 def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     print(">>>>>>>>>>>>>   Begin analyses")
     # load data from local alignments
-    dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    dataLocalHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hum"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataLocalHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     # load data from full alignments
-    dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum"+end+".sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
+    dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     print("<<<<<<<<<<<<<   Done reading in") 
     outDirPOS=outDir+"/Positions/"+baseName
     if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
@@ -1141,13 +1144,13 @@ def main(args):
     if args.end==True:
         end='.no_dup'
 
-    test=True
     for file in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(file)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
+
         setInter=['154_pos_12_S4',
                  '154_pos_17_S5',
                  '154_pos_18_S6',
@@ -1156,18 +1159,21 @@ def main(args):
                  '154_pos_7_S2',
                  '154_pos_8_S3']
 
-        if not baseName=='154_pos_6_S1':
-            test=False
-        else:
-            test=True
-        if True:
+        # setDone=['154_pos_7_S2',
+        #          '154_pos_21_S7',
+        #          '154_pos_17_S5']
+
+        setDone=['218_pos_2_S11',
+                 '348_pos_3_S15']
+        
+        if (baseName in setInter) and (baseName not in setDone):
             print("Analyzing: ",baseName)
             if args.shell==True:
                 print("Running main shell script")
                 os.system(scriptCMD)
             # if os.path.exists(os.path.abspath(os.path.abspath(args.out)+"/"+baseName+"_Pos"+end+".csv")):
                 # testT(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
-            # resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
+            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
 
     #once the add.sh is replaced by the actual function - do one run with both included in order to
     #compare the results and make sure the new method is working properly
@@ -1179,6 +1185,3 @@ def main(args):
     os.system("./add.sh "+os.path.abspath(args.out))
     # paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
     # allSamples(args.out,paths,end)
-
-
-repeat=['218_pos_3_S12_Pos.csv']
