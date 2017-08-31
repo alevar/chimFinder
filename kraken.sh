@@ -18,6 +18,7 @@ mkdir -p ${outputDir}/consensusHIV
 mkdir -p ${outputDir}/hisat
 mkdir -p ${outputDir}/splices
 mkdir -p ${outputDir}/beds
+mkdir -p ${outputDir}/tempF
 
 sampleR1Base=$(basename ${file})
 sampleR1="${sampleR1Base%.*.*}"
@@ -41,15 +42,17 @@ awk -F '\t' 'match($5,/9606*/) && match($5,/11676*/) {print $2}' ${outputDir}/kr
 #parse names and extract reads into fastq
 touch ${outputDir}/krakenOut/selected/${sample}_R1.fastq
 touch ${outputDir}/krakenOut/selected/${sample}_R2.fastq
-zcat ${inputDir}/${sampleR1Base} | grep -A 3 --no-group-separator -Ff ${outputDir}/krakenOut/selected/${sample}.chim - > ${outputDir}/krakenOut/selected/${sample}_R1.fastq
-zcat ${inputDir}/${sampleR2Base} | grep -A 3 --no-group-separator -Ff ${outputDir}/krakenOut/selected/${sample}.chim - > ${outputDir}/krakenOut/selected/${sample}_R2.fastq
+zcat ${inputDir}/${sampleR1Base} > ${outputDir}/tempF/${sample}_R1_001.fastq
+zcat ${inputDir}/${sampleR2Base} > ${outputDir}/tempF/${sample}_R2_001.fastq
+grep -A 3 --no-group-separator -Ff ${outputDir}/krakenOut/selected/${sample}.chim ${outputDir}/tempF/${sample}_R1_001.fastq > ${outputDir}/krakenOut/selected/${sample}_R1.fastq
+grep -A 3 --no-group-separator -Ff ${outputDir}/krakenOut/selected/${sample}.chim ${outputDir}/tempF/${sample}_R2_001.fastq > ${outputDir}/krakenOut/selected/${sample}_R2.fastq
 
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 echo DONE IN ${DUR}
 TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 SECONDS=0
-align with bowtie2 to hg38
+# align with bowtie2 to hg38
 echo ALIGNING TO HG38
 bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -1 ${outputDir}/krakenOut/selected/${sample}_R1.fastq -2 ${outputDir}/krakenOut/selected/${sample}_R2.fastq -S ${outputDir}/localAlignments/${sample}.chim.hum.sam
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
@@ -99,7 +102,7 @@ samtools view -S -@ ${threads} -b ${outputDir}/localAlignments/${sample}.chim.hi
 samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.chim.hiv.bam
 java -Xmx4g -jar /ccb/salz7-data/sw/packages/picard-tools-1.119/MarkDuplicates.jar INPUT=${outputDir}/localAlignments/${sample}.chim.hiv.bam OUTPUT=${outputDir}/localAlignments/${sample}.chim.hiv.no_dup.rem.bam METRICS_FILE=${outputDir}/localAlignments/${sample}.chim.hiv.dup.txt VALIDATION_STRINGENCY=LENIENT REMOVE_DUPLICATES=true TMP_DIR=${outputDir}/tmp
 samtools view -S -@ ${threads} -h -o ${outputDir}/localAlignments/${sample}.chim.hiv.sam ${outputDir}/localAlignments/${sample}.chim.hiv.no_dup.rem.bam
-samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.full.hiv.bam
+samtools index -@ ${threads} ${outputDir}/localAlignments/${sample}.chim.hiv.bam
 
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 echo DONE IN ${DUR}
@@ -107,8 +110,8 @@ TOTAL_TIME=$((TOTAL_TIME+${SECONDS}))
 
 SECONDS=0
 echo MAPPING AGAINST ANNOTATION
-./get_hum_hiv.pl ${outputDir}/fullAlignments/${sample}.full.hum.sam ${outputDir}/fullAlignments/${sample}.full.hiv.sam ${annotation} > ${outputDir}/splices/${sample}.full.txt
-./get_hum_hiv.pl ${outputDir}/localAlignments/${sample}.chim.hum.sam ${outputDir}/localAlignments/${sample}.chim.hiv.sam ${annotation} > ${outputDir}/splices/${sample}.chim.txt
+./get_hum_hiv.pl ${outputDir}/fullAlignments/${sample}.full.hum.sam ${outputDir}/fullAlignments/${sample}.full.hiv.sam ${annotation} ${outputDir}/tmp > ${outputDir}/splices/${sample}.full.txt
+./get_hum_hiv.pl ${outputDir}/localAlignments/${sample}.chim.hum.sam ${outputDir}/localAlignments/${sample}.chim.hiv.sam ${annotation} ${outputDir}/tmp > ${outputDir}/splices/${sample}.chim.txt
 #
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 echo DONE IN ${DUR}

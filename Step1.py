@@ -273,23 +273,15 @@ def createData(data,dataHUM,dataHIV):
     df.fillna(0,inplace=True)
     return df
 
+# this function filters by overlap and flanking alignment length
+# further it removes unnecessary data and combines into a single full dataframe with unified naming avoiding R1/R2 conventions
+# output can be saved as .full.csv and then grouped by split position all at once
+
+# this function allows identifying best reads
+# However, since greater minLen values for HIV and HUM alignments will yield fewer reads but at higher confidence
+# support reads could ignore the min len requirement as long as the split position is identical
+# or perhaps the minLen requirement for the support reads should be lower
 def filterOverlapCombine(data,minLen):
-    # this function filters by overlap and flanking alignment length
-    # further it removes unnecessary data and combines into a single full dataframe with unified naming avoiding R1/R2 conventions
-    # output can be saved as .full.csv and then grouped by split position all at once
-
-    # this function allows identifying best reads
-    # However, since greater minLen values for HIV and HUM alignments will yield fewer reads but at higher confidence
-    # support reads could ignore the min len requirement as long as the split position is identical
-    # or perhaps the minLen requirement for the support reads should be lower
-
-    # so the pipeline here should be as follows:
-    # 1. Run this function with lower minLenHUM and minLenHIV parameters in order to identfy all possible support reads
-    # 2. Run this function with greater minLenHUM and minLenHIV parameters on the dataframe generated in step 1
-    #    in order to identify split positions
-    # 3. For each split position from df with higher minLen threshold - find all support reads from both dfs
-    # 4. Perhaps find high confidence and low confidence reads separately
-
     dropList=["R1HUM_TS",
               "R1HUM_TE",
               "R1HUM_ID",
@@ -412,7 +404,6 @@ def filterOverlapCombine(data,minLen):
 
     frames=[dataR1Right,dataR1Left,dataR2Right,dataR2Left]
     df=pd.concat(frames).reset_index(drop=True)
-    # data["overlap"]=data.apply(lambda row: 0-row["ins"] if row["overlap"]==0 else row["overlap"],axis=1)
     return df
 
 def addSpan(data,dataPos):
@@ -445,12 +436,12 @@ def addSpan(data,dataPos):
     df=pd.concat(frames).reset_index(drop=True)
     return df
 
+# this function should do the following:
+# 1. group data by split position
+# 2. add a column of high confidence support reads from the first parameter DF
+# 3. add a column of low confidence support reads from the second parameter DF
 def findSupport(dataOrig, minLenList):
     minLenList_tmp=list(minLenList)
-    # this function should do the following:
-    # 1. group data by split position
-    # 2. add a column of high confidence support reads from the first parameter DF
-    # 3. add a column of low confidence support reads from the second parameter DF
 
     # First group by split and extract high confidence support reads
     minLenList_tmp.sort(reverse=True)
@@ -509,8 +500,7 @@ def findSupport(dataOrig, minLenList):
                     'HIV_RE':'max'
                 }
             }
-            
-            
+             
             data=filterOverlapCombine(dataOrig,minLen)
             dataPosT=pd.DataFrame([])
             dataPosT=pd.DataFrame(data.groupby(by=["comb","split","HUM_ID","R","orient"])[["QNAME","HUM_RS","HUM_RE","HIV_RS","HIV_RE"]].agg(aggregations)).reset_index()
@@ -556,20 +546,50 @@ def getSet(row):
     tmpLocalQNAME=list(row["reads"])
     return tmpLocalQNAME
 
-def writeReadNames(path,dataPos,dirPath,fileName,outPath1,outPath2):
-    readsFile=open(path,'w+')
-    readsList=[]
-    if ";" in dataPos:
-        for x in dataPos.split(";"):
-            readsList.append(x)
+def writeReadNames(outDir,row,fileName,baseName,dirPath):
+    outD=os.path.abspath(outDir)
+    tempF=outD+'/tempF'
+    txtPathAll=outD+'/Positions/'+baseName+"/"+str(row["comb"].replace("|","_"))+"_"+str(int(row["totalCount"]))+".all.txt"
+    readsFileAll=open(txtPathAll,'w+')
+
+    readsListAll=[]
+
+    dataPosAll=row['allReads']
+    if ";" in dataPosAll:
+        for x in dataPosAll.split(";"):
+            readsListAll.append(x)
     else:
-        readsList.append(dataPos)
+        readsListAll.append(dataPosAll)
 
-    for QNAME in readsList:
-        readsFile.write(QNAME+"\n")
-    readsFile.close()
+    for QNAME in readsListAll:
+        readsFileAll.write(QNAME+"\n")
+    readsFileAll.close()
 
-    scriptCMD="./extractReadsPerSplit.sh "+dirPath+" "+fileName+" "+path+" "+outPath1+" "+outPath2
+    outPath1_All="'"+outD+"/Positions/"+baseName+"/fq/"+str(row["comb"])+"_"+str(int(row["totalCount"]))+"_R1.all.fq'"
+    outPath2_All="'"+outD+"/Positions/"+baseName+"/fq/"+str(row["comb"])+"_"+str(int(row["totalCount"]))+"_R2.all.fq'"
+    scriptCMD="./extractReadsPerSplit.sh "+tempF+" "+fileName+" "+txtPathAll+" "+outPath1_All+" "+outPath2_All
+    os.system(scriptCMD)
+
+    # Now do the same for the span reads
+    txtPathSpan=outD+'/Positions/'+baseName+"/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["totalCount"]))+".span.txt"
+    readsFileSpan=open(txtPathSpan,'w+')
+    readsListSpan=[]
+
+    dataPosSpan=row['spanR1-R2']
+    if ";" in dataPosSpan:
+        for x in dataPosSpan.split(";"):
+            readsListSpan.append(x)
+    else:
+        readsListSpan.append(dataPosSpan)
+
+    for QNAME in readsListSpan:
+        if not QNAME=="-":
+            readsFileSpan.write(QNAME+"\n")
+    readsFileSpan.close()
+
+    outPath1_Span="'"+outD+"/Positions/"+baseName+"/fq/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["spanCount"]))+"_R1.span.fq'"
+    outPath2_Span="'"+outD+"/Positions/"+baseName+"/fq/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["spanCount"]))+"_R2.span.fq'"
+    scriptCMD="./extractReadsPerSplit.sh "+tempF+" "+fileName+" "+txtPathSpan+" "+outPath1_Span+" "+outPath2_Span
     os.system(scriptCMD)
 
 def getStats(data,baseName,outDir):
@@ -634,15 +654,17 @@ def allSamples(out,paths,end):
     df[["numNeg","numPos"]]=pd.DataFrame([x for x in df.apply(lambda row: countNegPos(row),axis=1)])
     df.to_csv(os.path.abspath(out)+"/allSamples"+end+".csv",index=False)
 
-# the following function is designed to combine the two dataframes together
-def combineLocalFull(dataPosLocal,dataPosFull,minLens):
-    def generateColumnsList(minLens):
-        colList=['comb']
-        for minLen in minLens:
-            colList=colList+["count_"+str(minLen),"reads_"+str(minLen)]
-        colList=colList+['orient','prim','chr','split','R','spanR1-R2','allReads','spanCount']
-        return colList
+def generateColumnsList(minLens,data):
+    colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
+    colNames=["comb"]
+    for x in colListLen:
+        colNames.append('reads_'+str(x))
+        colNames.append('count_'+str(x))
+    colNames=colNames+['orient','prim','chr','split','R','spanR1-R2','allReads','spanCount']
+    return colNames
     
+# the following function is designed to combine the two dataframes together
+def combineLocalFull(dataPosLocal,dataPosFull,minLens):    
     #the first thing to do is to add any missing reads and counts column and populate them with blank {} and 0 respectively
     def addMissing(dataPosLocal,dataPosFull):
         setColumnsLocal=set(list(dataPosLocal))
@@ -663,7 +685,7 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
     
     dataPosLocal,dataPosFull=addMissing(dataPosLocal,dataPosFull)
     
-    colList=generateColumnsList(minLens)
+    colList=generateColumnsList(minLens,dataPosFull)
 
     data=pd.DataFrame([],columns=colList)
 
@@ -691,7 +713,8 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
                                                             ";".join(list(setLa)),
                                                             len(setL)]
 
-            for minLen in minLens:
+            colListLen=[int(x.split("_")[-1]) for x in list(dataPosFull) if 'reads_' in x]
+            for minLen in colListLen:
                 l1=set(list(dataPosLocal[dataPosLocal['comb']==el]['reads_'+str(minLen)])[0])
                 l2=set(list(dataPosFull[dataPosFull['comb']==el]['reads_'+str(minLen)])[0])
                 setL=l1.union(l2)
@@ -703,16 +726,19 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
 
     dataLocalPosDiff=dataPosLocal[(dataPosLocal['comb'].isin(diff))]
     if len(dataLocalPosDiff)>0:
-        for minLen in minLens:
+        colListLen=[int(x.split("_")[-1]) for x in list(dataLocalPosDiff) if 'reads_' in x]
+        for minLen in colListLen:
             dataLocalPosDiff["reads_"+str(minLen)]=dataLocalPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
             dataLocalPosDiff['count_'+str(minLen)]=dataLocalPosDiff['reads_'+str(minLen)].str.split(";").str.len()
             dataLocalPosDiff.loc[(dataLocalPosDiff['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
         dataLocalPosDiff['spanR1-R2']=dataLocalPosDiff.apply(lambda row: ";".join(list(row['spanR1-R2'])),axis=1)
         dataLocalPosDiff['allReads']=dataLocalPosDiff.apply(lambda row: ";".join(list(row['allReads'])),axis=1)
     dataLocalPosDiff["prim"]=1
+
     dataFullPosDiff=dataPosFull[(dataPosFull['comb'].isin(diff))]
     if len(dataFullPosDiff)>0:
-        for minLen in minLens:
+        colListLen=[int(x.split("_")[-1]) for x in list(dataFullPosDiff) if 'reads_' in x]
+        for minLen in colListLen:
             dataFullPosDiff["reads_"+str(minLen)]=dataFullPosDiff.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
             dataFullPosDiff['count_'+str(minLen)]=dataFullPosDiff['reads_'+str(minLen)].str.split(";").str.len()
             dataFullPosDiff.loc[(dataFullPosDiff['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
@@ -723,28 +749,13 @@ def combineLocalFull(dataPosLocal,dataPosFull,minLens):
     data.reset_index(drop=True)
     
     colList=[]
-    for minLen in minLens:
+    colListLen=[int(x.split("_")[-1]) for x in list(dataLocalPosDiff) if 'reads_' in x]
+    for minLen in colListLen:
         colList=colList+["count_"+str(minLen)]
     data['totalCount']=data[colList].sum(axis=1)
 
     data.replace("","-",inplace=True)
-    # for minLen in minLens:
-    #     data.replace({"reads_"+str(minLen): {set([]):"-"},
-    #                   "count_"+str(minLen): {set([]):0},
-    #                   "splitR1-R2": {set([]):'-'}} ,inplace=True)
     return data
-
-# after this step is done
-# need to incorporate changes to the merging algorithm (when merging dataPosFull and dataPosLocal)
-# also verify that counts after merging are correct
-# perhaps would be reasonable to do the following:
-# 1. only return sets of reads when building separate dataPosFull and dataPosLocal
-# 2. count number of reads after merging the dataPosFull and dataPosLocal dataFrames together
-
-#Another aspect to consider:
-#when using multiple hiv references it might complicate things to guarantee that the hiv id of the spanning region is the same as that of the identified chimera
-#thus we are making the assumption that the references are roughly the same in terms of the positioning of genomic regions
-#however it would be best to add another note somewhere as to which particular gi number in the multiple reference the alignment belongs
 
 def addSpanOld(row,dataSep):
     dataSpan=pd.DataFrame([])
@@ -753,13 +764,11 @@ def addSpanOld(row,dataSep):
     if humR=='R1':
         hivR='R2'
     if 'hiv:hum' in row['orient']:
-        #&(dataSep[r+'HIV_RE']>row['HUM_RE'])&(dataSep[r+'HUM_RE']>row['HUM_RE'])
         dataSpan=dataSep[dataSep['HIV'].str.contains('sep'+humR)]  #check that the hum alignment is on the same side
         dataSpan=dataSpan[~(dataSpan[hivR+'HIV_ID']==0)] # check that the hiv is on the same side
         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
         dataSpan=dataSpan[(dataSpan[hivR+'HIV_RS']-row['HIV_RS']>-500)&(dataSpan[hivR+'HIV_RS']-row['HIV_RS']<0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
         dataSpan=dataSpan[(dataSpan[humR+'HUM_RE']-row['HUM_RE']<500)&(dataSpan[humR+'HUM_RE']-row['HUM_RE']>0)] # check that the end of the hum is after the end of the hum in the grouped dataframe
-#         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
         if len(dataSpan)>0:
             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
     if 'hum:hiv' in row['orient']:
@@ -768,7 +777,6 @@ def addSpanOld(row,dataSep):
         dataSpan=dataSpan[dataSpan[humR+'HUM_ID']==row['chr']] # check that the chromosomes match
         dataSpan=dataSpan[(dataSpan[hivR+'HIV_RE']-row['HIV_RE']<500)&(dataSpan[hivR+'HIV_RE']-row['HIV_RE']>0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
         dataSpan=dataSpan[(dataSpan[humR+'HUM_RS']-row['HUM_RS']>-500)&(dataSpan[humR+'HUM_RS']-row['HUM_RS']<0)] # check that the end of the hum is after the end of the hum in the grouped dataframe
-#         dataSpan=dataSpan[] # check that the distance between the beginning of the hiv and the end of the hum is reasonable. this step can likely be left out
         if len(dataSpan)>0:
             return [set(dataSpan["QNAME"]),len(dataSpan)] # return set of reads and count of reads
 
@@ -776,38 +784,42 @@ def addSpanOld(row,dataSep):
 
 # this function will produce a dataframe with information grouped by the SpliceSites
 # those reads that do not contain a valid spliceSite shall be discarded
-def groupBySpliceSites(df):
-    df.drop(['HIV_RE',
-             'HIV_RS',
-             'HUM_RE',
-             'HUM_RS',
-             'count_20',
-             'count_30',
-             'count_40',
-             'orient',
-             'prim',
-             'reads_20',
-             'reads_30',
-             'reads_40',
-             'spanCount',
-             'spanR1-R2'],axis=1,inplace=True)
+def groupBySpliceSites(data,outDir,baseName):
+    colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
+    colNames=["orient"]
+    for x in colListLen:
+        colNames.append('reads_'+str(x))
+        colNames.append('count_'+str(x))
+        
+    data.drop(colNames,axis=1,inplace=True)
     aggregations={
         'allReads':{
             'groupsCount':'count',
-            'allReads': lambda x: set(x)
+            'allReads': lambda x: ';'.join(set(x))
+        },
+        'spanR1-R2':{
+            'spanReads':lambda x: ';'.join(list(set([el for el in x if not el=='-'])))
+        },
+        'spanCount':{
+            'spanCount':'sum'
+        },
+        'prim':{
+            'prim':lambda x: sorted(set(x))[-1]
         },
         'totalCount':{
             'allReads_count':'sum'
+        },
+        'comb':{
+            'comb': lambda x: ';'.join(set(x))
         }
     }
-    dfg=pd.DataFrame(df.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount"]].agg(aggregations)).reset_index()
-    dfg.sort_values(by='groupsCount',ascending=False)
+    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount","spanCount","spanR1-R2","prim"]].agg(aggregations)).reset_index()
+    dfg=dfg.sort_values(by='groupsCount',ascending=False).reset_index(drop=True)
+    outPath=os.path.abspath(outDir)+"/"+baseName+"_Group.csv"
+    dfg.to_csv(outPath)
 
 # this function is to replace the add.sh script
 def addAnnotation(row,baseName,outDir):
-    #need to add joint reads column to each dataframe which will contain all reads from reads_40 ..30..etc and spanReads
-    #then can use this column below to find the first read (first read must always be with the greatest available minLen)
-
     firstRead=row['allReads'].split(';')[0]
     hum_nearest_5SS='-'
     hum_nearest_3SS='-'
@@ -845,11 +857,15 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     print("<<<<<<<<<<<<<   Done reading in") 
+    
     outDirPOS=outDir+"/Positions/"+baseName
     if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
         os.mkdir(os.path.abspath(outDir+"/Positions/"))
     if not os.path.exists(os.path.abspath(outDirPOS)):
         os.mkdir(os.path.abspath(outDirPOS))
+    if not os.path.exists(os.path.abspath(outDir+"/Positions/"+baseName+"/fq")):
+        print('hello friends')
+        os.mkdir(os.path.abspath(outDir+"/Positions/"+baseName+"/fq"))
 
     if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
         return
@@ -872,11 +888,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
         if len(dataLocalHUM)==0:
             return
 
-        # dataLocalHIV["lenAlign"]=dataLocalHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-        # dataLocalHUM["lenAlign"]=dataLocalHUM.apply(lambda row: len(row["SEQ"]),axis=1)
-        #calculate the percent aligned (num bp aligned/total read length bp)
-        # dataLocalHIV["percentAlign"]=(dataLocalHIV["Template_end"]-dataLocalHIV["Template_start"])/dataLocalHIV["lenAlign"]
-        # dataLocalHUM["percentAlign"]=(dataLocalHUM["Template_end"]-dataLocalHUM["Template_start"])/dataLocalHUM["lenAlign"]
         dataLocal=pd.DataFrame(dataLocalHIV["QNAME"]).reset_index(drop=True)
         dataLocalHUM=dataLocalHUM.reset_index(drop=True)
         dataLocalHIV=dataLocalHIV.reset_index(drop=True)
@@ -919,53 +930,30 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             dataPosFull=findSupport(dataFull,minLenList)
             if len(dataPosFull)>0:
                 dataPosFull=addSpan(dataFull,dataPosFull)
-                # dataPosFull[['spanR1-R2','spanCount']]=pd.DataFrame([x for x in dataPosFull.apply(lambda row: addSpan(row,dataFull[dataFull['HIV'].str.contains('sep')]),axis=1)])
                 dataPosFull.loc[dataPosFull['spanCount'].isnull(),['spanCount']]=dataPosFull.loc[dataPosFull['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
                 dataPosFull.loc[dataPosFull['spanR1-R2'].isnull(),['spanR1-R2']]=dataPosFull.loc[dataPosFull['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
             
             data=combineLocalFull(dataPosLocal,dataPosFull,minLenList)
-
-            # colList=[]
-            # for minLen in minLenList:
-            #     colList=colList+["count_"+str(minLen)]
-            # data['totalCount']=data[colList].sum(axis=1).astype(int)
-
-            # data['totalCount']=data['totalCount']+data['spanCount']
-            
-            # #lets now also add a column for all the reads that belong to a achimeric position including the reads which span r1-r2
-            # def joinReads(row,colList):
-            #     colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
-            #     reads=[]
-            #     for col in colList:
-            #         if not pd.isnull(row[col]):
-            #             reads.append(row[col])
-            #     return ';'.join(reads)
-
-            # colList=[int(x.split('_')[-1]) for x in list(data) if 'reads_' in x]
-            # colList.sort(reverse=True)
-            # data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
-            # colList=['reads_'+str(x) for x in colList]+['spanR1-R2']
-            # reads=[]
-            # for col in colList:
-            #     print(col)
-            #     data[col]=data[col].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
+            if len(data)==0:
+                return 1
 
             #Now add the nearest human splice site for each chimeric position
             # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
-            data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-
-            if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
-                os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
+            data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
+            groupBySpliceSites(data,outDir,baseName)
 
             childPIDS=[]
-            #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            #  os.system(cmdR1)
-            #  os.system(cmdR2)
-            #  print("write read names")
-            #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
-            #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
-            #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            # cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            # cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            # os.system(cmdR1)
+            # os.system(cmdR2)
+            print("write read names")
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1_001.fastq")
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2_001.fastq")
 
         else:
             print('936')
@@ -991,19 +979,21 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
 
             #Now add the nearest human splice site for each chimeric position
             # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
-            data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-            if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
-                os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
+            data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
+            groupBySpliceSites(data,outDir,baseName)
 
             childPIDS=[]
-            #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            #  os.system(cmdR1)
-            #  os.system(cmdR2)
-            #  print("write read names")
-            #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
-            #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
-            #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            # cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            # cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            # os.system(cmdR1)
+            # os.system(cmdR2)
+            print("write read names")
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1_001.fastq")
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2_001.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         print('987')
@@ -1016,11 +1006,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
 
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            # dataFullHIV["lenAlign"]=dataFullHIV.apply(lambda row: len(row["SEQ"]),axis=1)
-            # dataFullHUM["lenAlign"]=dataFullHUM.apply(lambda row: len(row["SEQ"]),axis=1)
-            #calculate the percent aligned (num bp aligned/total read length bp)
-            # dataFullHIV["percentAlign"]=(dataFullHIV["Template_end"]-dataFullHIV["Template_start"])/dataFullHIV["lenAlign"]
-            # dataFullHUM["percentAlign"]=(dataFullHUM["Template_end"]-dataFullHUM["Template_start"])/dataFullHUM["lenAlign"]
             dataFull=pd.DataFrame(dataFullHUM["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
@@ -1040,13 +1025,16 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             data=pd.DataFrame([])
             if len(dataPosFull)>0:
                 data=addSpan(dataFull,dataPosFull)
+            else:
+                return 1
 
             data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
             data.loc[data['spanCount'].isnull(),['spanCount']]=0
             data.loc[data['spanR1-R2'].isnull(),['spanR1-R2']]=data.loc[data['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
             data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
             
-            for minLen in minLenList:
+            colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
+            for minLen in colListLen:
                 data["reads_"+str(minLen)]=data.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
                 data['count_'+str(minLen)]=data['reads_'+str(minLen)].str.split(";").str.len()
                 data.loc[(data['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
@@ -1056,7 +1044,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             data["prim"]=0
 
             colList=[]
-            for minLen in minLenList:
+            for minLen in colListLen:
                 colList=colList+["count_"+str(minLen)]
             data['totalCount']=data[colList].sum(axis=1)
             #save the bed file of the positions
@@ -1066,19 +1054,21 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
 
             #Now add the nearest human splice site for each chimeric position
             # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
-            data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True).to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-            if not os.path.exists(os.path.abspath(outDirPOS+"/fq/")):
-                os.mkdir(os.path.abspath(outDirPOS+"/fq/"))
+            data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
+            os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
+            groupBySpliceSites(data,outDir,baseName)
 
-            # childPIDS=[]
-            #  cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            #  cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            #  os.system(cmdR1)
-            #  os.system(cmdR2)
-            #  print("write read names")
-            #  data.apply(lambda row: writeReadNames(outDirPOS+"/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+end+".txt",";".join([row["readsHC"],row["readsLC"]]),dirPath,fileName,outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R1.fq",outDirPOS+"/fq/"+str(row["comb"])+"_"+str(int(row["countLC"]+int(row["countHC"])))+"_R2.fq"),axis=1)
-            #  os.remove(dirPath+"/"+baseName+"_R1_001.fastq")
-            #  os.remove(dirPath+"/"+baseName+"_R2_001.fastq")
+            childPIDS=[]
+            # cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
+            # cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
+            # os.system(cmdR1)
+            # os.system(cmdR2)
+            print("write read names")
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1_001.fastq")
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2_001.fastq")
     
     return 1
 
@@ -1094,21 +1084,6 @@ def findAnnotation(row,intersection):
                "rRNA",
                "tRNA",
                "locus"]
-
-
-# 1. add HIV strain information along the chromosome to the comb column of the final dataframe
-# 2. group by the splice site
-# 3. incorporate splice site information gathering into the main script instead of running perl separately
-# 4. currently novel sites with lower minLen of alignment are discarded/not included as part of the final dataframe
-#       need to be included and higher minLen where absent needs to be approprietaly marked as such
-# 5. have a logger ready for the following tasks:
-#       - log which minLen values were discarded
-#       - log general stats
-# 6. add R1-R2 split information. Could be achieved as follows:
-#       - somewhere R1-R2/R2-R1 should be added
-#       - get the subset of the dataFrame from the dataLocal/dataFull which has the appropriate R1-R2/R2-R1 label
-#       - create a new column in the dataPos for R1-R2 support
-#       - add read names from the subset DataFrame to this new column in case the split position happens to be somewhere within the region spanned by the R1-R2 split
 
 def testT(outDir,baseName,dirPath,fileName,minLenList,end,args):
     data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
@@ -1128,15 +1103,6 @@ def testT(outDir,baseName,dirPath,fileName,minLenList,end,args):
     #Now add the nearest human splice site for each chimeric position
     data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
     data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-
-#yet another idea:
-#do rum the remove duplication scripts on the alignments and perform the analysis on the cleaned data
-
-#it seems the add.sh is pretty slow as well
-#perhaps should timeit the execution of the custom python method against the add.sh
-#would be best not to apply any external methods or as little as possible
-
-#Theres something wrong with the total counts - spancounts seem to be included but some count_s are not
 
 def main(args):
     print(args.minLen)
@@ -1159,29 +1125,38 @@ def main(args):
                  '154_pos_7_S2',
                  '154_pos_8_S3']
 
-        # setDone=['154_pos_7_S2',
-        #          '154_pos_21_S7',
-        #          '154_pos_17_S5']
+        setDone=['218_pos_5_S13',
+                 '256_pos_1_S8',
+                 '348_pos_3_S15',
+                 '218_pos_2_S11']
 
-        setDone=['218_pos_2_S11',
-                 '348_pos_3_S15']
-        
-        if (baseName in setInter) and (baseName not in setDone):
+        # if (baseName in setInter) and (baseName not in setDone):
+        if not baseName in setDone:
             print("Analyzing: ",baseName)
             if args.shell==True:
-                print("Running main shell script")
                 os.system(scriptCMD)
-            # if os.path.exists(os.path.abspath(os.path.abspath(args.out)+"/"+baseName+"_Pos"+end+".csv")):
-                # testT(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
+            
             resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
 
-    #once the add.sh is replaced by the actual function - do one run with both included in order to
-    #compare the results and make sure the new method is working properly
-    #verification should be done as follows:
-    #1. check if anything that is identified in the add.sh column is also present in the same way in the custom column
-    #2. if any differences are observed - check why - likely a mistake
-    #3. then check for any which are identified by the custom method but not by the add.sh
-    
-    os.system("./add.sh "+os.path.abspath(args.out))
-    # paths=glob.glob(os.path.abspath(args.out)+"/*Pos"+end+".csv")
-    # allSamples(args.out,paths,end)
+#===========================================
+#=================NOTES=====================
+#===========================================
+# 1. have a logger ready for the following tasks:
+#       - log which minLen values were discarded
+#       - log general stats
+# 2. #it seems the add.sh is pretty slow as well
+#       - perhaps should timeit the execution of the custom python method against the add.sh
+#       - would be best not to apply any external methods or as little as possible
+#once the add.sh is replaced by the actual function - do one run with both included in order to
+#compare the results and make sure the new method is working properly
+#verification should be done as follows:
+#1. check if anything that is identified in the add.sh column is also present in the same way in the custom column
+#2. if any differences are observed - check why - likely a mistake
+#3. then check for any which are identified by the custom method but not by the add.sh
+
+#splicing information is currently missing
+#this is due to the fact that we can not build a reliable consensus sequence from alignment to the multi-fasta reference
+#what we need to do is write the following script without including in the main pipeline
+#1. align to a regular selected HIV reference
+#2. run hisat2 on that
+#3. perform step2 of the analysis pipeline on that data

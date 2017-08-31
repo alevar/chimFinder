@@ -79,6 +79,14 @@ def getFromPos(baseName,outDir):
         numReads=dataPos['totalCount'].sum()
     return [numSplits,numReads]
 
+def getFromGroup(baseName,outDir):
+    splitsPosPath=os.path.abspath(outDir)+'/'+baseName+'_Group.csv'
+    numGroups=0
+    if os.path.exists(splitsPosPath):
+        dataPos=pd.read_csv(splitsPosPath)
+        numGroups=len(dataPos)
+    return numGroups
+
 def getBowtieReadsHivFull(baseName,outDir):
     bowtieHivFullPath=os.path.abspath(outDir)+'/fullAlignments/'+baseName+'.full,hiv.sam'
     numBowtieHivFull=0
@@ -131,7 +139,8 @@ def main(args):
                                   "chimericBowtie",
                                   "numSplits",#
                                   "numReads",#
-                                  "numSpliceJunctionsHIV"])
+                                  "numSpliceJunctionsHIV",
+                                  "numGroupsSS"])
     for fileN in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
         fullPath=os.path.abspath(fileN)
         fileName=fullPath.split('/')[-1]
@@ -151,7 +160,8 @@ def main(args):
                                   "chimericBowtie",
                                   "numSplits",#
                                   "numReads",#
-                                  "numSpliceJunctionsHIV"])
+                                  "numSpliceJunctionsHIV",
+                                  "numGroupsSS"])
         row['sample']=[baseName]
         row[['krakenHiv%','krakenHum%']]=[getKrakenP(baseName,args.out)]
         row['chimericReadsExtracted']=[getNumChimericExtracted(baseName,args.out)]
@@ -163,6 +173,7 @@ def main(args):
         row['chimericBowtie']=[getChimericBowtie(baseName,args.out)]
         row[["numSplits","numReads"]]=[getFromPos(baseName,args.out)]
         row['numSpliceJunctionsHIV']=0 #none detected since no consensus sequence is built properly from the multiple reference files
+        row['numGroupsSS']=[getFromGroup(baseName,args.out)]
         data=pd.concat([data,row])
 
     data.to_csv(os.path.abspath(args.out)+'/sampleSummary.csv')
