@@ -849,14 +849,13 @@ def addAnnotation(row,baseName,outDir):
     return [hum_nearest_5SS,hum_nearest_3SS]
 
 def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
-    print(">>>>>>>>>>>>>   Begin analyses")
+    print(">>>>>>>>>>>>>   Begin analysing "+baseName)
     # load data from local alignments
     dataLocalHIV = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataLocalHUM = pd.read_csv(outDir+"/localAlignments/"+baseName+".chim.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     # load data from full alignments
     dataFullHIV = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hiv.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
     dataFullHUM = pd.read_csv(outDir+"/fullAlignments/"+baseName+".full.hum.sam",sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL'])
-    print("<<<<<<<<<<<<<   Done reading in") 
     
     outDirPOS=outDir+"/Positions/"+baseName
     if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
@@ -864,7 +863,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     if not os.path.exists(os.path.abspath(outDirPOS)):
         os.mkdir(os.path.abspath(outDirPOS))
     if not os.path.exists(os.path.abspath(outDir+"/Positions/"+baseName+"/fq")):
-        print('hello friends')
         os.mkdir(os.path.abspath(outDir+"/Positions/"+baseName+"/fq"))
 
     if (len(dataLocalHIV)==0 or len(dataLocalHUM)==0) and (len(dataFullHIV)==0):
@@ -873,7 +871,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
     data=pd.DataFrame([],columns=['comb','split','reads','count','orient','prim'])
 
     if len(dataLocalHIV)>0 and len(dataFullHIV)>0 and len(dataLocalHUM)>0:
-        print('826')
+        print('Local and Full present')
         # extract flag information
         extractFlagBits(dataLocalHIV)
         extractFlagBits(dataLocalHUM)
@@ -911,7 +909,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
 
         dataFullHUM,dataFullHIV=filterReads(dataFullHUM,dataFullHIV)
         if not len(dataFullHUM)==0:
-            print('867')
             dataFull=pd.DataFrame(dataFullHIV["QNAME"]).reset_index(drop=True)
             dataFullHUM=dataFullHUM.reset_index(drop=True)
             dataFullHIV=dataFullHIV.reset_index(drop=True)
@@ -938,25 +935,19 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
                 return 1
 
             #Now add the nearest human splice site for each chimeric position
-            # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
             data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
             data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-            os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
             data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
             groupBySpliceSites(data,outDir,baseName)
 
             childPIDS=[]
-            # cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            # cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            # os.system(cmdR1)
-            # os.system(cmdR2)
-            print("write read names")
             data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
             os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1_001.fastq")
             os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2_001.fastq")
 
         else:
-            print('936')
             if len(dataPosLocal)>0:
                 for minLen in minLenList:
                     dataPosLocal["reads_"+str(minLen)]=dataPosLocal.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
@@ -978,25 +969,21 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
 
             #Now add the nearest human splice site for each chimeric position
-            # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
             data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
             data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-            os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
             data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
             groupBySpliceSites(data,outDir,baseName)
 
             childPIDS=[]
-            # cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            # cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            # os.system(cmdR1)
-            # os.system(cmdR2)
             print("write read names")
             data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
             os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1_001.fastq")
             os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2_001.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
-        print('987')
+        print('Only Full present')
         # extract flag information
         extractFlagBits(dataFullHIV)
         extractFlagBits(dataFullHUM)
@@ -1053,19 +1040,14 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args):
             # os.system(bedCMD)
 
             #Now add the nearest human splice site for each chimeric position
-            # data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
             data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
             data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
-            os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
             data=pd.read_csv(outDir+"/"+baseName+"_Pos"+end+".csv")
             groupBySpliceSites(data,outDir,baseName)
 
             childPIDS=[]
-            # cmdR1="zcat "+dirPath+"/"+baseName+"_R1_001.fastq.gz > "+dirPath+"/"+baseName+"_R1_001.fastq"
-            # cmdR2="zcat "+dirPath+"/"+baseName+"_R2_001.fastq.gz > "+dirPath+"/"+baseName+"_R2_001.fastq"
-            # os.system(cmdR1)
-            # os.system(cmdR2)
-            print("write read names")
             data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
             os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1_001.fastq")
             os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2_001.fastq")
@@ -1105,7 +1087,6 @@ def testT(outDir,baseName,dirPath,fileName,minLenList,end,args):
     data.to_csv(outDir+"/"+baseName+"_Pos"+end+".csv",index=False)
 
 def main(args):
-    print(args.minLen)
     end=""
     if args.end==True:
         end='.no_dup'
@@ -1117,26 +1098,11 @@ def main(args):
         baseName="_R1".join(fileName.split("_R1")[:-1])
         scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)
 
-        setInter=['154_pos_12_S4',
-                 '154_pos_17_S5',
-                 '154_pos_18_S6',
-                 '154_pos_21_S7',
-                 '154_pos_6_S1',
-                 '154_pos_7_S2',
-                 '154_pos_8_S3']
-
-        setDone=['218_pos_5_S13',
-                 '256_pos_1_S8',
-                 '348_pos_3_S15',
-                 '218_pos_2_S11']
-
-        # if (baseName in setInter) and (baseName not in setDone):
-        if not baseName in setDone:
-            print("Analyzing: ",baseName)
-            if args.shell==True:
-                os.system(scriptCMD)
-            
-            resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
+        if args.shell==True:
+            os.system(scriptCMD)
+        
+        resultsRow=wrapper(os.path.abspath(args.out),baseName,dirPath,fileName,args.minLen,end,args)
+        print("<<<<<<<<<<<<<< Done analyzing "+baseName)
 
 #===========================================
 #=================NOTES=====================
