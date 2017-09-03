@@ -146,6 +146,14 @@ def main(args):
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
+        setInter=['154_pos_12_S4',
+                 '154_pos_17_S5',
+                 '154_pos_18_S6',
+                 '154_pos_21_S7',
+                 '154_pos_6_S1',
+                 '154_pos_7_S2',
+                 '154_pos_8_S3']
+        # if baseName in setInter:
         print("Working on: "+baseName)
         
         row=pd.DataFrame([],columns=["sample",#
