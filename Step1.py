@@ -685,7 +685,7 @@ def groupBySpliceSites(data,outDir,baseName,baseEnd):
     dfg.to_csv(outPath)
 
 # this function is to replace the add.sh script
-def addAnnotation(row,baseName,outDir):
+def addAnnotation(row,baseName,outDir,baseEnd):
     firstRead=row['allReads'].split(';')[0]
     hum_nearest_5SS='-'
     hum_nearest_3SS='-'
@@ -801,7 +801,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
                 return 1
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)])
             data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
             data.to_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv",index=False)
             # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
@@ -809,9 +809,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             groupBySpliceSites(data,outDir,baseName,baseEnd)
 
             childPIDS=[]
-            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+".fastq")
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+".fastq")
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath,baseEnd),axis=1)
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R1.fastq")
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R2.fastq")
 
         else:
             if len(dataPosLocal)>0:
@@ -835,7 +835,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)])
             data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
             data.to_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv",index=False)
             # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
@@ -844,9 +844,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
 
             childPIDS=[]
             print("write read names")
-            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+".fastq")
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+".fastq")
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath,baseEnd),axis=1)
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R1.fastq")
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R2.fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         print('Only Full present')
@@ -906,7 +906,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             # os.system(bedCMD)
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)])
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)])
             data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
             data.to_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv",index=False)
             # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
@@ -914,9 +914,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             groupBySpliceSites(data,outDir,baseName,baseEnd)
 
             childPIDS=[]
-            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+".fastq")
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+".fastq")
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath,baseEnd),axis=1)
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R1.fastq")
+            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R2.fastq")
     
     return 1
 
@@ -1098,7 +1098,7 @@ def main(args):
             dirPath="/".join(fullPath.split('/')[:-1])
             baseName="_R1".join(fileName.split("_R1")[:-1])
             baseEnd=fileName.split(baseName)[-1].split(".fastq.gz")[0].split('R1')[-1]
-            scriptCMD="./kraken1.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)+" "+baseEnd
+            scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)+" "+baseEnd
 
             if args.shell==True:
                 os.system(scriptCMD)
