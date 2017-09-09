@@ -229,18 +229,18 @@ def filterOverlapCombine(data,minLen):
     dataR1Right=dataR1Right[~((dataR1Right["R1HUM_TS"]<dataR1Right["R1HIV_TS"])&(dataR1Right["R1HUM_TE"]>dataR1Right["R1HIV_TE"]))]
     dataR1Right=dataR1Right[~((dataR1Right["R1HIV_TS"]<dataR1Right["R1HUM_TS"])&(dataR1Right["R1HIV_TE"]>dataR1Right["R1HUM_TE"]))]
     dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
-    dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(str)+":"+dataR1Right['R1HIV_RS'].astype(str)
+    dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(int).astype(str)+":"+dataR1Right['R1HIV_RS'].astype(int).astype(str)
     dataR1Right["comb"]=dataR1Right.split+"@"+dataR1Right.R1HUM_ID+":"+dataR1Right.R1HIV_ID
     dataR1Right["orient"]="R1-hum:hiv"
     dataR1Right["overlap"]=dataR1Right["overlapR1"]
-    dataR1Right["HUM_TS"]=dataR1Right["R1HUM_TS"]
-    dataR1Right["HUM_TE"]=dataR1Right["R1HUM_TE"]
-    dataR1Right["HUM_RS"]=dataR1Right["R1HUM_RS"]
-    dataR1Right["HUM_RE"]=dataR1Right["R1HUM_RE"]
-    dataR1Right["HIV_TS"]=dataR1Right["R1HIV_TS"]
-    dataR1Right["HIV_TE"]=dataR1Right["R1HIV_TE"]
-    dataR1Right["HIV_RS"]=dataR1Right["R1HIV_RS"]
-    dataR1Right["HIV_RE"]=dataR1Right["R1HIV_RE"]
+    dataR1Right["HUM_TS"]=dataR1Right["R1HUM_TS"].astype(int)
+    dataR1Right["HUM_TE"]=dataR1Right["R1HUM_TE"].astype(int)
+    dataR1Right["HUM_RS"]=dataR1Right["R1HUM_RS"].astype(int)
+    dataR1Right["HUM_RE"]=dataR1Right["R1HUM_RE"].astype(int)
+    dataR1Right["HIV_TS"]=dataR1Right["R1HIV_TS"].astype(int)
+    dataR1Right["HIV_TE"]=dataR1Right["R1HIV_TE"].astype(int)
+    dataR1Right["HIV_RS"]=dataR1Right["R1HIV_RS"].astype(int)
+    dataR1Right["HIV_RE"]=dataR1Right["R1HIV_RE"].astype(int)
     dataR1Right["HUM_ID"]=dataR1Right["R1HUM_ID"]
     dataR1Right["HIV_ID"]=dataR1Right["R1HIV_ID"]
     dataR1Right=dataR1Right[(dataR1Right["HIV_TE"]-dataR1Right["HIV_TS"]-dataR1Right["overlap"])>minLen]
@@ -253,18 +253,18 @@ def filterOverlapCombine(data,minLen):
     dataR1Left=dataR1Left[~((dataR1Left["R1HUM_TS"]<dataR1Left["R1HIV_TS"])&(dataR1Left["R1HUM_TE"]>dataR1Left["R1HIV_TE"]))]
     dataR1Left=dataR1Left[~((dataR1Left["R1HIV_TS"]<dataR1Left["R1HUM_TS"])&(dataR1Left["R1HIV_TE"]>dataR1Left["R1HUM_TE"]))]
     dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
-    dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(str)+":"+dataR1Left['R1HUM_RS'].astype(str)
+    dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(int).astype(str)+":"+dataR1Left['R1HUM_RS'].astype(int).astype(str)
     dataR1Left["comb"]=dataR1Left.split+"@"+dataR1Left.R1HIV_ID+":"+dataR1Left.R1HUM_ID
     dataR1Left["orient"]="R1-hiv:hum"
     dataR1Left["overlap"]=dataR1Left["overlapR1"]
-    dataR1Left["HUM_TS"]=dataR1Left["R1HUM_TS"]
-    dataR1Left["HUM_TE"]=dataR1Left["R1HUM_TE"]
-    dataR1Left["HUM_RS"]=dataR1Left["R1HUM_RS"]
-    dataR1Left["HUM_RE"]=dataR1Left["R1HUM_RE"]
-    dataR1Left["HIV_TS"]=dataR1Left["R1HIV_TS"]
-    dataR1Left["HIV_TE"]=dataR1Left["R1HIV_TE"]
-    dataR1Left["HIV_RS"]=dataR1Left["R1HIV_RS"]
-    dataR1Left["HIV_RE"]=dataR1Left["R1HIV_RE"]
+    dataR1Left["HUM_TS"]=dataR1Left["R1HUM_TS"].astype(int)
+    dataR1Left["HUM_TE"]=dataR1Left["R1HUM_TE"].astype(int)
+    dataR1Left["HUM_RS"]=dataR1Left["R1HUM_RS"].astype(int)
+    dataR1Left["HUM_RE"]=dataR1Left["R1HUM_RE"].astype(int)
+    dataR1Left["HIV_TS"]=dataR1Left["R1HIV_TS"].astype(int)
+    dataR1Left["HIV_TE"]=dataR1Left["R1HIV_TE"].astype(int)
+    dataR1Left["HIV_RS"]=dataR1Left["R1HIV_RS"].astype(int)
+    dataR1Left["HIV_RE"]=dataR1Left["R1HIV_RE"].astype(int)
     dataR1Left["HUM_ID"]=dataR1Left["R1HUM_ID"]
     dataR1Left["HIV_ID"]=dataR1Left["R1HIV_ID"]
     dataR1Left=dataR1Left[(dataR1Left["HIV_TE"]-dataR1Left["HIV_TS"]-dataR1Left["overlap"])>minLen]
@@ -277,18 +277,18 @@ def filterOverlapCombine(data,minLen):
     dataR2Right=dataR2Right[~((dataR2Right["R2HUM_TS"]<dataR2Right["R2HIV_TS"])&(dataR2Right["R2HUM_TE"]>dataR2Right["R2HIV_TE"]))]
     dataR2Right=dataR2Right[~((dataR2Right["R2HIV_TS"]<dataR2Right["R2HUM_TS"])&(dataR2Right["R2HIV_TE"]>dataR2Right["R2HUM_TE"]))]
     dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
-    dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(str)+":"+dataR2Right['R2HIV_RS'].astype(str)
+    dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(int).astype(str)+":"+dataR2Right['R2HIV_RS'].astype(int).astype(str)
     dataR2Right["comb"]=dataR2Right.split+"@"+dataR2Right.R2HUM_ID+":"+dataR2Right.R2HIV_ID
     dataR2Right["orient"]="R2-hum:hiv"
     dataR2Right["overlap"]=dataR2Right["overlapR2"]
-    dataR2Right["HUM_TS"]=dataR2Right["R2HUM_TS"]
-    dataR2Right["HUM_TE"]=dataR2Right["R2HUM_TE"]
-    dataR2Right["HUM_RS"]=dataR2Right["R2HUM_RS"]
-    dataR2Right["HUM_RE"]=dataR2Right["R2HUM_RE"]
-    dataR2Right["HIV_TS"]=dataR2Right["R2HIV_TS"]
-    dataR2Right["HIV_TE"]=dataR2Right["R2HIV_TE"]
-    dataR2Right["HIV_RS"]=dataR2Right["R2HIV_RS"]
-    dataR2Right["HIV_RE"]=dataR2Right["R2HIV_RE"]
+    dataR2Right["HUM_TS"]=dataR2Right["R2HUM_TS"].astype(int)
+    dataR2Right["HUM_TE"]=dataR2Right["R2HUM_TE"].astype(int)
+    dataR2Right["HUM_RS"]=dataR2Right["R2HUM_RS"].astype(int)
+    dataR2Right["HUM_RE"]=dataR2Right["R2HUM_RE"].astype(int)
+    dataR2Right["HIV_TS"]=dataR2Right["R2HIV_TS"].astype(int)
+    dataR2Right["HIV_TE"]=dataR2Right["R2HIV_TE"].astype(int)
+    dataR2Right["HIV_RS"]=dataR2Right["R2HIV_RS"].astype(int)
+    dataR2Right["HIV_RE"]=dataR2Right["R2HIV_RE"].astype(int)
     dataR2Right["HUM_ID"]=dataR2Right["R2HUM_ID"]
     dataR2Right["HIV_ID"]=dataR2Right["R2HIV_ID"]
     dataR2Right=dataR2Right[(dataR2Right["HIV_TE"]-dataR2Right["HIV_TS"]-dataR2Right["overlap"])>minLen]
@@ -301,18 +301,18 @@ def filterOverlapCombine(data,minLen):
     dataR2Left=dataR2Left[~((dataR2Left["R2HUM_TS"]<dataR2Left["R2HIV_TS"])&(dataR2Left["R2HUM_TE"]>dataR2Left["R2HIV_TE"]))]
     dataR2Left=dataR2Left[~((dataR2Left["R2HIV_TS"]<dataR2Left["R2HUM_TS"])&(dataR2Left["R2HIV_TE"]>dataR2Left["R2HUM_TE"]))]
     dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
-    dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(str)+":"+dataR2Left['R2HUM_RS'].astype(str)
+    dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(int).astype(str)+":"+dataR2Left['R2HUM_RS'].astype(int).astype(str)
     dataR2Left["comb"]=dataR2Left.split+"@"+dataR2Left.R2HIV_ID+":"+dataR2Left.R2HUM_ID
     dataR2Left["orient"]="R2-hiv:hum"
     dataR2Left["overlap"]=dataR2Left["overlapR2"]
-    dataR2Left["HUM_TS"]=dataR2Left["R2HUM_TS"]
-    dataR2Left["HUM_TE"]=dataR2Left["R2HUM_TE"]
-    dataR2Left["HUM_RS"]=dataR2Left["R2HUM_RS"]
-    dataR2Left["HUM_RE"]=dataR2Left["R2HUM_RE"]
-    dataR2Left["HIV_TS"]=dataR2Left["R2HIV_TS"]
-    dataR2Left["HIV_TE"]=dataR2Left["R2HIV_TE"]
-    dataR2Left["HIV_RS"]=dataR2Left["R2HIV_RS"]
-    dataR2Left["HIV_RE"]=dataR2Left["R2HIV_RE"]
+    dataR2Left["HUM_TS"]=dataR2Left["R2HUM_TS"].astype(int)
+    dataR2Left["HUM_TE"]=dataR2Left["R2HUM_TE"].astype(int)
+    dataR2Left["HUM_RS"]=dataR2Left["R2HUM_RS"].astype(int)
+    dataR2Left["HUM_RE"]=dataR2Left["R2HUM_RE"].astype(int)
+    dataR2Left["HIV_TS"]=dataR2Left["R2HIV_TS"].astype(int)
+    dataR2Left["HIV_TE"]=dataR2Left["R2HIV_TE"].astype(int)
+    dataR2Left["HIV_RS"]=dataR2Left["R2HIV_RS"].astype(int)
+    dataR2Left["HIV_RE"]=dataR2Left["R2HIV_RE"].astype(int)
     dataR2Left["HUM_ID"]=dataR2Left["R2HUM_ID"]
     dataR2Left["HIV_ID"]=dataR2Left["R2HIV_ID"]
     dataR2Left=dataR2Left[(dataR2Left["HIV_TE"]-dataR2Left["HIV_TS"]-dataR2Left["overlap"])>minLen]
@@ -464,51 +464,56 @@ def getSet(row):
     tmpLocalQNAME=list(row["reads"])
     return tmpLocalQNAME
 
-def writeReadNames(outDir,row,fileName,baseName,dirPath,baseEnd):
+def writeReadNames(outDir,row,fileNameR1,fileNameR2,baseName,dirPath,baseEnd):
     outD=os.path.abspath(outDir)
     tempF=outD+'/tempF'
-    txtPathAll=outD+'/Positions/'+baseName+baseEnd+"/"+str(row["comb"].replace("|","_"))+"_"+str(int(row["totalCount"]))+".all.txt"
-    readsFileAll=open(txtPathAll,'w+')
+    # txtPathAll=outD+'/Positions/'+baseName+baseEnd+"/"+str(row["hum_nearest_5SS"].strip('\n')+"@"+row["R"])+".all.txt"
+    # readsFileAll=open(txtPathAll,'w+')
 
-    readsListAll=[]
+    # readsListAll=[]
 
-    dataPosAll=row['allReads']
-    if ";" in dataPosAll:
-        for x in dataPosAll.split(";"):
-            readsListAll.append(x)
-    else:
-        readsListAll.append(dataPosAll)
+    # dataPosAll=row['allReads']
+    # if ";" in dataPosAll:
+    #     for x in dataPosAll.split(";"):
+    #         readsListAll.append(x)
+    # else:
+    #     readsListAll.append(dataPosAll)
 
-    for QNAME in readsListAll:
-        readsFileAll.write(QNAME+"\n")
-    readsFileAll.close()
+    # for QNAME in readsListAll:
+    #     readsFileAll.write(QNAME+"\n")
+    # readsFileAll.close()
 
-    outPath1_All="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row["comb"])+"_"+str(int(row["totalCount"]))+"_R1.all.fq'"
-    outPath2_All="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row["comb"])+"_"+str(int(row["totalCount"]))+"_R2.all.fq'"
-    scriptCMD="./extractReadsPerSplit.sh "+tempF+" "+fileName+" "+txtPathAll+" "+outPath1_All+" "+outPath2_All
-    os.system(scriptCMD)
+    stringReads=row['allReads'].replace(';','|')
 
-    # Now do the same for the span reads
-    txtPathSpan=outD+'/Positions/'+baseName+baseEnd+"/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["totalCount"]))+".span.txt"
-    readsFileSpan=open(txtPathSpan,'w+')
-    readsListSpan=[]
+    outPath1_All="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row['hum_nearest_5SS'].strip('\n')+"@"+row["R"])+"_R1.all.fa'"
+    outPath2_All="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row['hum_nearest_5SS'].strip('\n')+"@"+row["R"])+"_R2.all.fa'"
+    # scriptCMD="./extractReadsPerSplit.sh "+tempF+" "+fileName+" "+stringReads+" "+outPath1_All+" "+outPath2_All
+    cmdR1="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileNameR1+" | seqtk seq -a - > "+outPath1_All
+    cmdR2="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileNameR2+" | seqtk seq -a - > "+outPath2_All
+    os.system(cmdR1)
+    os.system(cmdR2)
 
-    dataPosSpan=row['spanR1-R2']
-    if ";" in dataPosSpan:
-        for x in dataPosSpan.split(";"):
-            readsListSpan.append(x)
-    else:
-        readsListSpan.append(dataPosSpan)
+    # # Now do the same for the span reads
+    # txtPathSpan=outD+'/Positions/'+baseName+baseEnd+"/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["totalCount"]))+".span.txt"
+    # readsFileSpan=open(txtPathSpan,'w+')
+    # readsListSpan=[]
 
-    for QNAME in readsListSpan:
-        if not QNAME=="-":
-            readsFileSpan.write(QNAME+"\n")
-    readsFileSpan.close()
+    # dataPosSpan=row['spanR1-R2']
+    # if ";" in dataPosSpan:
+    #     for x in dataPosSpan.split(";"):
+    #         readsListSpan.append(x)
+    # else:
+    #     readsListSpan.append(dataPosSpan)
 
-    outPath1_Span="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["spanCount"]))+"_R1.span.fq'"
-    outPath2_Span="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["spanCount"]))+"_R2.span.fq'"
-    scriptCMD="./extractReadsPerSplit.sh "+tempF+" "+fileName+" "+txtPathSpan+" "+outPath1_Span+" "+outPath2_Span
-    os.system(scriptCMD)
+    # for QNAME in readsListSpan:
+    #     if not QNAME=="-":
+    #         readsFileSpan.write(QNAME+"\n")
+    # readsFileSpan.close()
+
+    # outPath1_Span="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["spanCount"]))+"_R1.span.fq'"
+    # outPath2_Span="'"+outD+"/Positions/"+baseName+baseEnd+"/fq/"+str(row["comb"].replace('|','_'))+"_"+str(int(row["spanCount"]))+"_R2.span.fq'"
+    # scriptCMD="./extractReadsPerSplit.sh "+tempF+" "+fileName+" "+txtPathSpan+" "+outPath1_Span+" "+outPath2_Span
+    # os.system(scriptCMD)
 
 def getStats(data,baseName,outDir):
     numSpliceJunctions=0
@@ -677,14 +682,18 @@ def groupBySpliceSites(data,outDir,baseName,baseEnd):
         },
         'comb':{
             'comb': lambda x: ';'.join(set(x))
+        },
+        'alignmentScore_raw':{
+            'alignmentScore_raw':'sum'
         }
     }
-    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS"])[["comb","R","allReads","totalCount","spanCount","spanR1-R2","prim"]].agg(aggregations)).reset_index()
-    dfg=dfg.sort_values(by='groupsCount',ascending=False).reset_index(drop=True)
+    
+    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS","chr","R"])[["comb","allReads","totalCount","spanCount","spanR1-R2","prim","alignmentScore_raw"]].agg(aggregations)).reset_index()
+    dfg["alignmentScore"]=dfg['alignmentScore_raw']/dfg['allReads_count']
+    dfg=dfg.sort_values(by='groupsCount',ascending=False).drop(["alignmentScore_raw"],axis=1).reset_index(drop=True)
     outPath=os.path.abspath(outDir)+"/"+baseName+baseEnd+"_Group.csv"
     dfg.to_csv(outPath)
 
-# this function is to replace the add.sh script
 def addAnnotation(row,baseName,outDir,baseEnd):
     firstRead=row['allReads'].split(';')[0]
     hum_nearest_5SS='-'
@@ -712,7 +721,7 @@ def addAnnotation(row,baseName,outDir,baseEnd):
             SS3_CMD="grep '"+firstRead+"' "+outDir+"/splices/"+baseName+baseEnd+".chim.txt"+" | awk -F '\t' '{print $10}'"
             hum_nearest_3SS=subprocess.check_output(SS3_CMD,shell=True)
 
-    return [hum_nearest_5SS,hum_nearest_3SS]
+    return pd.Series({'hum_nearest_5SS': hum_nearest_5SS, 'hum_nearest_3SS': hum_nearest_3SS})
 
 def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
     print(">>>>>>>>>>>>>   Begin analysing "+baseName)
@@ -791,27 +800,52 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
             dataPosFull=findSupport(dataFull,minLenList)
+            print("test 1")
             if len(dataPosFull)>0:
                 dataPosFull=addSpan(dataFull,dataPosFull)
                 dataPosFull.loc[dataPosFull['spanCount'].isnull(),['spanCount']]=dataPosFull.loc[dataPosFull['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
                 dataPosFull.loc[dataPosFull['spanR1-R2'].isnull(),['spanR1-R2']]=dataPosFull.loc[dataPosFull['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
             
+            print("test 2")
             data=combineLocalFull(dataPosLocal,dataPosFull,minLenList)
+            print("test 3")
             if len(data)==0:
                 return 1
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)])
-            data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)
+            print("test 4")
+            data=data.drop(["split","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            print("test 5")
             data.to_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv",index=False)
-            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv"))
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv")
+
+            colList=[]
+            colListLen=[int(x.split("_")[-1]) for x in list(df) if 'reads_' in x]
+            for minLen in colListLen:
+                df['score_'+str(minLen)]=df['count_'+str(minLen)]*minLen
+                colList.append('score_'+str(minLen))
+
+            df['alignmentScore_raw']=df[colList].sum(axis=1)
+            
             groupBySpliceSites(data,outDir,baseName,baseEnd)
 
+            data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Group"+end+".csv")
+            data=data[~(data['hum_nearest_5SS']=='-\n')|~(data['hum_nearest_5SS']=='-\n')].reset_index(drop=True).drop("Unnamed: 0",axis=1)
+            cleanPath=outDir+"/"+baseName+baseEnd+"_Group"+end+".clean.csv"
+            data=data.reset_index()
+            data.to_csv(cleanPath)
+            print("test 5.5")
+
             childPIDS=[]
-            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath,baseEnd),axis=1)
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R1.fastq")
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R2.fastq")
+            fileNameR1="R1".join(fileName.split('R1')[:-1])+"R1"+fileName.split('R1')[-1]
+            fileNameR1=fileNameR1.split(".fastq.gz")[0]+".fastq"
+            fileNameR2="R1".join(fileName.split('R1')[:-1])+"R2"+fileName.split('R1')[-1]
+            fileNameR2=fileNameR2.split(".fastq.gz")[0]+".fastq"
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath,baseEnd),axis=1)
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
 
         else:
             if len(dataPosLocal)>0:
@@ -821,7 +855,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
                     dataPosLocal.loc[(dataPosLocal['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
 
             dataPosLocal["prim"]=1
+            print("test 6")
             data=pd.concat([data,dataPosLocal])
+            print("test 7")
             data.reset_index(drop=True)
 
             colList=[]
@@ -830,23 +866,47 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             data['totalCount']=data[colList].sum(axis=1)
 
             data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
+            print("test 8")
             data.loc[data['spanCount'].isnull(),['spanCount']]=0
+            print("test 9")
             data.loc[data['spanR1-R2'].isnull(),['spanR1-R2']]=data.loc[data['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
             data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
+            print("test 10")
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)])
-            data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)
+            print("test 11")
+            data=data.drop(["split","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            print("test 12")
             data.to_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv",index=False)
-            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv"))
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv")
+
+            colList=[]
+            colListLen=[int(x.split("_")[-1]) for x in list(df) if 'reads_' in x]
+            for minLen in colListLen:
+                df['score_'+str(minLen)]=df['count_'+str(minLen)]*minLen
+                colList.append('score_'+str(minLen))
+
+            df['alignmentScore_raw']=df[colList].sum(axis=1)
+            
             groupBySpliceSites(data,outDir,baseName,baseEnd)
+            print("test 13")
+            data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Group"+end+".csv")
+            data=data[~(data['hum_nearest_5SS']=='-\n')|~(data['hum_nearest_5SS']=='-\n')].reset_index(drop=True).drop("Unnamed: 0",axis=1)
+            cleanPath=outDir+"/"+baseName+baseEnd+"_Group"+end+".clean.csv"
+            data=data.reset_index()
+            data.to_csv(cleanPath)
 
             childPIDS=[]
             print("write read names")
-            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath,baseEnd),axis=1)
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R1.fastq")
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R2.fastq")
+            fileNameR1="R1".join(fileName.split('R1')[:-1])+"R1"+fileName.split('R1')[-1]
+            fileNameR1=fileNameR1.split(".fastq.gz")[0]+".fastq"
+            fileNameR2="R1".join(fileName.split('R1')[:-1])+"R2"+fileName.split('R1')[-1]
+            fileNameR2=fileNameR2.split(".fastq.gz")[0]+".fastq"
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath,baseEnd),axis=1)
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
 
     if len(dataLocalHIV)==0 and len(dataFullHIV)>0:
         print('Only Full present')
@@ -874,7 +934,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             dataFull.to_csv(outDir+"/"+baseName+baseEnd+".full"+end+".csv",index=False)
             # drop duplicated reads - preserve first occurence
             dataFull.drop_duplicates(inplace=True)
+            print("test 14")
             dataPosFull=findSupport(dataFull,minLenList)
+            print("test 15")
             data=pd.DataFrame([])
             if len(dataPosFull)>0:
                 data=addSpan(dataFull,dataPosFull)
@@ -882,16 +944,20 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
                 return 1
 
             data['allReads']=data['allReads'].apply(lambda x: ';'.join(x))
+            print("test 16")
             data.loc[data['spanCount'].isnull(),['spanCount']]=0
             data.loc[data['spanR1-R2'].isnull(),['spanR1-R2']]=data.loc[data['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
+            print("test 17")
             data['spanR1-R2']=data['spanR1-R2'].apply(lambda x: ';'.join(x) if len(x)>0 or pd.isnull(x) else '-')
             
+            print("test 18")
             colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
             for minLen in colListLen:
                 data["reads_"+str(minLen)]=data.apply(lambda row: ";".join(list(row['reads_'+str(minLen)])),axis=1)
                 data['count_'+str(minLen)]=data['reads_'+str(minLen)].str.split(";").str.len()
                 data.loc[(data['reads_'+str(minLen)]==""),"count_"+str(minLen)] = 0
-                
+            
+            print("test 19")    
             data.replace("","-",inplace=True)
             data.reset_index(drop=True)
             data["prim"]=0
@@ -900,23 +966,45 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             for minLen in colListLen:
                 colList=colList+["count_"+str(minLen)]
             data['totalCount']=data[colList].sum(axis=1)
+            print("test 20")
             #save the bed file of the positions
             # data[['chr','HUM_RS','HUM_RE']].to_csv(outDir+"/beds/"+baseName+".bed",sep='\t',header=False,index=False)
             # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
             # os.system(bedCMD)
 
             #Now add the nearest human splice site for each chimeric position
-            data[['hum_nearest_5SS','hum_nearest_3SS']]=pd.DataFrame([x for x in data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)])
-            data=data.drop(["split","chr","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            data[['hum_nearest_5SS','hum_nearest_3SS']]=data.apply(lambda row: addAnnotation(row,baseName,outDir,baseEnd),axis=1)
+            print("test 21")
+            data=data.drop(["split","HIV_RE","HIV_RS","HUM_RE","HUM_RS"],axis=1).sort_values(by='totalCount',ascending=False).reset_index(drop=True)
+            print("test 22")
             data.to_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv",index=False)
-            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+"_Pos"+end+".csv"))
+            # os.system("./add.sh "+os.path.abspath(outDir)+" "+os.path.abspath(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv"))
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv")
+
+            colList=[]
+            colListLen=[int(x.split("_")[-1]) for x in list(df) if 'reads_' in x]
+            for minLen in colListLen:
+                df['score_'+str(minLen)]=df['count_'+str(minLen)]*minLen
+                colList.append('score_'+str(minLen))
+
+            df['alignmentScore_raw']=df[colList].sum(axis=1)
+            
             groupBySpliceSites(data,outDir,baseName,baseEnd)
+            print("test 23")
+            data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Group"+end+".csv")
+            data=data[~(data['hum_nearest_5SS']=='-\n')|~(data['hum_nearest_5SS']=='-\n')].reset_index(drop=True).drop("Unnamed: 0",axis=1)
+            cleanPath=outDir+"/"+baseName+baseEnd+"_Group"+end+".clean.csv"
+            data=data.reset_index()
+            data.to_csv(cleanPath)
 
             childPIDS=[]
-            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileName,baseName,dirPath,baseEnd),axis=1)
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R1.fastq")
-            os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+baseEnd+"_R2.fastq")
+            fileNameR1="R1".join(fileName.split('R1')[:-1])+"R1"+fileName.split('R1')[-1]
+            fileNameR1=fileNameR1.split(".fastq.gz")[0]+".fastq"
+            fileNameR2="R1".join(fileName.split('R1')[:-1])+"R2"+fileName.split('R1')[-1]
+            fileNameR2=fileNameR2.split(".fastq.gz")[0]+".fastq"
+            data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath,baseEnd),axis=1)
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
     
     return 1
 
@@ -1098,7 +1186,7 @@ def main(args):
             dirPath="/".join(fullPath.split('/')[:-1])
             baseName="_R1".join(fileName.split("_R1")[:-1])
             baseEnd=fileName.split(baseName)[-1].split(".fastq.gz")[0].split('R1')[-1]
-            scriptCMD="./kraken.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)+" "+baseEnd
+            scriptCMD="./kraken2.sh "+dirPath+" "+fileName+" "+args.out+" "+args.krakenDB+" "+args.hivDB+" "+args.humDB+" "+args.annotation+" "+str(args.threads)+" "+baseEnd
 
             if args.shell==True:
                 os.system(scriptCMD)

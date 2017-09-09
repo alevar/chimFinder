@@ -2,7 +2,7 @@
 
 outputDir=$1
 file=$2
-pathChimReads=$3
+string=$3
 outPath1=$4
 outPath2=$5
 
@@ -16,5 +16,5 @@ sampleR1Base="${sampleR1%_R1*}"_R1"${sampleR1##*_R1}".fastq
 # rm ${pathChimReads}
 # mv ${pathChimReads}.t ${pathChimReads}
 
-grep -A 3 --no-group-separator -Ff ${pathChimReads} ${outputDir}/${sampleR1Base} > ${outPath1}
-grep -A 3 --no-group-separator -Ff ${pathChimReads} ${outputDir}/${sampleR2Base} > ${outPath2}
+egrep -A 3 "${string}" ${outputDir}/${sampleR1Base} | seqtk seq -a - > ${outPath1}
+egrep -A 3 "${string}" ${outputDir}/${sampleR2Base} | seqtk seq -a - > ${outPath2}
