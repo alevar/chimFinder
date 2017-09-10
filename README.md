@@ -33,3 +33,17 @@
 2. kraken HUM
 3. Bowtie full hiv
 4. bowtie full hum
+
+Questions and ideas for future standalone C implementation:
+1. how do you calculate repetiteveness coefficient
+2. correct alignment length for the repetitiveness. Suppose human is mapped 100-150 but 40nts are highly repetitive. The score should be inflated somehow
+3. Another - in final group.csv aggregations calculate average alignment len
+4. What are good strategies for confidence score calculations
+5. Why is bowtie different from BLAT/Blast
+6. For nanopore/real-time sequencing: detect integration site in real time
+7. Confidence Score:
+	repetitiveness of the read
+	alignment length for human
+	alignment len for hiv
+	number of support reads
+8. Report consensus sequence for each integration site
