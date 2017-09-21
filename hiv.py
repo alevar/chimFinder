@@ -20,54 +20,87 @@ def hiv(argv):
 
     parser_step1 = subparsers.add_parser('step1',
                                 help='step1 help')
-    parser_step1.add_argument('-i',
-                                '--input',
+    parser_step1.add_argument('-i1',
+                                '--input1',
                                 required=True,
                                 type=str,
-                                help="directory which contains fastq.gz files")
+                                help="first alignment")
+    parser_step1.add_argument('-i2',
+                                '--input2',
+                                required=True,
+                                type=str,
+                                help="second alignment")
     parser_step1.add_argument('-o',
                                 '--out',
                                 required=False,
                                 type=str,
                                 default="./out",
-                                help="output directory")
-    parser_step1.add_argument('-k',
-                                '--krakenDB',
-                                required=True,
-                                type=str,
-                                help="path to kraken database")
-    parser_step1.add_argument('-v',
-                                '--hivDB',
-                                required=True,
-                                type=str,
-                                help="path to the hiv reference")
-    parser_step1.add_argument('-g',
-                                '--humDB',
-                                required=True,
-                                type=str,
-                                help="path to the hg38 reference")
+                                help="output file")
     parser_step1.add_argument('-t',
                               '--threads',
                               required=False,
                               default=1,
                               type=int,
                               help="the number of threads to use in the computation")
+    parser_step1.add_argument('-m',
+                              '--minCount',
+                              required=False,
+                              default=5,
+                              type=int,
+                              help="the minimum number of reads supporting an integration site.")
+    parser_step1.add_argument('-M',
+                              '--weightCount',
+                              required=False,
+                              default=5,
+                              type=int,
+                              help="the minimum number of reads supporting an integration site.")
+    parser_step1.add_argument('-n',
+                              '--minEntropy',
+                              required=False,
+                              default=0.5,
+                              type=int,
+                              help="minimum alignment entropy score.")
+    parser_step1.add_argument('-N',
+                              '--weightEntropy',
+                              required=False,
+                              default=0.5,
+                              type=int,
+                              help="minimum alignment entropy score.")
+    parser_step1.add_argument('-q',
+                              '--minQual',
+                              required=False,
+                              default=10,
+                              type=int,
+                              help="minimum mean mapping quality of sequenced read. Everything below this threshold will be reported as multialignment for which no assumption can be made from the annotation")
+    parser_step1.add_argument('-Q',
+                              '--weightQual',
+                              required=False,
+                              default=10,
+                              type=int,
+                              help="minimum mean mapping quality of sequenced read. Everything below this threshold will be reported as multialignment for which no assumption can be made from the annotation")
     parser_step1.add_argument('-x',
                               '--minLen',
                               required=False,
-                              default="30",
-                              nargs="*",
+                              default=30,
                               type=int,
                               help="the minimum number of nucleotides in alignment to keep a read.")
+    parser_step1.add_argument('-X',
+                              '--weightLen',
+                              required=False,
+                              default=30,
+                              type=int,
+                              help="the minimum number of nucleotides in alignment to keep a read.")
+    parser_step1.add_argument('-s',
+                              '--score',
+                              required=False,
+                              default=3,
+                              type=int,
+                              help="the minimum overall score to keep.")
     parser_step1.add_argument('-a',
                               '--annotation',
                               required=True,
                               type=str,
                               help="annotation for the human genome")
-    parser_step1.add_argument('-s',
-                              '--shell',
-                              action="store_true",
-                              help="run shell scripts")
     parser_step1.add_argument('-e',
                               '--end',
                               action="store_true",
@@ -76,6 +109,10 @@ def hiv(argv):
                               '--writeReads',
                               action="store_true",
                               help="write reads to fasta files")
+    parser_step1.add_argument('-p',
+                              '--plot',
+                              action="store_true",
+                              help="plot snapshots")
     parser_step1.set_defaults(func=Step1.main)
 
 #========================================
