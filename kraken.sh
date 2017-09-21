@@ -71,9 +71,14 @@ TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 SECONDS=0
 echo ALIGNING ALL HUMAN READS
-bowtie2 --very-sensitive-local --no-unal --local --phred33 -p 12 -x ${humanDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}${baseEnd}.full.hum.sam
+bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -1 ${outputDir}/tempF/${sample}_R1${baseEnd}.fastq -2 ${outputDir}/tempF/${sample}_R2${baseEnd}.fastq -S ${outputDir}/fullAlignments/${sample}${baseEnd}.full.hum.sam
+DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+echo DONE IN ${DUR}
+TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -1 ${inputDir}/${sampleR1Base} -2 ${inputDir}/${sampleR2Base} -S ${outputDir}/fullAlignments/${sample}${baseEnd}.full.hiv.sam
+SECONDS=0
+echo ALIGNING ALL HIV READS
+bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -1 ${outputDir}/tempF/${sample}_R1${baseEnd}.fastq -2 ${outputDir}/tempF/${sample}_R2${baseEnd}.fastq -S ${outputDir}/fullAlignments/${sample}${baseEnd}.full.hiv.sam
 DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 echo DONE IN ${DUR}
 TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))

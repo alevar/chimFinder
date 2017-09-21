@@ -47,3 +47,4 @@ Questions and ideas for future standalone C implementation:
 	alignment len for hiv
 	number of support reads
 8. Report consensus sequence for each integration site
+9. Another correction to implement is to say if alignment overlap between the human and hiv alignments on the read is greater than some constant than discard the read even if the alignments outside the overlap are sufficiently great.

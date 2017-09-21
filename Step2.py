@@ -112,7 +112,7 @@ def writeRefs(finalOut,finalOutUni,header,outDir,baseName):
 def indexAlign(args,finalOut,baseName,posName,posS):
     os.system("./spliceDetect.sh "+os.path.abspath(args.out)+" "+baseName+" "+args.input+" "+posName+" "+posS)
 
-def confirmSplice(baseName,filePath,args):
+def confirmSplice(baseName,filePath,args,baseEnd):
     header=""
     finalOut=[]
     finalOutUni=[]
@@ -134,11 +134,11 @@ def confirmSplice(baseName,filePath,args):
                 finalOut=contigsStrs
                 finalOutUni=contigStrsUni
 
-    writeRefs(finalOut,finalOutUni,header,args.out,baseName)
+    writeRefs(finalOut,finalOutUni,header,args.out,baseName+baseEnd)
 
-    os.system("./prepIndexAlign.sh "+os.path.abspath(args.out)+" "+baseName+" "+args.input)
+    os.system("./prepIndexAlign.sh "+os.path.abspath(args.out)+" "+baseName+" "+args.input+" "+baseEnd)
     for pos in finalOutUni:
-        indexAlign(args,finalOut,baseName,str(pos[1])+":"+str(pos[2]),str(pos[3]))
+        indexAlign(args,finalOut,baseName+baseEnd,str(pos[1])+":"+str(pos[2]),str(pos[3]))
     return [(x[1],x[2]) for x in finalOutUni]
 
 def extractFlagBits(data):
@@ -229,14 +229,15 @@ def confirm(args):
     df.to_csv(os.path.abspath(outDir)+"/splicing/splicePos.csv")
 
 def main(args):
-    for fileN in glob.glob(os.path.abspath(args.input)+"/*R1_001.fastq.gz"):
+    for fileN in glob.glob(os.path.abspath(args.input)+"/*R1*.fastq.gz"):
         fullPath=os.path.abspath(fileN)
         fileName=fullPath.split('/')[-1]
         dirPath="/".join(fullPath.split('/')[:-1])
         baseName="_R1".join(fileName.split("_R1")[:-1])
+        baseEnd=fileName.split(baseName)[-1].split(".fastq.gz")[0].split('R1')[-1]
         print("Working on: "+baseName)
-        consensusPath=os.path.abspath(args.out)+"/consensusHIV/"+baseName+".fa"
+        consensusPath=os.path.abspath(args.out)+"/consensusHIV/"+baseName+baseEnd+".fa"
         if os.path.exists(consensusPath):
-            poss=confirmSplice(baseName,consensusPath,args)
+            poss=confirmSplice(baseName,consensusPath,args,baseEnd)
 
     confirm(args)

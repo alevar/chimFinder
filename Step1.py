@@ -683,14 +683,14 @@ def groupBySpliceSites(data,outDir,baseName,baseEnd):
         'comb':{
             'comb': lambda x: ';'.join(set(x))
         },
-        'alignmentScore_raw':{
-            'alignmentScore_raw':'sum'
+        'score_raw':{
+            'score_raw':'sum'
         }
     }
     
-    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS","chr","R"])[["comb","allReads","totalCount","spanCount","spanR1-R2","prim","alignmentScore_raw"]].agg(aggregations)).reset_index()
-    dfg["alignmentScore"]=dfg['alignmentScore_raw']/dfg['allReads_count']
-    dfg=dfg.sort_values(by='groupsCount',ascending=False).drop(["alignmentScore_raw"],axis=1).reset_index(drop=True)
+    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_5SS","hum_nearest_3SS","chr","R"])[["comb","allReads","totalCount","spanCount","spanR1-R2","prim","score_raw"]].agg(aggregations)).reset_index()
+    dfg['score']=(dfg['score_raw']/dfg['groupsCount'])-(dfg['score_raw']**(-0.8))
+    dfg=dfg.sort_values(by='groupsCount',ascending=False).drop(["score_raw"],axis=1).reset_index(drop=True)
     outPath=os.path.abspath(outDir)+"/"+baseName+baseEnd+"_Group.csv"
     dfg.to_csv(outPath)
 
@@ -817,15 +817,15 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv")
 
             colList=[]
-            colListLen=[int(x.split("_")[-1]) for x in list(df) if 'reads_' in x]
+            colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
             for minLen in colListLen:
-                df['score_'+str(minLen)]=df['count_'+str(minLen)]*minLen
+                data['score_'+str(minLen)]=data['count_'+str(minLen)]*minLen
                 colList.append('score_'+str(minLen))
 
-            df['alignmentScore_raw']=df[colList].sum(axis=1)
+            data['alignmentScore_raw']=data[colList].sum(axis=1)
+            data['score_raw']=(data["alignmentScore_raw"]/data['totalCount'])-(data['alignmentScore_raw']**(-0.9))
             
             groupBySpliceSites(data,outDir,baseName,baseEnd)
-
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Group"+end+".csv")
             data=data[~(data['hum_nearest_5SS']=='-\n')|~(data['hum_nearest_5SS']=='-\n')].reset_index(drop=True).drop("Unnamed: 0",axis=1)
             cleanPath=outDir+"/"+baseName+baseEnd+"_Group"+end+".clean.csv"
@@ -870,12 +870,13 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv")
 
             colList=[]
-            colListLen=[int(x.split("_")[-1]) for x in list(df) if 'reads_' in x]
+            colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
             for minLen in colListLen:
-                df['score_'+str(minLen)]=df['count_'+str(minLen)]*minLen
+                data['score_'+str(minLen)]=data['count_'+str(minLen)]*minLen
                 colList.append('score_'+str(minLen))
 
-            df['alignmentScore_raw']=df[colList].sum(axis=1)
+            data['alignmentScore_raw']=data[colList].sum(axis=1)
+            data['score_raw']=(data["alignmentScore_raw"]/data['totalCount'])-(data['alignmentScore_raw']**(-0.9))
             
             groupBySpliceSites(data,outDir,baseName,baseEnd)
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Group"+end+".csv")
@@ -958,13 +959,14 @@ def wrapper(outDir,baseName,dirPath,fileName,minLenList,end,args,baseEnd):
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Pos"+end+".csv")
 
             colList=[]
-            colListLen=[int(x.split("_")[-1]) for x in list(df) if 'reads_' in x]
+            colListLen=[int(x.split("_")[-1]) for x in list(data) if 'reads_' in x]
             for minLen in colListLen:
-                df['score_'+str(minLen)]=df['count_'+str(minLen)]*minLen
+                data['score_'+str(minLen)]=data['count_'+str(minLen)]*minLen
                 colList.append('score_'+str(minLen))
 
-            df['alignmentScore_raw']=df[colList].sum(axis=1)
-
+            data['alignmentScore_raw']=data[colList].sum(axis=1)
+            data['score_raw']=(data["alignmentScore_raw"]/data['totalCount'])-(data['alignmentScore_raw']**(-0.9))
+            
             groupBySpliceSites(data,outDir,baseName,baseEnd)
             data=pd.read_csv(outDir+"/"+baseName+baseEnd+"_Group"+end+".csv")
             data=data[~(data['hum_nearest_5SS']=='-\n')|~(data['hum_nearest_5SS']=='-\n')].reset_index(drop=True).drop("Unnamed: 0",axis=1)
