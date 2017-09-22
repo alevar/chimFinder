@@ -245,7 +245,7 @@ def createData(data,dataHUM,dataHIV):
         "R1HUM_RS",
         "R1HUM_RE",
         "READ_LEN_R1",
-        "SEQ_R1",
+        "R1HUM_SEQ",
         "QUAL_R1",
         "R1HUM_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHUMR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
@@ -264,7 +264,7 @@ def createData(data,dataHUM,dataHIV):
         "R2HUM_RS",
         "R2HUM_RE",
         "READ_LEN_R2",
-        "SEQ_R2",
+        "R2HUM_SEQ",
         "QUAL_R2",
         "R2HUM_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHUMR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
@@ -282,12 +282,14 @@ def createData(data,dataHUM,dataHIV):
         "R1HIV_ID",
         "R1HIV_RS",
         "R1HIV_RE",
+        "R1HIV_SEQ",
         "R1HIV_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHIVR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
                                                                                                         "Reference_start",
                                                                                                         "Reference_end",
+                                                                                                        "SEQ",
                                                                                                         "MAPQ"]]
     df[["QNAME",
         "R2HIV_TS",
@@ -295,12 +297,14 @@ def createData(data,dataHUM,dataHIV):
         "R2HIV_ID",
         "R2HIV_RS",
         "R2HIV_RE",
+        "R2HIV_SEQ",
         "R2HIV_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHIVR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
                                                                                                         "Reference_start",
                                                                                                         "Reference_end",
+                                                                                                        "SEQ",
                                                                                                         "MAPQ"]]
     df[["R1HUM_ID",
         "R2HUM_ID",
@@ -343,7 +347,7 @@ def createDataUnpaired(data,dataHUM,dataHIV):
         "HUM_RS",
         "HUM_RE",
         "READ_LEN",
-        "SEQ",
+        "HUM_SEQ",
         "QUAL",
         "HUM_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHUM,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
@@ -361,12 +365,14 @@ def createDataUnpaired(data,dataHUM,dataHIV):
         "HIV_ID",
         "HIV_RS",
         "HIV_RE",
+        "HIV_SEQ",
         "HIV_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHIV,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
                                                                                                         "Reference_start",
                                                                                                         "Reference_end",
+                                                                                                        "SEQ",
                                                                                                         "MAPQ"]]
     df[["HUM_ID",
         "HUM_ID",
@@ -413,30 +419,36 @@ def topologicalNormalizedEntropy(s):
 #another paper: Look at figure 2 https://www.nature.com/articles/srep19788#f2
 #more https://www.xycoon.com/normalized_entropy.htm
 
-def processAligns(seq,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
+def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
 
     entropyScore_hiv=0
     entropyScore_hum=0
     meanQual_hiv=0
     meanQual_hum=0
 
-    s_hiv=seq[i1_hiv:i2_hiv]
+    s_hiv=seqHIV[i1_hiv:i2_hiv]
     if not len(s_hiv)==0:
         # ideal_hiv=eI(len(s_hiv))
         # if not ideal_hiv==0:
         #     entropyScore_hiv=abs(e(s_hiv))/ideal_hiv
         entropyScore_hiv=topologicalNormalizedEntropy(s_hiv)
         q_hiv=qual[i1_hiv:i2_hiv]
-        meanQual_hiv=sum([ord(x)-33 for x in q_hiv])/len(q_hiv)
+        if len(q_hiv)>0:
+            meanQual_hiv=sum([ord(x)-33 for x in q_hiv])/len(q_hiv)
+        else:
+            meanQual_hiv=0
 
-    s_hum=seq[i1_hum:i2_hum]
+    s_hum=seqHum[i1_hum:i2_hum]
     if not len(s_hum)==0:
         # ideal_hum=eI(len(s_hum))
         # if not ideal_hum==0:
         #     entropyScore_hum=abs(e(s_hum))/ideal_hum
         entropyScore_hum=topologicalNormalizedEntropy(s_hum)
         q_hum=qual[i1_hum:i2_hum]
-        meanQual_hum=sum([ord(x)-33 for x in q_hum])/len(q_hum)
+        if len(q_hum)>0:
+            meanQual_hum=sum([ord(x)-33 for x in q_hum])/len(q_hum)
+        else:
+            meanQual_hum=0
 
     return pd.Series({"entropyScore_hiv":entropyScore_hiv,
                         "meanQual_hiv":meanQual_hiv,
@@ -476,8 +488,10 @@ def filterOverlapCombine(data,minLen):
               "overlapR1",
               "overlapR2",
               "HIV",
-              "SEQ_R1",
-              "SEQ_R2",
+              "R1HUM_SEQ",
+              "R2HUM_SEQ",
+              "R1HIV_SEQ",
+              "R2HIV_SEQ",
               "QUAL_R1",
               "QUAL_R2",
               "R1HUM_MAPQ",
@@ -521,7 +535,8 @@ def filterOverlapCombine(data,minLen):
         dataR1Right[['entropyScore_hiv',
                      'meanQual_hiv',
                      'entropyScore_hum',
-                     'meanQual_hum']]=dataR1Right.merge(dataR1Right.apply(lambda row: processAligns(row['SEQ_R1'],
+                     'meanQual_hum']]=dataR1Right.merge(dataR1Right.apply(lambda row: processAligns(row['R1HUM_SEQ'],
+                                                                                                    row['R1HIV_SEQ'],
                                                                                                     row['QUAL_R1'],
                                                                                                     int(row['HIV_TS']+row['overlap']),
                                                                                                     int(row['HIV_TE']),
@@ -562,7 +577,8 @@ def filterOverlapCombine(data,minLen):
         dataR1Left[['entropyScore_hiv',
                      'meanQual_hiv',
                      'entropyScore_hum',
-                     'meanQual_hum']]=dataR1Left.merge(dataR1Left.apply(lambda row: processAligns(row['SEQ_R1'],
+                     'meanQual_hum']]=dataR1Left.merge(dataR1Left.apply(lambda row: processAligns(row['R1HUM_SEQ'],
+                                                                                                    row['R1HIV_SEQ'],
                                                                                                     row['QUAL_R1'],
                                                                                                     int(row['HIV_TS']),
                                                                                                     int(row['HIV_TE']-row['overlap']),
@@ -604,7 +620,8 @@ def filterOverlapCombine(data,minLen):
         dataR2Right[['entropyScore_hiv',
                      'meanQual_hiv',
                      'entropyScore_hum',
-                     'meanQual_hum']]=dataR2Right.merge(dataR2Right.apply(lambda row: processAligns(row['SEQ_R2'],
+                     'meanQual_hum']]=dataR2Right.merge(dataR2Right.apply(lambda row: processAligns(row['R2HUM_SEQ'],
+                                                                                                    row['R2HIV_SEQ'],
                                                                                                     row['QUAL_R2'],
                                                                                                     int(row['HIV_TS']+row['overlap']),
                                                                                                     int(row['HIV_TE']),
@@ -645,7 +662,8 @@ def filterOverlapCombine(data,minLen):
         dataR2Left[['entropyScore_hiv',
                      'meanQual_hiv',
                      'entropyScore_hum',
-                     'meanQual_hum']]=dataR2Left.merge(dataR2Left.apply(lambda row: processAligns(row['SEQ_R2'],
+                     'meanQual_hum']]=dataR2Left.merge(dataR2Left.apply(lambda row: processAligns(row['R2HUM_SEQ'],
+                                                                                                    row['R2HIV_SEQ'],
                                                                                                     row['QUAL_R2'],
                                                                                                     int(row['HIV_TS']),
                                                                                                     int(row['HIV_TE']-row['overlap']),
@@ -695,7 +713,8 @@ def filterOverlapCombineUnpaired(data,minLen):
         dataRight[['entropyScore_hiv',
                      'meanQual_hiv',
                      'entropyScore_hum',
-                     'meanQual_hum']]=dataRight.merge(dataRight.apply(lambda row: processAligns(row['SEQ'],
+                     'meanQual_hum']]=dataRight.merge(dataRight.apply(lambda row: processAligns(row['HUM_SEQ'],
+                                                                                                    row['HIV_SEQ'],
                                                                                                     row['QUAL'],
                                                                                                     int(row['HIV_TS']+row['overlap']),
                                                                                                     int(row['HIV_TE']),
@@ -732,12 +751,13 @@ def filterOverlapCombineUnpaired(data,minLen):
         dataLeft[['entropyScore_hiv',
                      'meanQual_hiv',
                      'entropyScore_hum',
-                     'meanQual_hum']]=dataLeft.merge(dataLeft.apply(lambda row: processAligns(row['SEQ'],
-                                                                                                    row['QUAL'],
-                                                                                                    int(row['HIV_TS']),
-                                                                                                    int(row['HIV_TE']-row['overlap']),
-                                                                                                    int(row['HUM_TS']+row['overlap']),
-                                                                                                    int(row['HUM_TE'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                     'meanQual_hum']]=dataLeft.merge(dataLeft.apply(lambda row: processAligns(row['HUM_SEQ'],
+                                                                                            row['HIV_SEQ'],
+                                                                                            row['QUAL'],
+                                                                                            int(row['HIV_TS']),
+                                                                                            int(row['HIV_TE']-row['overlap']),
+                                                                                            int(row['HUM_TS']+row['overlap']),
+                                                                                            int(row['HUM_TE'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                    'meanQual_hum_y']]
@@ -814,31 +834,31 @@ def findSupport(dataOrig,minLen,args,unpaired):
             'HIV_RE':'max'
         },
         'HIV_AL':{
-            'HIV_AL':'mean'
+            'HIV_AL':'sum'
         },
         'HUM_AL':{
-            'HUM_AL':'mean'
+            'HUM_AL':'sum'
         },
         'READ_LEN':{
-            'READ_LEN':'mean'
+            'READ_LEN':'sum'
         },
         'entropyScore_hiv':{
-            'entropyScore_hiv':'mean'
+            'entropyScore_hiv':'sum'
         },
         'entropyScore_hum':{
-            'entropyScore_hum':'mean'
+            'entropyScore_hum':'sum'
         },
         'meanQual_hiv':{
-            'meanQual_hiv':'mean'
+            'meanQual_hiv':'sum'
         },
         'meanQual_hum':{
-            'meanQual_hum':'mean'
+            'meanQual_hum':'sum'
         },
         'HIV_MAPQ':{
-            'HIV_MAPQ':'mean'
+            'HIV_MAPQ':'sum'
         },
         'HUM_MAPQ':{
-            'HUM_MAPQ':'mean'
+            'HUM_MAPQ':'sum'
         }
     }
 
@@ -860,7 +880,14 @@ def findSupport(dataOrig,minLen,args,unpaired):
     return dataPos
 
 def score(dataPos,args,minLen):
-    dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(int)
+    dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(int)/dataPos["count"]
+    dataPos["HIV_AL"]=dataPos["HIV_AL"].astype(int)/dataPos["count"]
+    dataPos["HUM_AL"]=dataPos["HUM_AL"].astype(int)/dataPos["count"]
+    dataPos["HIV_MAPQ"]=dataPos["HIV_MAPQ"].astype(int)/dataPos["count"]
+    dataPos["HUM_MAPQ"]=dataPos["HUM_MAPQ"].astype(int)/dataPos["count"]
+    dataPos["entropyScore_hiv"]=dataPos["entropyScore_hiv"].astype(int)/dataPos["count"]
+    dataPos["entropyScore_hum"]=dataPos["entropyScore_hum"].astype(int)/dataPos["count"]
+
     dataPos["HIV_AL_score"]=1-((dataPos["HIV_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
     dataPos["HUM_AL_score"]=1-((dataPos["HUM_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
     m=float(args.minCount)/2.0
@@ -868,22 +895,43 @@ def score(dataPos,args,minLen):
     dataPos["count_score"]=(((dataPos["count"]-m)/m)/((1.0/m)+(((dataPos["count"]-m)/m)**2)**0.5)/2)+0.5 # algebraic sigmoid function
     dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["HIV_MAPQ"]/10)))
     dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["HUM_MAPQ"]/10)))
-    
-    dataPos["score"]=dataPos['HIV_AL_score'] \
-                    *dataPos['entropyScore_hiv'] \
-                    *dataPos['HUM_AL_score'] \
-                    *dataPos['entropyScore_hum'] \
+
+    dataPos["score_raw"]=(dataPos['HIV_AL_score']*args.weightLen \
+                    +dataPos['entropyScore_hiv']*args.weightEntropy \
+                    +dataPos['HUM_AL_score']*args.weightLen \
+                    +dataPos['entropyScore_hum']*args.weightEntropy) \
+                    /((args.weightEntropy*2)+(args.weightLen*2)) \
                     *dataPos['count_score']
+
+    dataPos["score"]=dataPos['score_raw']*dataPos['count_score']
     dataPos=dataPos.round({'score': 3})
     return dataPos
 
-def approxCloseness(split1,split2):
-    res=abs(int(split1.split(":")[0])-int(split2.split(":")[0]))+abs(int(split1.split(":")[2])-int(split2.split(":")[2]))
-    try:
-        res2=math.log(res)
-    except:
-        return 0
-    return res2
+def approxCloseness(data,args):
+    data.sort_values(by=["HUM_RS","hum_nearest_SS"],inplace=True)
+    data["diff1"]=abs(data['HUM_RS']-data['HUM_RS'].shift(-1))
+    data["diff2"]=abs(data['HUM_RS']-data['HUM_RS'].shift(1))
+    data['t1']=data["diff1"]<args.close
+    data['t2']=data["diff2"]<args.close
+    data['t']=data['t1']|data['t2']
+
+    l=list(data["t"])
+    uid=0
+    start=True
+    newL=[]
+    for x in range(len(l)):
+        if start:
+            newL.append(uid)
+            start=False
+        elif l[x]==l[x-1]:
+            newL.append(uid)
+        else:
+            uid=uid+1
+            newL.append(uid)
+    data.reset_index(inplace=True,drop=True)
+    data["uid"]=pd.Series(newL)
+
+    return data.drop(['diff1','diff2','t1','t2','t'],axis=1).reset_index(drop=True)
 
 def getSet(row):
     tmpLocalQNAME=list(row["reads"])
@@ -1047,21 +1095,46 @@ def groupBySpliceSites(data):
         'comb':{
             'comb': lambda x: ';'.join(set(x))
         },
-        'score':{
-            'score':'sum'
+        'entropyScore_hum':{
+            'entropyScore_hum':'sum'
+        },
+        'entropyScore_hiv':{
+            'entropyScore_hiv':'sum'
+        },
+        'HIV_AL':{
+            'HIV_AL':'sum'
+        },
+        'HUM_AL':{
+            'HUM_AL':'sum'
+        },
+        'READ_LEN':{
+            'READ_LEN':'sum'
+        },
+        'HIV_MAPQ':{
+            'HIV_MAPQ':'sum'
+        },
+        'HUM_MAPQ':{
+            'HUM_MAPQ':'sum'
         }
     }
     
     dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
                                       "chr",
-                                      "R"])[["comb",
-                                            "reads",
-                                            "count",
-                                            "spanCount",
-                                            "spanR1-R2",
-                                            "score"]].agg(aggregations)).reset_index()
+                                      "R",
+                                      "uid"])[["comb",
+                                                "reads",
+                                                "count",
+                                                "spanCount",
+                                                "spanR1-R2",
+                                                "entropyScore_hum",
+                                                "entropyScore_hiv",
+                                                "HIV_AL",
+                                                "HUM_AL",
+                                                "READ_LEN",
+                                                "HIV_MAPQ",
+                                                "HUM_MAPQ"]].agg(aggregations)).reset_index()
 
-    return dfg.sort_values(by='score',ascending=False).reset_index(drop=True)
+    return dfg.reset_index(drop=True)
 
 def groupBySpliceSitesUnpaired(data):
     colNames=["orient"]
@@ -1078,19 +1151,44 @@ def groupBySpliceSitesUnpaired(data):
         'comb':{
             'comb': lambda x: ';'.join(set(x))
         },
-        'score':{
-            'score':'sum'
+        'entropyScore_hum':{
+            'entropyScore_hum':'sum'
+        },
+        'entropyScore_hiv':{
+            'entropyScore_hiv':'sum'
+        },
+        'HIV_AL':{
+            'HIV_AL':'sum'
+        },
+        'HUM_AL':{
+            'HUM_AL':'sum'
+        },
+        'READ_LEN':{
+            'READ_LEN':'sum'
+        },
+        'HIV_MAPQ':{
+            'HIV_MAPQ':'sum'
+        },
+        'HUM_MAPQ':{
+            'HUM_MAPQ':'sum'
         }
     }
     
     dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
                                       "chr",
-                                      "R"])[["comb",
-                                            "reads",
-                                            "count",
-                                            "score"]].agg(aggregations)).reset_index()
+                                      "R",
+                                      "uid"])[["comb",
+                                                "reads",
+                                                "count",
+                                                "entropyScore_hum",
+                                                "entropyScore_hiv",
+                                                "HIV_AL",
+                                                "HUM_AL",
+                                                "READ_LEN",
+                                                "HIV_MAPQ",
+                                                "HUM_MAPQ"]].agg(aggregations)).reset_index()
 
-    return dfg.sort_values(by='score',ascending=False).reset_index(drop=True)
+    return dfg.reset_index(drop=True)
 
 def addAnnotation(row,baseName,outDir):
     firstRead=row['reads'].split(';')[0]
@@ -1265,57 +1363,6 @@ def annotate(dataBed,annPath,data):
 
     # annotation should return - for those which do not intersect a genomic region
 
-# the following function will produce plots for the data
-# most importantly it will generate a snapshot plots for genomic regions as follows:
-# x-axis is the genomic region such as chromosome
-# y-axis is the coverage of the position
-def plotSnapshots(data):
-    x = np.linspace(0,10,100)
-    x[75:] = np.linspace(40,42.5,25)
-
-    y = np.sin(x)
-
-    f,(ax,ax2) = plt.subplots(1,2,sharey=True, facecolor='w')
-
-    # plot the same data on both axes
-    ax.plot(x, y)
-    ax2.plot(x, y)
-
-    ax.set_xlim(0,7.5)
-    ax2.set_xlim(40,42.5)
-
-    # hide the spines between ax and ax2
-    ax.spines['right'].set_visible(False)
-    ax2.spines['left'].set_visible(False)
-    ax.yaxis.tick_left()
-    ax.tick_params(labelright='off')
-    ax2.yaxis.tick_right()
-
-    # This looks pretty good, and was fairly painless, but you can get that
-    # cut-out diagonal lines look with just a bit more work. The important
-    # thing to know here is that in axes coordinates, which are always
-    # between 0-1, spine endpoints are at these locations (0,0), (0,1),
-    # (1,0), and (1,1).  Thus, we just need to put the diagonals in the
-    # appropriate corners of each of our axes, and so long as we use the
-    # right transform and disable clipping.
-
-    d = .015 # how big to make the diagonal lines in axes coordinates
-    # arguments to pass plot, just so we don't keep repeating them
-    kwargs = dict(transform=ax.transAxes, color='k', clip_on=False)
-    ax.plot((1-d,1+d), (-d,+d), **kwargs)
-    ax.plot((1-d,1+d),(1-d,1+d), **kwargs)
-
-    kwargs.update(transform=ax2.transAxes)  # switch to the bottom axes
-    ax2.plot((-d,+d), (1-d,1+d), **kwargs)
-    ax2.plot((-d,+d), (-d,+d), **kwargs)
-
-    # What's cool about this is that now if we vary the distance between
-    # ax and ax2 via f.subplots_adjust(hspace=...) or plt.subplot_tool(),
-    # the diagonal lines will move accordingly, and stay right at the tips
-    # of the spines they are 'breaking'
-
-    plt.show()
-
 # the following function will check if the second read in the pair supports the conformation
 # another idea is to for paired reads to see if the read on the hiv side is also aligned to hiv 
 # and the read on the human to another human
@@ -1404,7 +1451,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         data.drop_duplicates(inplace=True)
         print('1147')
         dataPos=findSupport(data,minLen,args,unpaired)
-        dataPos=score(data,minLen,args,unpaired)
 
         if len(dataPos)>0:
             print('1151')
@@ -1418,10 +1464,11 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
             # annotate(os.path.abspath(args.out)+".bed",os.path.abspath(args.annotation),dataPos)
             print('1159')
             dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
+            dataPos=approxCloseness(dataPos,args)
+
             # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
             # os.system(bedCMD)
             print("1163")
-            dataPos=dataPos.drop(["split"],axis=1).sort_values(by='score',ascending=False).reset_index(drop=True)
             dataPos["reads"]=dataPos["reads"].str.join(";")
             if not unpaired:
                 dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
@@ -1432,30 +1479,41 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
             #         'hum_nearest_3SS']]=dataPos.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)
             # dataPos.to_csv(os.path.abspath(args.out)+"_Test"+end+".csv",index=False)
 
-            dataPosMultiAlignment=dataPos[(dataPos['HIV_MAPQ']<args.minQual)|(dataPos['HUM_MAPQ']<args.minQual)]
-            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".csv",index=False)
-            dataPos=dataPos[(dataPos['HIV_MAPQ']>=args.minQual)&(dataPos['HUM_MAPQ']>=args.minQual)]
+            dataTMP=dataPos[dataPos['HUM_MAPQ']>=args.minQual]
+            dataPosMultiAlignment=dataPos[(dataPos['HUM_MAPQ']<args.minQual)&~(dataPos["uid"]).isin(set(dataTMP["uid"]))].reset_index(drop=True)
+            dataPos=dataPos[dataPos["uid"].isin(set(dataTMP["uid"]))].reset_index(drop=True)
 
+            if unpaired:
+                dataPos=groupBySpliceSitesUnpaired(dataPos)
+                dataPos=dataPos[~(dataPos['hum_nearest_SS']=='-')].reset_index(drop=True)
+                dataPosMultiAlignment=groupBySpliceSitesUnpaired(dataPosMultiAlignment)
+                dataPosMultiAlignment=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=='-')].reset_index(drop=True)
+            else:
+                dataPos=groupBySpliceSites(dataPos)
+                dataPos=dataPos[~(dataPos['hum_nearest_SS']=='-')].reset_index(drop=True)
+                dataPosMultiAlignment=groupBySpliceSites(dataPosMultiAlignment)
+                dataPosMultiAlignment=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=='-')].reset_index(drop=True)
+
+            dataPos=score(dataPos,args,minLen)
+            dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
+            dataPosMultiAlignment=score(dataPosMultiAlignment,args,minLen)
+            dataPosMultiAlignment=dataPosMultiAlignment.sort_values(by='score',ascending=False).reset_index(drop=True)
+
+            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".csv",index=False)
             dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".csv",index=False)
 
             dataPos=dataPos[~(dataPos['hum_nearest_SS']=="-") \
                             &(dataPos['entropyScore_hiv']>args.minEntropy) \
                             &(dataPos['entropyScore_hum']>args.minEntropy) \
-                            &(dataPos['HIV_MAPQ']>args.minQual) \
-                            &(dataPos['HUM_MAPQ']>args.minQual) \
-                            &(dataPos['score']>0.3)]
-            dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv",index=False)
+                            &(dataPos['score']>args.score)]
 
-            if unpaired:
-                data=groupBySpliceSitesUnpaired(dataPos)
-                data.to_csv(os.path.abspath(args.out)+"_Group"+end+".csv",index=False)
-                data=data[~(data['hum_nearest_SS']=='-')].reset_index(drop=True)
-                data.to_csv(os.path.abspath(args.out)+"_Group"+end+".clean.csv")
-            else:
-                data=groupBySpliceSites(dataPos)
-                data.to_csv(os.path.abspath(args.out)+"_Group"+end+".csv",index=False)
-                data=data[~(data['hum_nearest_SS']=='-')].reset_index(drop=True)
-                data.to_csv(os.path.abspath(args.out)+"_Group"+end+".clean.csv")
+            dataPosMultiAlignment=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=="-") \
+                            &(dataPosMultiAlignment['entropyScore_hiv']>args.minEntropy) \
+                            &(dataPosMultiAlignment['entropyScore_hum']>args.minEntropy) \
+                            &(dataPosMultiAlignment['score']>args.score)]
+
+            dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv",index=False)
+            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv",index=False)
 
             #completely forgot that we can write reads from the sam file
             #should make it much faster
@@ -1514,34 +1572,16 @@ def main(args):
 # could be faster
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-# calculate additional score for Pos without counts
-# recalculate when grouping by human sites
-# when grouping by sites - so not filter by score prior to grouping. Only after
-
-# figure out how to deal with mapq of 0
-# one approach is to produce separate reports for likely uniquely mapped reads - if any chimeras are identified
-# then we can show the location on the chromosome
-# and build a report for no unique mappings which will tell which reads are chimeric, but without clear human mapping
-# Need to separate groupings also by confidence of mapping
-# for instance, split data by MAPQ
-# for those where MAPQ == 0, we can not make a judgement about the nearest human splice site
-# however they may still be very good reads, hence in that section do include MAPQ in the score calculation
-
-# Again, try to do approximation of closeness of different chimeras by position
-# grouping by splicesite does sometimes group rather distant positions
-# if a specific closeness paramter is implemented such results could be better trusted
-
-# If use the reference from the ucsc, then must also use the corresponding annotation
-# Need to doenload
-
 # Check the reset_index() for the dfs
-
-# Need to introduce weighing into the score equation
-
-# Fix scoring equation. Do score calculation independently for lowMAPQ and unique Pos.csv.
-# For each (lowMAPQ, highMAPQ) output two Pos.csv's: clean and all.
-
-# Then do closeness approximation
 
 # at the very end need to build python environment and requirements.txt
 # sicne the code should work with both python2 and python3 need to do this for both
+
+# !!!!!!!!!!Not taking into consideration the hiv alignment position since those come from a high dimensional and varying multi-fasta reference
+
+# do not forget to remove all unnecessary columns in the summary
+# perhaps write out extended Pos.grouping and with most columns removed
+
+# implement writeReads function without grepping
+
+# collapse any records from the LowMAPQ into highMAPQ if present in highMAPQ

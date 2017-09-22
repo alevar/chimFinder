@@ -96,6 +96,12 @@ def hiv(argv):
                               default=0.3,
                               type=float,
                               help="the minimum overall score to keep.")
+    parser_step1.add_argument('-c',
+                              '--close',
+                              required=False,
+                              default=30,
+                              type=int,
+                              help="distance between two integration sites to group together")
     parser_step1.add_argument('-a',
                               '--annotation',
                               required=True,
