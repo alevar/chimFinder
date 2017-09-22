@@ -46,7 +46,7 @@ def calcAlignmentStartEnd(row,reference,start):
             end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
         else:
             end=start+sum(list(map(int,cigarList[idxfM-1:idxlM][::2])))-1
-        if (row['reversedCurr']==16)and(reference==False):
+        if (row['reversedCurr']==16) and (reference==False):
             return str(len(row["SEQ"])-1-end)+":"+str(len(row["SEQ"])-1-start)
         else:
             return str(start)+":"+str(end)
@@ -856,27 +856,25 @@ def findSupport(dataOrig,minLen,args,unpaired):
                                                                                     "meanQual_hum",
                                                                                     "HIV_MAPQ",
                                                                                     "HUM_MAPQ"]].agg(aggregations)).reset_index()
-    dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)
+    dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)            
+    return dataPos
+
+def score(dataPos,args,minLen):
     dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(int)
     dataPos["HIV_AL_score"]=1-((dataPos["HIV_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
     dataPos["HUM_AL_score"]=1-((dataPos["HUM_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
-    dataPos["count_score"]=(dataPos["count"].astype(float)/float(args.minCount))/(((1.0/float(args.minCount))+(dataPos["count"].astype(float)/float(args.minCount))**2)**0.5) # algebraic sigmoid function
+    m=float(args.minCount)/2.0
+    dataPos["count"]=dataPos["count"].astype(float)
+    dataPos["count_score"]=(((dataPos["count"]-m)/m)/((1.0/m)+(((dataPos["count"]-m)/m)**2)**0.5)/2)+0.5 # algebraic sigmoid function
     dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["HIV_MAPQ"]/10)))
     dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["HUM_MAPQ"]/10)))
-    # dataPos["score"]=(dataPos['HIV_AL_score'] \
-    #                 *dataPos['entropyScore_hiv'] \
-    #                 *dataPos['HIV_MAPQ_score'] \
-    #                 *dataPos['HUM_AL_score'] \
-    #                 *dataPos['entropyScore_hum'] \
-    #                 *dataPos['HUM_MAPQ_score']) \
-    #                 *dataPos['count_score']
+    
     dataPos["score"]=dataPos['HIV_AL_score'] \
                     *dataPos['entropyScore_hiv'] \
                     *dataPos['HUM_AL_score'] \
                     *dataPos['entropyScore_hum'] \
                     *dataPos['count_score']
     dataPos=dataPos.round({'score': 3})
-            
     return dataPos
 
 def approxCloseness(split1,split2):
@@ -1318,6 +1316,12 @@ def plotSnapshots(data):
 
     plt.show()
 
+# the following function will check if the second read in the pair supports the conformation
+# another idea is to for paired reads to see if the read on the hiv side is also aligned to hiv 
+# and the read on the human to another human
+def checkPair(data):
+    pass
+
 def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
     # load data from local alignments
     dataHIV=pd.read_csv(os.path.abspath(args.input1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
@@ -1400,6 +1404,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         data.drop_duplicates(inplace=True)
         print('1147')
         dataPos=findSupport(data,minLen,args,unpaired)
+        dataPos=score(data,minLen,args,unpaired)
 
         if len(dataPos)>0:
             print('1151')
@@ -1494,43 +1499,13 @@ def main(args):
         print('not real path')
         return
 
-# another point to implement is to implement duplicate removal.
-# Simple duplicates removal (should be sufficient to reduce the number of reads in the df can be as follows):
-# 1. in the sam dataframe if multiple reads which are on the same R1/R2 have identical SEQs then remove all but one with highest quality
-# 2. Implement quality calculation for both human and hiv alignments
-
 #Think carefully about this:
 # perhaps makes more sense to just make step3 as extraction step. Give original fastq file and extract fasta from there
 # Reasons:
 # 1. Sam does not preserve barcode information in the read name
 # 2. R1/R2 pair is not guaranteed to be present
 
-# Scoring. COnsider the following:
-# 1. Hum ALignment Length
-# 2. HIV alignment length
-# 3. Hum alignment quality score
-# 4. HIV alignment quality score
-# 5. number of reads in groups
-# 6. number of reads in splice groups
-# 7. entropy of the read complexity
-
-# for scoring the following needs to be done:
-# all individual scores need to be normalized to [0,1]
-# for counts the following should be done
-# the minimum number is defined
-# the count is divided (normazlized) by the minimum
-# such results in deflation of the overal score when the count is less than minimum
-# and inflation of the count is greater than minimum
-# in order to achive this the product of all scores can be 
-
 # also need to run old annotation into a separate column to see if different from the new implementation
-
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# for each annotated region annotation seems to also return a duplicate annotated as -
-# needs fixing
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-# apply soft thresholding to count similar to the signum function and not a sigmoid
 
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # try to make extractStartEnd more efficient
@@ -1547,16 +1522,10 @@ def main(args):
 # one approach is to produce separate reports for likely uniquely mapped reads - if any chimeras are identified
 # then we can show the location on the chromosome
 # and build a report for no unique mappings which will tell which reads are chimeric, but without clear human mapping
-
 # Need to separate groupings also by confidence of mapping
 # for instance, split data by MAPQ
 # for those where MAPQ == 0, we can not make a judgement about the nearest human splice site
 # however they may still be very good reads, hence in that section do include MAPQ in the score calculation
-
-#==DONE
-# investigate leftRight:
-# currently R1 has R1:r/l as opposed to R2:right/left
-# need to check which one is being checked later in the software and change to uniform representation
 
 # Again, try to do approximation of closeness of different chimeras by position
 # grouping by splicesite does sometimes group rather distant positions
@@ -1567,25 +1536,12 @@ def main(args):
 
 # Check the reset_index() for the dfs
 
-#===========================================
-#=================NOTES=====================
-#===========================================
-# 1. have a logger ready for the following tasks:
-#       - log which minLen values were discarded
-#       - log general stats
-# 2. #it seems the add.sh is pretty slow as well
-#       - perhaps should timeit the execution of the custom python method against the add.sh
-#       - would be best not to apply any external methods or as little as possible
-#once the add.sh is replaced by the actual function - do one run with both included in order to
-#compare the results and make sure the new method is working properly
-#verification should be done as follows:
-#1. check if anything that is identified in the add.sh column is also present in the same way in the custom column
-#2. if any differences are observed - check why - likely a mistake
-#3. then check for any which are identified by the custom method but not by the add.sh
+# Need to introduce weighing into the score equation
 
-#splicing information is currently missing
-#this is due to the fact that we can not build a reliable consensus sequence from alignment to the multi-fasta reference
-#what we need to do is write the following script without including in the main pipeline
-#1. align to a regular selected HIV reference
-#2. run hisat2 on that
-#3. perform step2 of the analysis pipeline on that data
+# Fix scoring equation. Do score calculation independently for lowMAPQ and unique Pos.csv.
+# For each (lowMAPQ, highMAPQ) output two Pos.csv's: clean and all.
+
+# Then do closeness approximation
+
+# at the very end need to build python environment and requirements.txt
+# sicne the code should work with both python2 and python3 need to do this for both

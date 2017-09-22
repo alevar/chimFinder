@@ -51,9 +51,9 @@ def hiv(argv):
     parser_step1.add_argument('-M',
                               '--weightCount',
                               required=False,
-                              default=5,
-                              type=int,
-                              help="the minimum number of reads supporting an integration site.")
+                              default=1.0,
+                              type=float,
+                              help="Weight of the number of reads score in the cumulative score equation")
     parser_step1.add_argument('-n',
                               '--minEntropy',
                               required=False,
@@ -63,9 +63,9 @@ def hiv(argv):
     parser_step1.add_argument('-N',
                               '--weightEntropy',
                               required=False,
-                              default=0.5,
-                              type=int,
-                              help="minimum alignment entropy score.")
+                              default=1.0,
+                              type=float,
+                              help="Weight of the entropy score in the cumulative score equation")
     parser_step1.add_argument('-q',
                               '--minQual',
                               required=False,
@@ -75,9 +75,9 @@ def hiv(argv):
     parser_step1.add_argument('-Q',
                               '--weightQual',
                               required=False,
-                              default=10,
-                              type=int,
-                              help="minimum mean mapping quality of sequenced read. Everything below this threshold will be reported as multialignment for which no assumption can be made from the annotation")
+                              default=1.0,
+                              type=float,
+                              help="Weight of the mapping score in the cumulative score equation")
     parser_step1.add_argument('-x',
                               '--minLen',
                               required=False,
@@ -87,14 +87,14 @@ def hiv(argv):
     parser_step1.add_argument('-X',
                               '--weightLen',
                               required=False,
-                              default=30,
-                              type=int,
-                              help="the minimum number of nucleotides in alignment to keep a read.")
+                              default=1.0,
+                              type=float,
+                              help="Weight of the alignment length score in the cumulative score equation")
     parser_step1.add_argument('-s',
                               '--score',
                               required=False,
-                              default=3,
-                              type=int,
+                              default=0.3,
+                              type=float,
                               help="the minimum overall score to keep.")
     parser_step1.add_argument('-a',
                               '--annotation',
