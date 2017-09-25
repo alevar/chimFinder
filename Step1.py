@@ -942,12 +942,21 @@ def writeReadNames(outDir,row,fileNameR1,fileNameR2,baseName,dirPath):
     tempF=outD+'/tmp/fq'
     stringReads=row['reads'].replace(';','|')
 
-    outPath1_All="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+row["R"])+"_R1.all.fa'"
-    outPath2_All="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+row["R"])+"_R2.all.fa'"
+    outPath1_All="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+row["R"]+"@"+str(row['comb'].split("@")[0]))+"_R1.all.fa'"
+    outPath2_All="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+row["R"]+"@"+str(row['comb'].split("@")[0]))+"_R2.all.fa'"
     cmdR1="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileNameR1+" | seqtk seq -a - > "+outPath1_All
     cmdR2="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileNameR2+" | seqtk seq -a - > "+outPath2_All
     os.system(cmdR1)
     os.system(cmdR2)
+
+def writeReadNamesUnpaired(outDir,row,fileName,baseName,dirPath):
+    outD=os.path.abspath(outDir)
+    tempF=outD+'/tmp/fq'
+    stringReads=row['reads'].replace(';','|')
+
+    outPath="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+str(row['comb'].split("@")[0]))+".fa'"
+    cmd="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileName+" | seqtk seq -a - > "+outPath
+    os.system(cmd)
 
 # def writeReadNames(dataPos,dataHIV,outDir,fileName):
 #     def helper(row,dataHIV,outDir,fileName):
@@ -1369,6 +1378,10 @@ def annotate(dataBed,annPath,data):
 def checkPair(data):
     pass
 
+# This function shall calculate the minimum final score based on the arguments specified by the user
+def minScore(args):
+    pass
+
 def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
     # load data from local alignments
     dataHIV=pd.read_csv(os.path.abspath(args.input1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
@@ -1418,10 +1431,8 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         if len(dataHIV[dataHIV["paired"]>0])==0 and len(dataHUM[dataHUM["paired"]>0])==0:
             unpaired=True
         # extract start and end for both template and reference
-        print("1124")
         dataHIV=extractStartEnd(dataHIV)
         dataHUM=extractStartEnd(dataHUM)
-        print("1127")
         dataHUM,dataHIV=filterReads(dataHUM,dataHIV)
         if len(dataHUM)==0:
             return
@@ -1429,7 +1440,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         data=pd.DataFrame(dataHIV["QNAME"]).reset_index(drop=True)
         dataHUM=dataHUM.reset_index(drop=True)
         dataHIV=dataHIV.reset_index(drop=True)
-        print("1135")
         if unpaired:
             data=createDataUnpaired(data,dataHUM,dataHIV)
         else:
@@ -1437,23 +1447,18 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
 
         data.replace('', np.nan,inplace=True)
         data.fillna(0,inplace=True)
-        print("1140")
         if unpaired:
             data=leftRightUnpaired(data,minLen)
-            print("1142")
             data=overlapUnpaired(data)
         else:
             data=leftRight(data,minLen)
-            print("1142")
             data=overlap(data)
         # data.to_csv(os.path.abspath(args.out)+".chim"+end+".csv",index=False)
         # drop duplicated reads - preserve first occurence
         data.drop_duplicates(inplace=True)
-        print('1147')
         dataPos=findSupport(data,minLen,args,unpaired)
 
         if len(dataPos)>0:
-            print('1151')
             if not unpaired:
                 dataPos=addSpan(data,dataPos)
                 dataPos.loc[dataPos['spanCount'].isnull(),['spanCount']]=dataPos.loc[dataPos['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
@@ -1462,13 +1467,11 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
             dataBed=dataPos[['chr','HUM_RS','HUM_RE']].drop_duplicates()
             # dataBed.to_csv(os.path.abspath(args.out)+".bed",sep='\t',header=False,index=False)
             # annotate(os.path.abspath(args.out)+".bed",os.path.abspath(args.annotation),dataPos)
-            print('1159')
             dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
             dataPos=approxCloseness(dataPos,args)
 
             # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
             # os.system(bedCMD)
-            print("1163")
             dataPos["reads"]=dataPos["reads"].str.join(";")
             if not unpaired:
                 dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
@@ -1499,6 +1502,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
             dataPosMultiAlignment=score(dataPosMultiAlignment,args,minLen)
             dataPosMultiAlignment=dataPosMultiAlignment.sort_values(by='score',ascending=False).reset_index(drop=True)
 
+            dataPos.drop(["uid","HUM_MAPQ","HIV_MAPQ","count_score","HIV_MAPQ_score","HUM_MAPQ_score","score_raw","READ_LEN"],axis=1,inplace=True)
+            dataPosMultiAlignment.drop(["uid","HUM_MAPQ","HIV_MAPQ","count_score","HIV_MAPQ_score","HUM_MAPQ_score","score_raw","READ_LEN"],axis=1,inplace=True)
+
             dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".csv",index=False)
             dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".csv",index=False)
 
@@ -1515,18 +1521,29 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
             dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv",index=False)
             dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv",index=False)
 
-            #completely forgot that we can write reads from the sam file
-            #should make it much faster
-            #for each comb in the Pos.csv file
-            #find corresponding positions in the original human file
-            #save to csv with \n delimeter
-
-            # childPIDS=[]
-            # fileNameR1=baseName+"_R1.fastq"
-            # fileNameR2=baseName+"_R2.fastq"
-            # data.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
-            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
-            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+            # completely forgot that we can write reads from the sam file
+            # should make it much faster
+            # for each comb in the Pos.csv file
+            # find corresponding positions in the original human file
+            # save to csv with \n delimeter
+            if args.writeReads:
+                if not unpaired:
+                    # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
+                    # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
+                    fileNameR1=baseName+"_R1.fastq"
+                    fileNameR2=baseName+"_R2.fastq"
+                    dataPos.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
+                    dataPosMultiAlignment.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
+                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+                else:
+                    # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
+                    # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
+                    fileName=baseName+".fastq"
+                    dataPos.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+                    dataPosMultiAlignment.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
     
     return 1
 
@@ -1575,7 +1592,7 @@ def main(args):
 # Check the reset_index() for the dfs
 
 # at the very end need to build python environment and requirements.txt
-# sicne the code should work with both python2 and python3 need to do this for both
+# since the code should work with both python2 and python3 need to do this for both
 
 # !!!!!!!!!!Not taking into consideration the hiv alignment position since those come from a high dimensional and varying multi-fasta reference
 
@@ -1584,4 +1601,21 @@ def main(args):
 
 # implement writeReads function without grepping
 
-# collapse any records from the LowMAPQ into highMAPQ if present in highMAPQ
+# What really need to be implemented is the following function
+# The function will take as an input all weights and scoring arguments passed
+# and it will calculate the minimum overall score for the desired combination
+# unless the minimum score is specified, in which case it should override the calculation
+
+# entropy must be more than 0.8
+
+# also consider making the alignment length score into a sigmoid function as well
+# as we can see from the 29 experiment KANSL3 fits the parameters but because of the relatively low score brings the alignment down significantly
+# if a sigmoid function were applied it would be on top
+
+# consider giving penalties for excessively long overlaps
+
+# do not forget to retain the count_score (currently missing from the final results)
+
+# In the end the fasta records will have to be written from the dataframe,
+# since the raw sequence data is not supplied to the application and for that matter should not be supplied
+# This should not be a priority however at the moment.
