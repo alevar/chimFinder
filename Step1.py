@@ -385,16 +385,6 @@ def createDataUnpaired(data,dataHUM,dataHIV):
     df.fillna(0,inplace=True)
     return df
 
-# replace these two methods from stackOverflow
-def e(s):
-    prob=[float(s.count(c))/len(s) for c in dict.fromkeys(list(s))]
-    e=-sum([p * math.log(p) / math.log(2.0) for p in prob])
-    return e
-
-def eI(l):
-    p=1.0/l
-    return -1.0*l*p*math.log(p)/math.log(2.0)
-
 # the function below should compute normalized entropy as described in https://academic.oup.com/bioinformatics/article/27/8/1061/227307/Topological-entropy-of-DNA-sequences
 def topologicalNormalizedEntropy(s):
     def findCF(l):
@@ -428,9 +418,6 @@ def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
 
     s_hiv=seqHIV[i1_hiv:i2_hiv]
     if not len(s_hiv)==0:
-        # ideal_hiv=eI(len(s_hiv))
-        # if not ideal_hiv==0:
-        #     entropyScore_hiv=abs(e(s_hiv))/ideal_hiv
         entropyScore_hiv=topologicalNormalizedEntropy(s_hiv)
         q_hiv=qual[i1_hiv:i2_hiv]
         if len(q_hiv)>0:
@@ -440,9 +427,6 @@ def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
 
     s_hum=seqHum[i1_hum:i2_hum]
     if not len(s_hum)==0:
-        # ideal_hum=eI(len(s_hum))
-        # if not ideal_hum==0:
-        #     entropyScore_hum=abs(e(s_hum))/ideal_hum
         entropyScore_hum=topologicalNormalizedEntropy(s_hum)
         q_hum=qual[i1_hum:i2_hum]
         if len(q_hum)>0:
@@ -888,11 +872,14 @@ def score(dataPos,args,minLen):
     dataPos["entropyScore_hiv"]=dataPos["entropyScore_hiv"].astype(int)/dataPos["count"]
     dataPos["entropyScore_hum"]=dataPos["entropyScore_hum"].astype(int)/dataPos["count"]
 
-    dataPos["HIV_AL_score"]=1-((dataPos["HIV_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
-    dataPos["HUM_AL_score"]=1-((dataPos["HUM_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
+    # dataPos["HIV_AL_score"]=1-((dataPos["HIV_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
+    # dataPos["HUM_AL_score"]=1-((dataPos["HUM_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
+    k=float(args.minLen)/2.0
+    dataPos["HIV_AL_score"]=(((dataPos["HIV_AL"]-k)/k)/((1.0/k)+(((dataPos["HIV_AL"]-k)/k)**2)**0.5)/2)+0.5 # algebraic sigmoid function
+    dataPos["HUM_AL_score"]=(((dataPos["HUM_AL"]-k)/k)/((1.0/k)+(((dataPos["HUM_AL"]-k)/k)**2)**0.5)/2)+0.5 # algebraic sigmoid function
     m=float(args.minCount)/2.0
     dataPos["count"]=dataPos["count"].astype(float)
-    dataPos["count_score"]=(((dataPos["count"]-m)/m)/((1.0/m)+(((dataPos["count"]-m)/m)**2)**0.5)/2)+0.5 # algebraic sigmoid function
+    dataPos["count_score"]=((((dataPos["count"]-m)/m)/((1.0/m)+(((dataPos["count"]-m)/m)**2)**0.5)/2)/(1/args.maxCountPenalty))+(1-args.maxCountPenalty) # algebraic sigmoid function
     dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["HIV_MAPQ"]/10)))
     dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["HUM_MAPQ"]/10)))
 
@@ -1502,24 +1489,50 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
             dataPosMultiAlignment=score(dataPosMultiAlignment,args,minLen)
             dataPosMultiAlignment=dataPosMultiAlignment.sort_values(by='score',ascending=False).reset_index(drop=True)
 
-            dataPos.drop(["uid","HUM_MAPQ","HIV_MAPQ","count_score","HIV_MAPQ_score","HUM_MAPQ_score","score_raw","READ_LEN"],axis=1,inplace=True)
-            dataPosMultiAlignment.drop(["uid","HUM_MAPQ","HIV_MAPQ","count_score","HIV_MAPQ_score","HUM_MAPQ_score","score_raw","READ_LEN"],axis=1,inplace=True)
+            dataPos.drop(["uid",
+                          "HUM_MAPQ",
+                          "HIV_MAPQ",
+                          "count_score",
+                          "HIV_MAPQ_score",
+                          "HUM_MAPQ_score",
+                          "score_raw",
+                          "READ_LEN"],axis=1,inplace=True)
+            dataPosMultiAlignment.drop(["uid",
+                                        "HUM_MAPQ",
+                                        "HIV_MAPQ",
+                                        "count_score",
+                                        "HIV_MAPQ_score",
+                                        "HUM_MAPQ_score",
+                                        "score_raw",
+                                        "READ_LEN"],axis=1,inplace=True)
 
-            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".csv",index=False)
-            dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".csv",index=False)
-
-            dataPos=dataPos[~(dataPos['hum_nearest_SS']=="-") \
+            dataPosLowMAPQ=dataPos[~(dataPos['hum_nearest_SS']=="-") \
                             &(dataPos['entropyScore_hiv']>args.minEntropy) \
                             &(dataPos['entropyScore_hum']>args.minEntropy) \
                             &(dataPos['score']>args.score)]
 
-            dataPosMultiAlignment=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=="-") \
+            dataPosMultiAlignmentLowMAPQ=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=="-") \
                             &(dataPosMultiAlignment['entropyScore_hiv']>args.minEntropy) \
                             &(dataPosMultiAlignment['entropyScore_hum']>args.minEntropy) \
                             &(dataPosMultiAlignment['score']>args.score)]
 
-            dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv",index=False)
-            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv",index=False)
+            colsOrder=["hum_nearest_SS",
+                       "chr",
+                       "comb",
+                       "R",
+                       "count",
+                       "reads",
+                       "spanReads",
+                       "score"]
+            if unpaired:
+                colsOrder.remove("R")
+
+            dataPosMultiAlignment=dataPosMultiAlignment[colsOrder]
+            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".csv",index=False)
+            dataPos=dataPos[colsOrder]
+            dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".csv",index=False)
+            dataPosLowMAPQ.to_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv",index=False)
+            dataPosMultiAlignmentLowMAPQ.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv",index=False)
 
             # completely forgot that we can write reads from the sam file
             # should make it much faster
@@ -1619,3 +1632,6 @@ def main(args):
 # In the end the fasta records will have to be written from the dataframe,
 # since the raw sequence data is not supplied to the application and for that matter should not be supplied
 # This should not be a priority however at the moment.
+
+# remove super low entropy and other filter reads before any grouping
+# otherwise they might end up spuriously in the groupings

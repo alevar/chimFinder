@@ -48,6 +48,12 @@ def hiv(argv):
                               default=5,
                               type=int,
                               help="the minimum number of reads supporting an integration site.")
+    parser_step1.add_argument('-p',
+                              '--maxCountPenalty',
+                              required=False,
+                              default=0.5,
+                              type=int,
+                              help="the maximum penalty to give for minCount when hit.")
     parser_step1.add_argument('-M',
                               '--weightCount',
                               required=False,
@@ -109,8 +115,9 @@ def hiv(argv):
                               help="annotation for the human genome")
     parser_step1.add_argument('-e',
                               '--end',
-                              action="store_true",
-                              help="remove duplicates")
+                              default="",
+                              type=str,
+                              help="suffix to append to the end of the ouput name")
     parser_step1.add_argument('-w',
                               '--writeReads',
                               action="store_true",
