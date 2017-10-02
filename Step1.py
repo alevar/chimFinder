@@ -510,6 +510,8 @@ def filterOverlapCombine(data,minLen):
     dataR1Right["HIV_RE"]=dataR1Right["R1HIV_RE"].astype(int)
     dataR1Right["HUM_ID"]=dataR1Right["R1HUM_ID"]
     dataR1Right["HIV_ID"]=dataR1Right["R1HIV_ID"]
+    dataR1Right["SEQ"]=dataR1Right[dataR1Right['reversedCurr']==0]["R1HUM_SEQ"]
+    dataR1Right["R_SEQ"]=dataR1Right[dataR1Right['reversedCurr']==16]["R1HUM_SEQ"]
     dataR1Right["HIV_MAPQ"]=dataR1Right["R1HIV_MAPQ"].astype(int)
     dataR1Right["HUM_MAPQ"]=dataR1Right["R1HUM_MAPQ"].astype(int)
     dataR1Right["HIV_AL"]=dataR1Right["HIV_TE"]-dataR1Right["HIV_TS"]-dataR1Right["overlap"]
@@ -552,6 +554,8 @@ def filterOverlapCombine(data,minLen):
     dataR1Left["HIV_RE"]=dataR1Left["R1HIV_RE"].astype(int)
     dataR1Left["HUM_ID"]=dataR1Left["R1HUM_ID"]
     dataR1Left["HIV_ID"]=dataR1Left["R1HIV_ID"]
+    dataR1Left["SEQ"]=dataR1Left[dataR1Left['reversedCurr']==0]["R1HUM_SEQ"]
+    dataR1Left["R_SEQ"]=dataR1Left[dataR1Left['reversedCurr']==16]["R1HUM_SEQ"]
     dataR1Left["HIV_MAPQ"]=dataR1Left["R1HIV_MAPQ"].astype(int)
     dataR1Left["HUM_MAPQ"]=dataR1Left["R1HUM_MAPQ"].astype(int)
     dataR1Left["HIV_AL"]=dataR1Left["HIV_TE"]-dataR1Left["HIV_TS"]-dataR1Left["overlap"]
@@ -595,6 +599,8 @@ def filterOverlapCombine(data,minLen):
     dataR2Right["HIV_RE"]=dataR2Right["R2HIV_RE"].astype(int)
     dataR2Right["HUM_ID"]=dataR2Right["R2HUM_ID"]
     dataR2Right["HIV_ID"]=dataR2Right["R2HIV_ID"]
+    dataR2Right["SEQ"]=dataR2Right[dataR2Right['reversedCurr']==0]["R2HUM_SEQ"]
+    dataR2Right["R_SEQ"]=dataR2Right[dataR2Right['reversedCurr']==16]["R2HUM_SEQ"]
     dataR2Right["HIV_MAPQ"]=dataR2Right["R2HIV_MAPQ"].astype(int)
     dataR2Right["HUM_MAPQ"]=dataR2Right["R2HUM_MAPQ"].astype(int)
     dataR2Right["HIV_AL"]=dataR2Right["HIV_TE"]-dataR2Right["HIV_TS"]-dataR2Right["overlap"]
@@ -637,6 +643,8 @@ def filterOverlapCombine(data,minLen):
     dataR2Left["HIV_RE"]=dataR2Left["R2HIV_RE"].astype(int)
     dataR2Left["HUM_ID"]=dataR2Left["R2HUM_ID"]
     dataR2Left["HIV_ID"]=dataR2Left["R2HIV_ID"]
+    dataR2Left["SEQ"]=dataR2Left[dataR2Left['reversedCurr']==0]["R2HUM_SEQ"]
+    dataR2Left["R_SEQ"]=dataR2Left[dataR2Left['reversedCurr']==16]["R2HUM_SEQ"]
     dataR2Left["HIV_MAPQ"]=dataR2Left["R2HIV_MAPQ"].astype(int)
     dataR2Left["HUM_MAPQ"]=dataR2Left["R2HUM_MAPQ"].astype(int)
     dataR2Left["HIV_AL"]=dataR2Left["HIV_TE"]-dataR2Left["HIV_TS"]-dataR2Left["overlap"]
@@ -690,6 +698,8 @@ def filterOverlapCombineUnpaired(data,minLen):
     dataRight["HIV_RE"]=dataRight["HIV_RE"].astype(int)
     dataRight["HIV_MAPQ"]=dataRight["HIV_MAPQ"].astype(int)
     dataRight["HUM_MAPQ"]=dataRight["HUM_MAPQ"].astype(int)
+    dataRight["SEQ"]=dataRight[dataRight['reversedCurr']==0]["HUM_SEQ"]
+    dataRight["R_SEQ"]=dataRight[dataRight['reversedCurr']==16]["HUM_SEQ"]
     dataRight["HIV_AL"]=dataRight["HIV_TE"]-dataRight["HIV_TS"]-dataRight["overlap"]
     dataRight["HUM_AL"]=dataRight["HUM_TE"]-dataRight["HUM_TS"]-dataRight["overlap"]
     dataRight=dataRight[(dataRight['HIV_AL']>minLen)&(dataRight['HUM_AL']>minLen)]
@@ -728,6 +738,8 @@ def filterOverlapCombineUnpaired(data,minLen):
     dataLeft["HIV_RE"]=dataLeft["HIV_RE"].astype(int)
     dataLeft["HIV_MAPQ"]=dataLeft["HIV_MAPQ"].astype(int)
     dataLeft["HUM_MAPQ"]=dataLeft["HUM_MAPQ"].astype(int)
+    dataLeft["SEQ"]=dataLeft[dataLeft['reversedCurr']==0]["HUM_SEQ"]
+    dataLeft["R_SEQ"]=dataLeft[dataLeft['reversedCurr']==16]["HUM_SEQ"]
     dataLeft["HIV_AL"]=dataLeft["HIV_TE"]-dataLeft["HIV_TS"]-dataLeft["overlap"]
     dataLeft["HUM_AL"]=dataLeft["HUM_TE"]-dataLeft["HUM_TS"]-dataLeft["overlap"]
     dataLeft=dataLeft[(dataLeft["HIV_AL"]>minLen)&(dataLeft["HUM_AL"]>minLen)]
@@ -790,20 +802,17 @@ def addSpan(data,dataPos):
 # 1. group data by split position
 # 2. add a column of high confidence support reads from the first parameter DF
 # 3. add a column of low confidence support reads from the second parameter DF
-def findSupport(dataOrig,minLen,args,unpaired):
-    data=pd.DataFrame([])
-    # if there are multiple minLen in the minLenList then check the the highest does yild more than one
-    # if not, then discard and check the next minLen before constructing the dataPos
-
-    if unpaired:
-        data=filterOverlapCombineUnpaired(dataOrig,minLen)
-    else:
-        data=filterOverlapCombine(dataOrig,minLen)
-    
+def findSupport(data,minLen,args,unpaired):
     aggregations={
         'QNAME':{
             'count':'count',
             'reads': lambda x: set(x)
+        },
+        'SEQ':{
+            'seqs': lambda x: list(x)
+        },
+        'R_SEQ':{
+            'r_seqs': lambda x: list(x)
         },
         'HUM_RS':{
             'HUM_RS':'min'
@@ -859,39 +868,74 @@ def findSupport(dataOrig,minLen,args,unpaired):
                                                                                     "entropyScore_hum",
                                                                                     "meanQual_hum",
                                                                                     "HIV_MAPQ",
-                                                                                    "HUM_MAPQ"]].agg(aggregations)).reset_index()
+                                                                                    "HUM_MAPQ",
+                                                                                    "SEQ",
+                                                                                    "R_SEQ"]].agg(aggregations)).reset_index()
     dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)            
     return dataPos
 
 def score(dataPos,args,minLen):
-    dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(int)/dataPos["count"]
-    dataPos["HIV_AL"]=dataPos["HIV_AL"].astype(int)/dataPos["count"]
-    dataPos["HUM_AL"]=dataPos["HUM_AL"].astype(int)/dataPos["count"]
-    dataPos["HIV_MAPQ"]=dataPos["HIV_MAPQ"].astype(int)/dataPos["count"]
-    dataPos["HUM_MAPQ"]=dataPos["HUM_MAPQ"].astype(int)/dataPos["count"]
-    dataPos["entropyScore_hiv"]=dataPos["entropyScore_hiv"].astype(int)/dataPos["count"]
-    dataPos["entropyScore_hum"]=dataPos["entropyScore_hum"].astype(int)/dataPos["count"]
-
-    # dataPos["HIV_AL_score"]=1-((dataPos["HIV_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
-    # dataPos["HUM_AL_score"]=1-((dataPos["HUM_AL"]-dataPos["READ_LEN"]/2).abs()/(dataPos["READ_LEN"]/2))
-    k=float(args.minLen)/2.0
-    dataPos["HIV_AL_score"]=(((dataPos["HIV_AL"]-k)/k)/((1.0/k)+(((dataPos["HIV_AL"]-k)/k)**2)**0.5)/2)+0.5 # algebraic sigmoid function
-    dataPos["HUM_AL_score"]=(((dataPos["HUM_AL"]-k)/k)/((1.0/k)+(((dataPos["HUM_AL"]-k)/k)**2)**0.5)/2)+0.5 # algebraic sigmoid function
-    m=float(args.minCount)/2.0
+    dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(float)/dataPos["count"].astype(float)
+    dataPos["HIV_MAPQ"]=dataPos["HIV_MAPQ"].astype(float)/dataPos["count"].astype(float)
+    dataPos["HUM_MAPQ"]=dataPos["HUM_MAPQ"].astype(float)/dataPos["count"].astype(float)
+    dataPos["HIV_AL"]=dataPos["HIV_AL"].astype(float)/dataPos["count"].astype(float)
+    dataPos["HUM_AL"]=dataPos["HUM_AL"].astype(float)/dataPos["count"].astype(float)
+    dataPos["entropyScore_hiv"]=dataPos["entropyScore_hiv"].astype(float)/dataPos["count"].astype(float)
+    dataPos["entropyScore_hum"]=dataPos["entropyScore_hum"].astype(float)/dataPos["count"].astype(float)
     dataPos["count"]=dataPos["count"].astype(float)
-    dataPos["count_score"]=((((dataPos["count"]-m)/m)/((1.0/m)+(((dataPos["count"]-m)/m)**2)**0.5)/2)/(1/args.maxCountPenalty))+(1-args.maxCountPenalty) # algebraic sigmoid function
-    dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["HIV_MAPQ"]/10)))
-    dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["HUM_MAPQ"]/10)))
 
-    dataPos["score_raw"]=(dataPos['HIV_AL_score']*args.weightLen \
-                    +dataPos['entropyScore_hiv']*args.weightEntropy \
-                    +dataPos['HUM_AL_score']*args.weightLen \
-                    +dataPos['entropyScore_hum']*args.weightEntropy) \
-                    /((args.weightEntropy*2)+(args.weightLen*2)) \
-                    *dataPos['count_score']
+    dataPos["HIV_AL"]=(dataPos["READ_LEN"]/2)-((dataPos["HIV_AL"]-dataPos["READ_LEN"]/2).abs())
+    dataPos["HUM_AL"]=(dataPos["READ_LEN"]/2)-((dataPos["HUM_AL"]-dataPos["READ_LEN"]/2).abs())
 
-    dataPos["score"]=dataPos['score_raw']*dataPos['count_score']
-    dataPos=dataPos.round({'score': 3})
+    k=float(args.minLen)
+    ssAl=args.steepSlopeAL
+    dataPos["HIV_AL_score"]=(((((dataPos['HIV_AL']-k)/k) \
+                        /(((ssAl/k)+((dataPos['HIV_AL']-k)/k)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxAlLenPenalty))) \
+                                +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
+
+    dataPos["HUM_AL_score"]=(((((dataPos['HUM_AL']-k)/k) \
+                        /(((ssAl/k)+((dataPos['HUM_AL']-k)/k)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxAlLenPenalty))) \
+                                +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+
+    m=float(args.minCount)/2.0
+    dataPos["count_score"]=(((((dataPos['count']-m)/m) \
+                        /(((1.0/m)+((dataPos['count']-m)/m)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxCountPenalty))) \
+                                +args.maxCountPenalty # algebraic sigmoid function of read count score
+    
+    # dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["HIV_MAPQ"]/10)))
+    # dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["HUM_MAPQ"]/10)))
+    # dataPos['jointEntropy']=((dataPos['entropyScore_hiv']*args.weightEntropy \
+    #                 +dataPos['entropyScore_hum']*args.weightEntropy) \
+    #                 /(args.weightEntropy*2))
+    # dataPos['jointAlLen']=((dataPos['HUM_AL_score']*args.weightLen \
+    #                 +dataPos['HIV_AL_score']*args.weightLen) \
+    #                 /(args.weightLen*2))
+    # dataPos["score"]=dataPos['jointEntropy'] \
+    #                 *dataPos['count_score']*args.weightCount \
+    #                 *dataPos['jointAlLen']
+
+    dataPos['jointEntropy']=((dataPos['entropyScore_hiv'] \
+                    +dataPos['entropyScore_hum']) \
+                    /(2))
+    dataPos['jointAlLen']=((dataPos['HUM_AL_score'] \
+                    +dataPos['HIV_AL_score']) \
+                    /(2))
+    dataPos["score"]=(dataPos['jointEntropy'] \
+                    *dataPos['count_score'] \
+                    *dataPos['jointAlLen'])
+
+    dataPos.drop(["jointEntropy",
+                  "jointAlLen"],axis=1,inplace=True)
+    dataPos=dataPos.round({'score': 4})
     return dataPos
 
 def approxCloseness(data,args):
@@ -1079,6 +1123,12 @@ def groupBySpliceSites(data):
             'groupsCount':'count',
             'reads': lambda x: ';'.join(set(x))
         },
+        'seqs':{
+            'seqs': list(x)[0]
+        },
+        'r_seqs':{
+            'r_seqs': list(x)[0]
+        },
         'spanR1-R2':{
             'spanReads':lambda x: ';'.join(list(set([el for el in x if not el=='-'])))
         },
@@ -1128,7 +1178,9 @@ def groupBySpliceSites(data):
                                                 "HUM_AL",
                                                 "READ_LEN",
                                                 "HIV_MAPQ",
-                                                "HUM_MAPQ"]].agg(aggregations)).reset_index()
+                                                "HUM_MAPQ",
+                                                "seqs",
+                                                "r_seqs"]].agg(aggregations)).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1140,6 +1192,12 @@ def groupBySpliceSitesUnpaired(data):
         'reads':{
             'groupsCount':'count',
             'reads': lambda x: ';'.join(set(x))
+        },
+        'seqs':{
+            'seqs': lambda x: list(x)
+        },
+        'r_seqs':{
+            'r_seqs': lambda x: list(x)
         },
         'count':{
             'count':'sum'
@@ -1182,7 +1240,9 @@ def groupBySpliceSitesUnpaired(data):
                                                 "HUM_AL",
                                                 "READ_LEN",
                                                 "HIV_MAPQ",
-                                                "HUM_MAPQ"]].agg(aggregations)).reset_index()
+                                                "HUM_MAPQ",
+                                                "seqs",
+                                                "r_seqs"]].agg(aggregations)).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1369,6 +1429,118 @@ def checkPair(data):
 def minScore(args):
     pass
 
+def reverseComplementR_SEQs(seqs):
+    replacement=[]
+    for seq in seqs:
+        comp=''
+        for nt in seq.upper()[::-1]:
+            if nt=='A':
+                comp+='T'
+            elif nt=='T':
+                comp+='A'
+            elif nt=='C':
+                comp+='G'
+            elif nt=='G':
+                comp+='C'
+            else:
+                comp+=nt
+    return replacement
+
+def percentIdentity():
+    pass
+
+def softClippingEnd():
+    pass
+
+def rest(dataPos,args,data,ext,unpaired,baseName,outDir,dirPath):
+    if not unpaired:
+        dataPos=addSpan(data,dataPos)
+        dataPos.loc[dataPos['spanCount'].isnull(),['spanCount']]=dataPos.loc[dataPos['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
+        dataPos.loc[dataPos['spanR1-R2'].isnull(),['spanR1-R2']]=dataPos.loc[dataPos['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
+
+    dataBed=dataPos[['chr','HUM_RS','HUM_RE']].drop_duplicates()
+    # dataBed.to_csv(os.path.abspath(args.out)+".bed",sep='\t',header=False,index=False)
+    # annotate(os.path.abspath(args.out)+".bed",os.path.abspath(args.annotation),dataPos)
+    dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
+    dataPos=dataPos[~(dataPos['hum_nearest_SS']=='-')].reset_index(drop=True)
+    dataPos=approxCloseness(dataPos,args)
+
+    # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
+    # os.system(bedCMD)
+    dataPos["reads"]=dataPos["reads"].str.join(";")
+    if not unpaired:
+        dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
+        dataPos["spanR1-R2"].replace("","-",inplace=True)
+
+    dataPos.to_csv("./unsplit"+ext+".csv")
+
+    #Now add the nearest human splice site for each chimeric position
+    # dataPos[['hum_nearest_5SS',
+    #         'hum_nearest_3SS']]=dataPos.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)
+    # dataPos.to_csv(os.path.abspath(args.out)+"_Test"+end+".csv",index=False)
+
+    # dataTMP=dataPos[dataPos['HUM_MAPQ']>=args.minQual]
+    # dataPosMultiAlignment=dataPos[(dataPos['HUM_MAPQ']<args.minQual)&~(dataPos["uid"]).isin(set(dataTMP["uid"]))].reset_index(drop=True)
+    # dataPos=dataPos[dataPos["uid"].isin(set(dataTMP["uid"]))].reset_index(drop=True)
+
+    if unpaired:
+        dataPos=groupBySpliceSitesUnpaired(dataPos)
+    else:
+        dataPos=groupBySpliceSites(dataPos)
+
+    dataPos=score(dataPos,args,args.minLen)
+    dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
+
+    dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+ext+".csv",index=False)
+    dataPosClean=dataPos[~(dataPos['hum_nearest_SS']=="-") \
+                    &(dataPos['entropyScore_hiv']>args.minEntropy) \
+                    &(dataPos['entropyScore_hum']>args.minEntropy) \
+                    &(dataPos['score']>args.score)]
+
+    # dataPos.drop(["uid",
+    #               "HUM_MAPQ",
+    #               "HIV_MAPQ",
+    #               "count_score",
+    #               "READ_LEN"],axis=1,inplace=True)
+
+    # colsOrder=["hum_nearest_SS",
+    #            "chr",
+    #            "comb",
+    #            "R",
+    #            "count",
+    #            "reads",
+    #            "spanReads",
+    #            "score"]
+    # if unpaired:
+    #     colsOrder.remove("R")
+
+    # dataPos=dataPos[colsOrder]
+    # dataPosClean=dataPosClean[colsOrder]
+    dataPosClean.to_csv(os.path.abspath(args.out)+"_Pos"+ext+".clean.csv",index=False)
+
+    # completely forgot that we can write reads from the sam file
+    # should make it much faster
+    # for each comb in the Pos.csv file
+    # find corresponding positions in the original human file
+    # save to csv with \n delimeter
+    if args.writeReads:
+        if not unpaired:
+            # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
+            # dataPosMultiAlignmnte=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
+            fileNameR1=baseName+"_R1.fastq"
+            fileNameR2=baseName+"_R2.fastq"
+            dataPosClean.head(n=20).apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+        else:
+            # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
+            # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
+            fileName=baseName+".fastq"
+            dataPosClean.head(n=20).apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
+            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+
+
 def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
     # load data from local alignments
     dataHIV=pd.read_csv(os.path.abspath(args.input1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
@@ -1417,9 +1589,42 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         unpaired=False
         if len(dataHIV[dataHIV["paired"]>0])==0 and len(dataHUM[dataHUM["paired"]>0])==0:
             unpaired=True
+        
+        if args.spliced is not None:
+            if os.path.exists(os.path.abspath(args.spliced)):
+                dataSpliced=pd.read_csv(os.path.abspath(args.spliced),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
+                                                                                                                                'FLAG',
+                                                                                                                                'RNAME',
+                                                                                                                                'POS',
+                                                                                                                                'MAPQ',
+                                                                                                                                'CIGAR',
+                                                                                                                                'RNEXT',
+                                                                                                                                'PNEXT',
+                                                                                                                                'TLEN',
+                                                                                                                                'SEQ',
+                                                                                                                                'QUAL'])
+                dataSpliced=dataSpliced[dataSpliced['CIGAR'].str.contains("N")]
+                extractFlagBits(dataSpliced)
+                dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
+                dataHUM["tid"]=dataHUM['QNAME']+dataHUM['firstRead'].astype(str)+dataHUM['lastRead'].astype(str)
+                dataHIV["tid"]=dataHIV['QNAME']+dataHIV['firstRead'].astype(str)+dataHIV['lastRead'].astype(str)
+                print("!!!!splicing!!!!")
+                print(len(dataHUM))
+                print(len(dataHIV))
+                dataHUM=dataHUM[~dataHUM['tid'].isin(set(dataSpliced['tid']))]
+                dataHIV=dataHIV[~dataHIV['tid'].isin(set(dataSpliced['tid']))]
+                dataHUM.drop(['tid'],axis=1,inplace=True)
+                dataHIV.drop(['tid'],axis=1,inplace=True)
+                print(len(dataHUM))
+                print(len(dataHIV))
+            
+            else:
+                print("Spliced file does not exist")
+
         # extract start and end for both template and reference
         dataHIV=extractStartEnd(dataHIV)
         dataHUM=extractStartEnd(dataHUM)
+
         dataHUM,dataHIV=filterReads(dataHUM,dataHIV)
         if len(dataHUM)==0:
             return
@@ -1443,120 +1648,32 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         # data.to_csv(os.path.abspath(args.out)+".chim"+end+".csv",index=False)
         # drop duplicated reads - preserve first occurence
         data.drop_duplicates(inplace=True)
-        dataPos=findSupport(data,minLen,args,unpaired)
 
-        if len(dataPos)>0:
-            if not unpaired:
-                dataPos=addSpan(data,dataPos)
-                dataPos.loc[dataPos['spanCount'].isnull(),['spanCount']]=dataPos.loc[dataPos['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
-                dataPos.loc[dataPos['spanR1-R2'].isnull(),['spanR1-R2']]=dataPos.loc[dataPos['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
+        # data.to_csv("./data.csv")
+        # unpaired=False
+        # data=pd.read_csv("./data.csv")
 
-            dataBed=dataPos[['chr','HUM_RS','HUM_RE']].drop_duplicates()
-            # dataBed.to_csv(os.path.abspath(args.out)+".bed",sep='\t',header=False,index=False)
-            # annotate(os.path.abspath(args.out)+".bed",os.path.abspath(args.annotation),dataPos)
-            dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
-            dataPos=approxCloseness(dataPos,args)
+        d=pd.DataFrame([])
+        # if there are multiple minLen in the minLenList then check the the highest does yild more than one
+        # if not, then discard and check the next minLen before constructing the dataPos
+        if unpaired:
+            d=filterOverlapCombineUnpaired(data,args.minLen)
+        else:
+            d=filterOverlapCombine(data,args.minLen)
+        d=d[(d["entropyScore_hum"]>args.minEntropy)&(d["entropyScore_hiv"]>args.minEntropy)]
 
-            # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
-            # os.system(bedCMD)
-            dataPos["reads"]=dataPos["reads"].str.join(";")
-            if not unpaired:
-                dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
-                dataPos["spanR1-R2"].replace("","-",inplace=True)
+        dataHighMAPQ=d[d['HUM_MAPQ']>=args.minQual]
+        dataLowMAPQ=d[(d['HUM_MAPQ']<args.minQual)&~(d["QNAME"].isin(set(dataHighMAPQ["QNAME"])))]
 
-            #Now add the nearest human splice site for each chimeric position
-            # dataPos[['hum_nearest_5SS',
-            #         'hum_nearest_3SS']]=dataPos.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)
-            # dataPos.to_csv(os.path.abspath(args.out)+"_Test"+end+".csv",index=False)
+        dataHighMAPQ.to_csv("./data.csv")
 
-            dataTMP=dataPos[dataPos['HUM_MAPQ']>=args.minQual]
-            dataPosMultiAlignment=dataPos[(dataPos['HUM_MAPQ']<args.minQual)&~(dataPos["uid"]).isin(set(dataTMP["uid"]))].reset_index(drop=True)
-            dataPos=dataPos[dataPos["uid"].isin(set(dataTMP["uid"]))].reset_index(drop=True)
+        dataPosHighMAPQ=findSupport(dataHighMAPQ,minLen,args,unpaired)
+        dataPosLowMAPQ=findSupport(dataLowMAPQ,minLen,args,unpaired)
 
-            if unpaired:
-                dataPos=groupBySpliceSitesUnpaired(dataPos)
-                dataPos=dataPos[~(dataPos['hum_nearest_SS']=='-')].reset_index(drop=True)
-                dataPosMultiAlignment=groupBySpliceSitesUnpaired(dataPosMultiAlignment)
-                dataPosMultiAlignment=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=='-')].reset_index(drop=True)
-            else:
-                dataPos=groupBySpliceSites(dataPos)
-                dataPos=dataPos[~(dataPos['hum_nearest_SS']=='-')].reset_index(drop=True)
-                dataPosMultiAlignment=groupBySpliceSites(dataPosMultiAlignment)
-                dataPosMultiAlignment=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=='-')].reset_index(drop=True)
-
-            dataPos=score(dataPos,args,minLen)
-            dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
-            dataPosMultiAlignment=score(dataPosMultiAlignment,args,minLen)
-            dataPosMultiAlignment=dataPosMultiAlignment.sort_values(by='score',ascending=False).reset_index(drop=True)
-
-            dataPos.drop(["uid",
-                          "HUM_MAPQ",
-                          "HIV_MAPQ",
-                          "count_score",
-                          "HIV_MAPQ_score",
-                          "HUM_MAPQ_score",
-                          "score_raw",
-                          "READ_LEN"],axis=1,inplace=True)
-            dataPosMultiAlignment.drop(["uid",
-                                        "HUM_MAPQ",
-                                        "HIV_MAPQ",
-                                        "count_score",
-                                        "HIV_MAPQ_score",
-                                        "HUM_MAPQ_score",
-                                        "score_raw",
-                                        "READ_LEN"],axis=1,inplace=True)
-
-            dataPosLowMAPQ=dataPos[~(dataPos['hum_nearest_SS']=="-") \
-                            &(dataPos['entropyScore_hiv']>args.minEntropy) \
-                            &(dataPos['entropyScore_hum']>args.minEntropy) \
-                            &(dataPos['score']>args.score)]
-
-            dataPosMultiAlignmentLowMAPQ=dataPosMultiAlignment[~(dataPosMultiAlignment['hum_nearest_SS']=="-") \
-                            &(dataPosMultiAlignment['entropyScore_hiv']>args.minEntropy) \
-                            &(dataPosMultiAlignment['entropyScore_hum']>args.minEntropy) \
-                            &(dataPosMultiAlignment['score']>args.score)]
-
-            colsOrder=["hum_nearest_SS",
-                       "chr",
-                       "comb",
-                       "R",
-                       "count",
-                       "reads",
-                       "spanReads",
-                       "score"]
-            if unpaired:
-                colsOrder.remove("R")
-
-            dataPosMultiAlignment=dataPosMultiAlignment[colsOrder]
-            dataPosMultiAlignment.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".csv",index=False)
-            dataPos=dataPos[colsOrder]
-            dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+end+".csv",index=False)
-            dataPosLowMAPQ.to_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv",index=False)
-            dataPosMultiAlignmentLowMAPQ.to_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv",index=False)
-
-            # completely forgot that we can write reads from the sam file
-            # should make it much faster
-            # for each comb in the Pos.csv file
-            # find corresponding positions in the original human file
-            # save to csv with \n delimeter
-            if args.writeReads:
-                if not unpaired:
-                    # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
-                    # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
-                    fileNameR1=baseName+"_R1.fastq"
-                    fileNameR2=baseName+"_R2.fastq"
-                    dataPos.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
-                    dataPosMultiAlignment.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
-                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
-                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
-                else:
-                    # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
-                    # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
-                    fileName=baseName+".fastq"
-                    dataPos.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-                    dataPosMultiAlignment.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
-                    # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+        if len(dataPosHighMAPQ)>0:
+            rest(dataPosHighMAPQ,args,data,"",unpaired,baseName,outDir,dirPath)
+        if len(dataPosLowMAPQ)>0:
+            rest(dataPosLowMAPQ,args,data,"_LowMAPQ",unpaired,baseName,outDir,dirPath)
     
     return 1
 
@@ -1587,14 +1704,6 @@ def main(args):
         print('not real path')
         return
 
-#Think carefully about this:
-# perhaps makes more sense to just make step3 as extraction step. Give original fastq file and extract fasta from there
-# Reasons:
-# 1. Sam does not preserve barcode information in the read name
-# 2. R1/R2 pair is not guaranteed to be present
-
-# also need to run old annotation into a separate column to see if different from the new implementation
-
 #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 # try to make extractStartEnd more efficient
 # perhaps look at the regular expressions used by Ella in her scripts
@@ -1606,8 +1715,6 @@ def main(args):
 
 # at the very end need to build python environment and requirements.txt
 # since the code should work with both python2 and python3 need to do this for both
-
-# !!!!!!!!!!Not taking into consideration the hiv alignment position since those come from a high dimensional and varying multi-fasta reference
 
 # do not forget to remove all unnecessary columns in the summary
 # perhaps write out extended Pos.grouping and with most columns removed
@@ -1621,17 +1728,31 @@ def main(args):
 
 # entropy must be more than 0.8
 
-# also consider making the alignment length score into a sigmoid function as well
-# as we can see from the 29 experiment KANSL3 fits the parameters but because of the relatively low score brings the alignment down significantly
-# if a sigmoid function were applied it would be on top
-
 # consider giving penalties for excessively long overlaps
-
-# do not forget to retain the count_score (currently missing from the final results)
 
 # In the end the fasta records will have to be written from the dataframe,
 # since the raw sequence data is not supplied to the application and for that matter should not be supplied
 # This should not be a priority however at the moment.
 
-# remove super low entropy and other filter reads before any grouping
-# otherwise they might end up spuriously in the groupings
+# Should we consider the number of insertions/deletions/mismatches in the score calculations?
+
+# Yet another improvement would be to store the sequence of the first read in the collection
+# this would allow a very quick lookup during the manual verification
+
+# Another idea for span reads:
+#1. Add only those that are fully hiv on one side and fully human on the other side
+# should not contain a fragmented HIV HUMan read on either side
+# it could be fragmented if it appears to indicate the same splice site
+
+# Supply human splicing annotation to hisat and do not include novel splice sites
+# use the same as the one used by the UCSC BLAT
+
+# lookup if there is an option for bowtie and hisat to not report secondary alignments. Seems they do it by default
+
+# question: when provided with known splice sites, does hisat2 still report novel ones or only align in accordance with those provided
+
+# perhaps the ITGAE gene is in the 1B6 sample, but is not detected in the annotation,
+# because we are only annotating the 3'SS. Try adding Ellas script to the output once again,
+# to see if anything can be revealed through that script
+# for now will check manually
+# the manual analysis has shown that the position is nowhere to be found in the results page
