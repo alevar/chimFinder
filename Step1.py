@@ -186,13 +186,13 @@ def filterReads(dataHUM,dataHIV):
     dataHUM=dataHUM[(dataHUM["secondaryAlignment"]==0)&(dataHUM["PCRdup"]==0)&(dataHUM["suppAl"]==0)&(dataHUM["noPassFilter"]==0)]
     dataHIV=dataHIV[(dataHIV["secondaryAlignment"]==0)&(dataHIV["PCRdup"]==0)&(dataHIV["suppAl"]==0)&(dataHIV["noPassFilter"]==0)]
     #now we can exclude paired-end reads which do not contain information from both references
-    setHIV=set(dataHIV["QNAME"])
-    setHUM=set(dataHUM["QNAME"])
-    setQnames=setHIV.intersection(setHUM)
-    dataHUM=dataHUM[dataHUM["QNAME"].isin(setQnames)]
-    dataHIV=dataHIV[dataHIV["QNAME"].isin(setQnames)]
-    if (len(setQnames)==0):
-        return pd.DataFrame([]),pd.DataFrame([])
+    # setHIV=set(dataHIV["QNAME"])
+    # setHUM=set(dataHUM["QNAME"])
+    # setQnames=setHIV.intersection(setHUM)
+    # dataHUM=dataHUM[dataHUM["QNAME"].isin(setQnames)]
+    # dataHIV=dataHIV[dataHIV["QNAME"].isin(setQnames)]
+    # if (len(setQnames)==0):
+    #     return pd.DataFrame([]),pd.DataFrame([])
     return dataHUM, dataHIV
 
 def createData(data,dataHUM,dataHIV):
@@ -207,7 +207,8 @@ def createData(data,dataHUM,dataHIV):
                                                 "READ_LEN",
                                                 "SEQ",
                                                 "QUAL",
-                                                "MAPQ"]]
+                                                "MAPQ",
+                                                "reversedCurr"]]
     dataHUMR2=dataHUM[dataHUM['lastRead']==128][["QNAME",
                                                 "Template_start",
                                                 "Template_end",
@@ -217,7 +218,8 @@ def createData(data,dataHUM,dataHIV):
                                                 "READ_LEN",
                                                 "SEQ",
                                                 "QUAL",
-                                                "MAPQ"]]
+                                                "MAPQ",
+                                                "reversedCurr"]]
     dataHIVR1=dataHIV[dataHIV['firstRead']==64][["QNAME",
                                                 "Template_start",
                                                 "Template_end",
@@ -227,7 +229,8 @@ def createData(data,dataHUM,dataHIV):
                                                 "READ_LEN",
                                                 "SEQ",
                                                 "QUAL",
-                                                "MAPQ"]]
+                                                "MAPQ",
+                                                "reversedCurr"]]
     dataHIVR2=dataHIV[dataHIV['lastRead']==128][["QNAME",
                                                 "Template_start",
                                                 "Template_end",
@@ -237,7 +240,8 @@ def createData(data,dataHUM,dataHIV):
                                                 "READ_LEN",
                                                 "SEQ",
                                                 "QUAL",
-                                                "MAPQ"]]
+                                                "MAPQ",
+                                                "reversedCurr"]]
     df[["QNAME",
         "R1HUM_TS",
         "R1HUM_TE",
@@ -247,7 +251,8 @@ def createData(data,dataHUM,dataHIV):
         "READ_LEN_R1",
         "R1HUM_SEQ",
         "QUAL_R1",
-        "R1HUM_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHUMR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
+        "R1HUM_MAPQ",
+        "R1HUM_reversedCurr"]]=pd.DataFrame(pd.merge(data,dataHUMR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
@@ -256,7 +261,8 @@ def createData(data,dataHUM,dataHIV):
                                                                                                         "READ_LEN",
                                                                                                         "SEQ",
                                                                                                         "QUAL",
-                                                                                                        "MAPQ"]]
+                                                                                                        "MAPQ",
+                                                                                                        "reversedCurr"]]
     df[["QNAME",
         "R2HUM_TS",
         "R2HUM_TE",
@@ -266,7 +272,8 @@ def createData(data,dataHUM,dataHIV):
         "READ_LEN_R2",
         "R2HUM_SEQ",
         "QUAL_R2",
-        "R2HUM_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHUMR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
+        "R2HUM_MAPQ",
+        "R2HUM_reversedCurr"]]=pd.DataFrame(pd.merge(data,dataHUMR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
@@ -275,7 +282,8 @@ def createData(data,dataHUM,dataHIV):
                                                                                                         "READ_LEN",
                                                                                                         "SEQ",
                                                                                                         "QUAL",
-                                                                                                        "MAPQ"]]
+                                                                                                        "MAPQ",
+                                                                                                        "reversedCurr"]]
     df[["QNAME",
         "R1HIV_TS",
         "R1HIV_TE",
@@ -283,14 +291,16 @@ def createData(data,dataHUM,dataHIV):
         "R1HIV_RS",
         "R1HIV_RE",
         "R1HIV_SEQ",
-        "R1HIV_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHIVR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
+        "R1HIV_MAPQ",
+        "R1HIV_reversedCurr"]]=pd.DataFrame(pd.merge(data,dataHIVR1,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
                                                                                                         "Reference_start",
                                                                                                         "Reference_end",
                                                                                                         "SEQ",
-                                                                                                        "MAPQ"]]
+                                                                                                        "MAPQ",
+                                                                                                        "reversedCurr"]]
     df[["QNAME",
         "R2HIV_TS",
         "R2HIV_TE",
@@ -298,14 +308,16 @@ def createData(data,dataHUM,dataHIV):
         "R2HIV_RS",
         "R2HIV_RE",
         "R2HIV_SEQ",
-        "R2HIV_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHIVR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
+        "R2HIV_MAPQ",
+        "R2HIV_reversedCurr"]]=pd.DataFrame(pd.merge(data,dataHIVR2,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
                                                                                                         "Reference_start",
                                                                                                         "Reference_end",
                                                                                                         "SEQ",
-                                                                                                        "MAPQ"]]
+                                                                                                        "MAPQ",
+                                                                                                        "reversedCurr"]]
     df[["R1HUM_ID",
         "R2HUM_ID",
         "R1HIV_ID",
@@ -313,7 +325,11 @@ def createData(data,dataHUM,dataHIV):
         "R1HUM_MAPQ",
         "R2HUM_MAPQ",
         "R1HIV_MAPQ",
-        "R2HIV_MAPQ"]].fillna('',inplace=True)
+        "R2HIV_MAPQ",
+        "R1HUM_reversedCurr",
+        "R2HUM_reversedCurr",
+        "R1HIV_reversedCurr",
+        "R2HIV_reversedCurr"]].fillna('',inplace=True)
     df.fillna(0,inplace=True)
     return df
 
@@ -329,7 +345,8 @@ def createDataUnpaired(data,dataHUM,dataHIV):
                     "READ_LEN",
                     "SEQ",
                     "QUAL",
-                    "MAPQ"]]
+                    "MAPQ",
+                    "reversedCurr"]]
     dataHIV=dataHIV[["QNAME",
                     "Template_start",
                     "Template_end",
@@ -339,7 +356,8 @@ def createDataUnpaired(data,dataHUM,dataHIV):
                     "READ_LEN",
                     "SEQ",
                     "QUAL",
-                    "MAPQ"]]
+                    "MAPQ",
+                    "reversedCurr"]]
     df[["QNAME",
         "HUM_TS",
         "HUM_TE",
@@ -349,7 +367,8 @@ def createDataUnpaired(data,dataHUM,dataHIV):
         "READ_LEN",
         "HUM_SEQ",
         "QUAL",
-        "HUM_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHUM,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
+        "HUM_MAPQ",
+        "HUM_reversedCurr"]]=pd.DataFrame(pd.merge(data,dataHUM,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
@@ -358,7 +377,8 @@ def createDataUnpaired(data,dataHUM,dataHIV):
                                                                                                         "READ_LEN",
                                                                                                         "SEQ",
                                                                                                         "QUAL",
-                                                                                                        "MAPQ"]]
+                                                                                                        "MAPQ",
+                                                                                                        "reversedCurr"]]
     df[["QNAME",
         "HIV_TS",
         "HIV_TE",
@@ -366,14 +386,16 @@ def createDataUnpaired(data,dataHUM,dataHIV):
         "HIV_RS",
         "HIV_RE",
         "HIV_SEQ",
-        "HIV_MAPQ"]]=pd.DataFrame(pd.merge(data,dataHIV,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
+        "HIV_MAPQ",
+        "HIV_reversedCurr"]]=pd.DataFrame(pd.merge(data,dataHIV,how='left',on='QNAME')).reset_index(drop=True)[["QNAME",
                                                                                                         "Template_start",
                                                                                                         "Template_end",
                                                                                                         "RNAME",
                                                                                                         "Reference_start",
                                                                                                         "Reference_end",
                                                                                                         "SEQ",
-                                                                                                        "MAPQ"]]
+                                                                                                        "MAPQ",
+                                                                                                        "reversedCurr"]]
     df[["HUM_ID",
         "HUM_ID",
         "HIV_ID",
@@ -381,7 +403,9 @@ def createDataUnpaired(data,dataHUM,dataHIV):
         "HUM_MAPQ",
         "HUM_MAPQ",
         "HIV_MAPQ",
-        "HIV_MAPQ"]].fillna('',inplace=True)
+        "HIV_MAPQ",
+        "HUM_reversedCurr",
+        "HIV_reversedCurr"]].fillna('',inplace=True)
     df.fillna(0,inplace=True)
     return df
 
@@ -409,14 +433,18 @@ def topologicalNormalizedEntropy(s):
 #another paper: Look at figure 2 https://www.nature.com/articles/srep19788#f2
 #more https://www.xycoon.com/normalized_entropy.htm
 
-def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
+def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum,readLen,rHUM,rHIV):
 
     entropyScore_hiv=0
     entropyScore_hum=0
     meanQual_hiv=0
     meanQual_hum=0
 
-    s_hiv=seqHIV[i1_hiv:i2_hiv]
+    s_hiv=""
+    if rHIV==True: # if reverse complemented take into account
+        s_hiv=seqHIV[readLen-i2_hiv:readLen-i1_hiv]
+    else:
+        s_hiv=seqHIV[i1_hiv:i2_hiv]
     if not len(s_hiv)==0:
         entropyScore_hiv=topologicalNormalizedEntropy(s_hiv)
         q_hiv=qual[i1_hiv:i2_hiv]
@@ -425,7 +453,11 @@ def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
         else:
             meanQual_hiv=0
 
-    s_hum=seqHum[i1_hum:i2_hum]
+    s_hiv=""
+    if rHUM==True: # if reverse complemented take into account
+        s_hum=seqHum[readLen-i2_hum:readLen-i1_hum]
+    else:
+        s_hum=seqHum[i1_hum:i2_hum]
     if not len(s_hum)==0:
         entropyScore_hum=topologicalNormalizedEntropy(s_hum)
         q_hum=qual[i1_hum:i2_hum]
@@ -448,7 +480,7 @@ def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum):
 # However, since greater minLen values for HIV and HUM alignments will yield fewer reads but at higher confidence
 # support reads could ignore the min len requirement as long as the split position is identical
 # or perhaps the minLen requirement for the support reads should be lower
-def filterOverlapCombine(data,minLen):
+def filterOverlapCombine(data,args):
     dropList=["R1HUM_TS",
               "R1HUM_TE",
               "R1HUM_ID",
@@ -483,7 +515,11 @@ def filterOverlapCombine(data,minLen):
               "R2HUM_MAPQ",
               "R2HIV_MAPQ",
               "READ_LEN_R1",
-              "READ_LEN_R2"]
+              "READ_LEN_R2",
+              "R1HUM_reversedCurr",
+              "R2HUM_reversedCurr",
+              "R1HIV_reversedCurr",
+              "R2HIV_reversedCurr"]
 
     # R1 right
     data['entropyScore_hiv']=0
@@ -510,13 +546,14 @@ def filterOverlapCombine(data,minLen):
     dataR1Right["HIV_RE"]=dataR1Right["R1HIV_RE"].astype(int)
     dataR1Right["HUM_ID"]=dataR1Right["R1HUM_ID"]
     dataR1Right["HIV_ID"]=dataR1Right["R1HIV_ID"]
-    dataR1Right["SEQ"]=dataR1Right[dataR1Right['reversedCurr']==0]["R1HUM_SEQ"]
-    dataR1Right["R_SEQ"]=dataR1Right[dataR1Right['reversedCurr']==16]["R1HUM_SEQ"]
+    dataR1Right["SEQ"]=dataR1Right["R1HUM_SEQ"]
+#     dataR1Right["SEQ"]=dataR1Right[dataR1Right['R1HUM_reversedCurr']==0]["R1HUM_SEQ"]
+#     dataR1Right["R_SEQ"]=dataR1Right[dataR1Right['R1HUM_reversedCurr']==16]["R1HUM_SEQ"]
     dataR1Right["HIV_MAPQ"]=dataR1Right["R1HIV_MAPQ"].astype(int)
     dataR1Right["HUM_MAPQ"]=dataR1Right["R1HUM_MAPQ"].astype(int)
     dataR1Right["HIV_AL"]=dataR1Right["HIV_TE"]-dataR1Right["HIV_TS"]-dataR1Right["overlap"]
     dataR1Right["HUM_AL"]=dataR1Right["HUM_TE"]-dataR1Right["HUM_TS"]-dataR1Right["overlap"]
-    dataR1Right=dataR1Right[(dataR1Right['HIV_AL']>minLen)&(dataR1Right['HUM_AL']>minLen)]
+    dataR1Right=dataR1Right[(dataR1Right['HIV_AL']>args.minLen)&(dataR1Right['HUM_AL']>args.minLen)]
     if len(dataR1Right>0):
         dataR1Right[['entropyScore_hiv',
                      'meanQual_hiv',
@@ -527,7 +564,10 @@ def filterOverlapCombine(data,minLen):
                                                                                                     int(row['HIV_TS']+row['overlap']),
                                                                                                     int(row['HIV_TE']),
                                                                                                     int(row['HUM_TS']),
-                                                                                                    int(row['HUM_TE']-row['overlap'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                                                                                                    int(row['HUM_TE']-row['overlap']),
+                                                                                                    int(row['READ_LEN_R1']),
+                                                                                                    row["R1HUM_reversedCurr"]==16,
+                                                                                                    row["R1HIV_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                                    'meanQual_hum_y']]
@@ -554,13 +594,14 @@ def filterOverlapCombine(data,minLen):
     dataR1Left["HIV_RE"]=dataR1Left["R1HIV_RE"].astype(int)
     dataR1Left["HUM_ID"]=dataR1Left["R1HUM_ID"]
     dataR1Left["HIV_ID"]=dataR1Left["R1HIV_ID"]
-    dataR1Left["SEQ"]=dataR1Left[dataR1Left['reversedCurr']==0]["R1HUM_SEQ"]
-    dataR1Left["R_SEQ"]=dataR1Left[dataR1Left['reversedCurr']==16]["R1HUM_SEQ"]
+    dataR1Left["SEQ"]=dataR1Left["R1HUM_SEQ"]
+#     dataR1Left["SEQ"]=dataR1Left[dataR1Left['R1HUM_reversedCurr']==0]["R1HUM_SEQ"]
+#     dataR1Left["R_SEQ"]=dataR1Left[dataR1Left['R1HUM_reversedCurr']==16]["R1HUM_SEQ"]
     dataR1Left["HIV_MAPQ"]=dataR1Left["R1HIV_MAPQ"].astype(int)
     dataR1Left["HUM_MAPQ"]=dataR1Left["R1HUM_MAPQ"].astype(int)
     dataR1Left["HIV_AL"]=dataR1Left["HIV_TE"]-dataR1Left["HIV_TS"]-dataR1Left["overlap"]
     dataR1Left["HUM_AL"]=dataR1Left["HUM_TE"]-dataR1Left["HUM_TS"]-dataR1Left["overlap"]
-    dataR1Left=dataR1Left[(dataR1Left["HIV_AL"]>minLen)&(dataR1Left["HUM_AL"]>minLen)]
+    dataR1Left=dataR1Left[(dataR1Left["HIV_AL"]>args.minLen)&(dataR1Left["HUM_AL"]>args.minLen)]
     if len(dataR1Left)>0:
         dataR1Left[['entropyScore_hiv',
                      'meanQual_hiv',
@@ -571,7 +612,10 @@ def filterOverlapCombine(data,minLen):
                                                                                                     int(row['HIV_TS']),
                                                                                                     int(row['HIV_TE']-row['overlap']),
                                                                                                     int(row['HUM_TS']+row['overlap']),
-                                                                                                    int(row['HUM_TE'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                                                                                                    int(row['HUM_TE']),
+                                                                                                    int(row['READ_LEN_R1']),
+                                                                                                    row["R1HUM_reversedCurr"]==16,
+                                                                                                    row["R1HIV_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                    'meanQual_hum_y']]
@@ -599,13 +643,14 @@ def filterOverlapCombine(data,minLen):
     dataR2Right["HIV_RE"]=dataR2Right["R2HIV_RE"].astype(int)
     dataR2Right["HUM_ID"]=dataR2Right["R2HUM_ID"]
     dataR2Right["HIV_ID"]=dataR2Right["R2HIV_ID"]
-    dataR2Right["SEQ"]=dataR2Right[dataR2Right['reversedCurr']==0]["R2HUM_SEQ"]
-    dataR2Right["R_SEQ"]=dataR2Right[dataR2Right['reversedCurr']==16]["R2HUM_SEQ"]
+    dataR2Right["SEQ"]=dataR2Right["R2HUM_SEQ"]
+#     dataR2Right["SEQ"]=dataR2Right[dataR2Right['R2HUM_reversedCurr']==0]["R2HUM_SEQ"]
+#     dataR2Right["R_SEQ"]=dataR2Right[dataR2Right['R2HUM_reversedCurr']==16]["R2HUM_SEQ"]
     dataR2Right["HIV_MAPQ"]=dataR2Right["R2HIV_MAPQ"].astype(int)
     dataR2Right["HUM_MAPQ"]=dataR2Right["R2HUM_MAPQ"].astype(int)
     dataR2Right["HIV_AL"]=dataR2Right["HIV_TE"]-dataR2Right["HIV_TS"]-dataR2Right["overlap"]
     dataR2Right["HUM_AL"]=dataR2Right["HUM_TE"]-dataR2Right["HUM_TS"]-dataR2Right["overlap"]
-    dataR2Right=dataR2Right[(dataR2Right["HIV_AL"]>minLen)&(dataR2Right["HUM_AL"]>minLen)]
+    dataR2Right=dataR2Right[(dataR2Right["HIV_AL"]>args.minLen)&(dataR2Right["HUM_AL"]>args.minLen)]
     if len(dataR2Right)>0:
         dataR2Right[['entropyScore_hiv',
                      'meanQual_hiv',
@@ -616,7 +661,10 @@ def filterOverlapCombine(data,minLen):
                                                                                                     int(row['HIV_TS']+row['overlap']),
                                                                                                     int(row['HIV_TE']),
                                                                                                     int(row['HUM_TS']),
-                                                                                                    int(row['HUM_TE']-row['overlap'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                                                                                                    int(row['HUM_TE']-row['overlap']),
+                                                                                                    int(row['READ_LEN_R2']),
+                                                                                                    row["R2HUM_reversedCurr"]==16,
+                                                                                                    row["R2HIV_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                                    'meanQual_hum_y']]
@@ -643,13 +691,14 @@ def filterOverlapCombine(data,minLen):
     dataR2Left["HIV_RE"]=dataR2Left["R2HIV_RE"].astype(int)
     dataR2Left["HUM_ID"]=dataR2Left["R2HUM_ID"]
     dataR2Left["HIV_ID"]=dataR2Left["R2HIV_ID"]
-    dataR2Left["SEQ"]=dataR2Left[dataR2Left['reversedCurr']==0]["R2HUM_SEQ"]
-    dataR2Left["R_SEQ"]=dataR2Left[dataR2Left['reversedCurr']==16]["R2HUM_SEQ"]
+    dataR2Left["SEQ"]=dataR2Left["R2HUM_SEQ"]
+#     dataR2Left["SEQ"]=dataR2Left[dataR2Left['R2HUM_reversedCurr']==0]["R2HUM_SEQ"]
+#     dataR2Left["R_SEQ"]=dataR2Left[dataR2Left['R2HUM_reversedCurr']==16]["R2HUM_SEQ"]
     dataR2Left["HIV_MAPQ"]=dataR2Left["R2HIV_MAPQ"].astype(int)
     dataR2Left["HUM_MAPQ"]=dataR2Left["R2HUM_MAPQ"].astype(int)
     dataR2Left["HIV_AL"]=dataR2Left["HIV_TE"]-dataR2Left["HIV_TS"]-dataR2Left["overlap"]
     dataR2Left["HUM_AL"]=dataR2Left["HUM_TE"]-dataR2Left["HUM_TS"]-dataR2Left["overlap"]
-    dataR2Left=dataR2Left[(dataR2Left["HIV_AL"]>minLen)&(dataR2Left["HUM_AL"]>minLen)]
+    dataR2Left=dataR2Left[(dataR2Left["HIV_AL"]>args.minLen)&(dataR2Left["HUM_AL"]>args.minLen)]
     if len(dataR2Left)>0:
         dataR2Left[['entropyScore_hiv',
                      'meanQual_hiv',
@@ -660,20 +709,59 @@ def filterOverlapCombine(data,minLen):
                                                                                                     int(row['HIV_TS']),
                                                                                                     int(row['HIV_TE']-row['overlap']),
                                                                                                     int(row['HUM_TS']+row['overlap']),
-                                                                                                    int(row['HUM_TE'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                                                                                                    int(row['HUM_TE']),
+                                                                                                    int(row['READ_LEN_R2']),
+                                                                                                    row["R2HUM_reversedCurr"]==16,
+                                                                                                    row["R2HIV_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                    'meanQual_hum_y']]
 
+    
     dataR2Left["READ_LEN"]=dataR2Left["READ_LEN_R2"]
     dataR2Left["R"]="R2"
     dataR2Left.drop(dropList,axis=1,inplace=True)
 
     frames=[dataR1Right,dataR1Left,dataR2Right,dataR2Left]
     df=pd.concat(frames).reset_index(drop=True)
+    
+    df["HIV_AL"]=(df["READ_LEN"]/2)-((df["HIV_AL"]-df["READ_LEN"]/2).abs())
+    df["HUM_AL"]=(df["READ_LEN"]/2)-((df["HUM_AL"]-df["READ_LEN"]/2).abs())
+
+    k=float(args.minLen)
+    ssAl=args.steepSlopeAL
+    df["HIV_AL_score"]=(((((df['HIV_AL']-k)/k) \
+                        /(((ssAl/k)+((df['HIV_AL']-k)/k)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxAlLenPenalty))) \
+                                +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
+
+    df["HUM_AL_score"]=(((((df['HUM_AL']-k)/k) \
+                        /(((ssAl/k)+((df['HUM_AL']-k)/k)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxAlLenPenalty))) \
+                                +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+
+    df['jointEntropy']=((df['entropyScore_hiv'] \
+                    +df['entropyScore_hum']) \
+                    /(2))
+    df['jointAlLen']=((df['HUM_AL_score'] \
+                    +df['HIV_AL_score']) \
+                    /(2))
+    df["scorePrelim"]=(df['jointEntropy'] \
+                    *df['jointAlLen'])
+
+    df.drop(["jointEntropy",
+                  "jointAlLen"],axis=1,inplace=True)
+    df=df.round({'scorePrelim': 4})
+    df=df[df["scorePrelim"]>=args.score]
+    df["SEQ"]=list(zip(df.scorePrelim, df.SEQ))
+    
     return df
 
-def filterOverlapCombineUnpaired(data,minLen):
+def filterOverlapCombineUnpaired(data,args):
     #right
     data['entropyScore_hiv']=0
     data['meanQual_hiv']=0
@@ -698,11 +786,12 @@ def filterOverlapCombineUnpaired(data,minLen):
     dataRight["HIV_RE"]=dataRight["HIV_RE"].astype(int)
     dataRight["HIV_MAPQ"]=dataRight["HIV_MAPQ"].astype(int)
     dataRight["HUM_MAPQ"]=dataRight["HUM_MAPQ"].astype(int)
-    dataRight["SEQ"]=dataRight[dataRight['reversedCurr']==0]["HUM_SEQ"]
-    dataRight["R_SEQ"]=dataRight[dataRight['reversedCurr']==16]["HUM_SEQ"]
+    dataRight["SEQ"]=dataRight["HUM_SEQ"]
+#     dataRight["SEQ"]=dataRight[dataRight['HUM_reversedCurr']==0]["HUM_SEQ"]
+#     dataRight["R_SEQ"]=dataRight[dataRight['HUM_reversedCurr']==16]["HUM_SEQ"]
     dataRight["HIV_AL"]=dataRight["HIV_TE"]-dataRight["HIV_TS"]-dataRight["overlap"]
     dataRight["HUM_AL"]=dataRight["HUM_TE"]-dataRight["HUM_TS"]-dataRight["overlap"]
-    dataRight=dataRight[(dataRight['HIV_AL']>minLen)&(dataRight['HUM_AL']>minLen)]
+    dataRight=dataRight[(dataRight['HIV_AL']>args.minLen)&(dataRight['HUM_AL']>args.minLen)]
     if len(dataRight>0):
         dataRight[['entropyScore_hiv',
                      'meanQual_hiv',
@@ -713,7 +802,10 @@ def filterOverlapCombineUnpaired(data,minLen):
                                                                                                     int(row['HIV_TS']+row['overlap']),
                                                                                                     int(row['HIV_TE']),
                                                                                                     int(row['HUM_TS']),
-                                                                                                    int(row['HUM_TE']-row['overlap'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                                                                                                    int(row['HUM_TE']-row['overlap']),
+                                                                                                    int(row['READ_LEN']),
+                                                                                                    row["HUM_reversedCurr"]==16,
+                                                                                                    row["HIV_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                                    'meanQual_hum_y']]
@@ -738,11 +830,12 @@ def filterOverlapCombineUnpaired(data,minLen):
     dataLeft["HIV_RE"]=dataLeft["HIV_RE"].astype(int)
     dataLeft["HIV_MAPQ"]=dataLeft["HIV_MAPQ"].astype(int)
     dataLeft["HUM_MAPQ"]=dataLeft["HUM_MAPQ"].astype(int)
-    dataLeft["SEQ"]=dataLeft[dataLeft['reversedCurr']==0]["HUM_SEQ"]
-    dataLeft["R_SEQ"]=dataLeft[dataLeft['reversedCurr']==16]["HUM_SEQ"]
+    dataLeft["SEQ"]=dataLeft["HUM_SEQ"]
+#     dataLeft["SEQ"]=dataLeft[dataLeft['HUM_reversedCurr']==0]["HUM_SEQ"]
+#     dataLeft["R_SEQ"]=dataLeft[dataLeft['HUM_reversedCurr']==16]["HUM_SEQ"]
     dataLeft["HIV_AL"]=dataLeft["HIV_TE"]-dataLeft["HIV_TS"]-dataLeft["overlap"]
     dataLeft["HUM_AL"]=dataLeft["HUM_TE"]-dataLeft["HUM_TS"]-dataLeft["overlap"]
-    dataLeft=dataLeft[(dataLeft["HIV_AL"]>minLen)&(dataLeft["HUM_AL"]>minLen)]
+    dataLeft=dataLeft[(dataLeft["HIV_AL"]>args.minLen)&(dataLeft["HUM_AL"]>args.minLen)]
     if len(dataLeft)>0:
         dataLeft[['entropyScore_hiv',
                      'meanQual_hiv',
@@ -753,7 +846,10 @@ def filterOverlapCombineUnpaired(data,minLen):
                                                                                             int(row['HIV_TS']),
                                                                                             int(row['HIV_TE']-row['overlap']),
                                                                                             int(row['HUM_TS']+row['overlap']),
-                                                                                            int(row['HUM_TE'])),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
+                                                                                            int(row['HUM_TE']),
+                                                                                            int(row['READ_LEN']),
+                                                                                            row["HUM_reversedCurr"]==16,
+                                                                                            row["HIV_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
                                                                                                                                                                    'meanQual_hiv_y',
                                                                                                                                                                    'entropyScore_hum_y',
                                                                                                                                                                    'meanQual_hum_y']]
@@ -802,17 +898,14 @@ def addSpan(data,dataPos):
 # 1. group data by split position
 # 2. add a column of high confidence support reads from the first parameter DF
 # 3. add a column of low confidence support reads from the second parameter DF
-def findSupport(data,minLen,args,unpaired):
+def findSupport(data,minLen,unpaired):
     aggregations={
         'QNAME':{
             'count':'count',
             'reads': lambda x: set(x)
         },
         'SEQ':{
-            'seqs': lambda x: list(x)
-        },
-        'R_SEQ':{
-            'r_seqs': lambda x: list(x)
+            'seq': lambda x: (max(dict(list(x)), key=int),dict(list(x))[max(dict(list(x)), key=int)])
         },
         'HUM_RS':{
             'HUM_RS':'min'
@@ -869,8 +962,7 @@ def findSupport(data,minLen,args,unpaired):
                                                                                     "meanQual_hum",
                                                                                     "HIV_MAPQ",
                                                                                     "HUM_MAPQ",
-                                                                                    "SEQ",
-                                                                                    "R_SEQ"]].agg(aggregations)).reset_index()
+                                                                                    "SEQ"]].agg(aggregations)).reset_index()
     dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)            
     return dataPos
 
@@ -1123,11 +1215,8 @@ def groupBySpliceSites(data):
             'groupsCount':'count',
             'reads': lambda x: ';'.join(set(x))
         },
-        'seqs':{
-            'seqs': list(x)[0]
-        },
-        'r_seqs':{
-            'r_seqs': list(x)[0]
+        'seq':{
+            'seq': lambda x: dict(list(x))[max(dict(list(x)), key=int)]
         },
         'spanR1-R2':{
             'spanReads':lambda x: ';'.join(list(set([el for el in x if not el=='-'])))
@@ -1179,8 +1268,7 @@ def groupBySpliceSites(data):
                                                 "READ_LEN",
                                                 "HIV_MAPQ",
                                                 "HUM_MAPQ",
-                                                "seqs",
-                                                "r_seqs"]].agg(aggregations)).reset_index()
+                                                "seq"]].agg(aggregations)).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1193,11 +1281,8 @@ def groupBySpliceSitesUnpaired(data):
             'groupsCount':'count',
             'reads': lambda x: ';'.join(set(x))
         },
-        'seqs':{
-            'seqs': lambda x: list(x)
-        },
-        'r_seqs':{
-            'r_seqs': lambda x: list(x)
+        'seq':{
+            'seq': lambda x: dict(list(x))[max(dict(list(x)), key=int)]
         },
         'count':{
             'count':'sum'
@@ -1241,8 +1326,7 @@ def groupBySpliceSitesUnpaired(data):
                                                 "READ_LEN",
                                                 "HIV_MAPQ",
                                                 "HUM_MAPQ",
-                                                "seqs",
-                                                "r_seqs"]].agg(aggregations)).reset_index()
+                                                "seq"]].agg(aggregations)).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1472,7 +1556,7 @@ def rest(dataPos,args,data,ext,unpaired,baseName,outDir,dirPath):
         dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
         dataPos["spanR1-R2"].replace("","-",inplace=True)
 
-    dataPos.to_csv("./unsplit"+ext+".csv")
+    # dataPos.to_csv("./unsplit"+ext+".csv")
 
     #Now add the nearest human splice site for each chimeric position
     # dataPos[['hum_nearest_5SS',
@@ -1491,32 +1575,31 @@ def rest(dataPos,args,data,ext,unpaired,baseName,outDir,dirPath):
     dataPos=score(dataPos,args,args.minLen)
     dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
 
+    print("!!!!saving data!!!!")
+
     dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+ext+".csv",index=False)
     dataPosClean=dataPos[~(dataPos['hum_nearest_SS']=="-") \
                     &(dataPos['entropyScore_hiv']>args.minEntropy) \
                     &(dataPos['entropyScore_hum']>args.minEntropy) \
                     &(dataPos['score']>args.score)]
 
-    # dataPos.drop(["uid",
-    #               "HUM_MAPQ",
-    #               "HIV_MAPQ",
-    #               "count_score",
-    #               "READ_LEN"],axis=1,inplace=True)
+    colsOrder=["hum_nearest_SS",
+               "chr",
+               "comb",
+               "R",
+               "seq",
+               "count",
+               "score",
+               "fileName"]
+    if unpaired:
+        colsOrder.remove("R")
 
-    # colsOrder=["hum_nearest_SS",
-    #            "chr",
-    #            "comb",
-    #            "R",
-    #            "count",
-    #            "reads",
-    #            "spanReads",
-    #            "score"]
-    # if unpaired:
-    #     colsOrder.remove("R")
+    if unpaired:
+        dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
+    else:
+        dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
 
-    # dataPos=dataPos[colsOrder]
-    # dataPosClean=dataPosClean[colsOrder]
-    dataPosClean.to_csv(os.path.abspath(args.out)+"_Pos"+ext+".clean.csv",index=False)
+    dataPosClean[colsOrder].to_csv(os.path.abspath(args.out)+"_Pos"+ext+".clean.csv",index=False)
 
     # completely forgot that we can write reads from the sam file
     # should make it much faster
@@ -1529,14 +1612,14 @@ def rest(dataPos,args,data,ext,unpaired,baseName,outDir,dirPath):
             # dataPosMultiAlignmnte=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
             fileNameR1=baseName+"_R1.fastq"
             fileNameR2=baseName+"_R2.fastq"
-            dataPosClean.head(n=20).apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
+            dataPosClean[dataPosClean['score']>0.8].apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
             # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
             # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
         else:
             # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
             # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
             fileName=baseName+".fastq"
-            dataPosClean.head(n=20).apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+            dataPosClean[dataPosClean['score']>0.8].apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
             # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
             # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
 
@@ -1567,7 +1650,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
                                                                                                                     'QUAL'])
 
     if (len(dataHIV)==0 or len(dataHUM)==0): #exit if either alignment is empty
-        print("Alignment is empty")
+        # print("Alignment is empty")
         return
     
     outDirPOS=outDir+"/Positions/"
@@ -1608,23 +1691,28 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
                 dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
                 dataHUM["tid"]=dataHUM['QNAME']+dataHUM['firstRead'].astype(str)+dataHUM['lastRead'].astype(str)
                 dataHIV["tid"]=dataHIV['QNAME']+dataHIV['firstRead'].astype(str)+dataHIV['lastRead'].astype(str)
-                print("!!!!splicing!!!!")
-                print(len(dataHUM))
-                print(len(dataHIV))
-                dataHUM=dataHUM[~dataHUM['tid'].isin(set(dataSpliced['tid']))]
+                # print("!!!!splicing!!!!")
+                # print(len(dataHUM))
+                # print(len(dataHIV))
+                # dataHUM=dataHUM[~dataHUM['tid'].isin(set(dataSpliced['tid']))]
                 dataHIV=dataHIV[~dataHIV['tid'].isin(set(dataSpliced['tid']))]
-                dataHUM.drop(['tid'],axis=1,inplace=True)
+                # dataHUM.drop(['tid'],axis=1,inplace=True)
+                dataHUM=dataHUM[dataHUM['tid'].isin(set(dataHIV['tid']))]
+                dataHIV=dataHIV[dataHIV['tid'].isin(set(dataHUM['tid']))]
                 dataHIV.drop(['tid'],axis=1,inplace=True)
-                print(len(dataHUM))
-                print(len(dataHIV))
+                dataHUM.drop(['tid'],axis=1,inplace=True)
+                # print(len(dataHUM))
+                # print(len(dataHIV))
             
             else:
                 print("Spliced file does not exist")
 
         # extract start and end for both template and reference
+        # print("extractStartEnd")
         dataHIV=extractStartEnd(dataHIV)
         dataHUM=extractStartEnd(dataHUM)
 
+        # print("filterReads")
         dataHUM,dataHIV=filterReads(dataHUM,dataHIV)
         if len(dataHUM)==0:
             return
@@ -1632,6 +1720,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         data=pd.DataFrame(dataHIV["QNAME"]).reset_index(drop=True)
         dataHUM=dataHUM.reset_index(drop=True)
         dataHIV=dataHIV.reset_index(drop=True)
+        # print("createData")
         if unpaired:
             data=createDataUnpaired(data,dataHUM,dataHIV)
         else:
@@ -1639,6 +1728,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
 
         data.replace('', np.nan,inplace=True)
         data.fillna(0,inplace=True)
+        # print("leftRightOverlap")
         if unpaired:
             data=leftRightUnpaired(data,minLen)
             data=overlapUnpaired(data)
@@ -1656,19 +1746,31 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         d=pd.DataFrame([])
         # if there are multiple minLen in the minLenList then check the the highest does yild more than one
         # if not, then discard and check the next minLen before constructing the dataPos
+        # print("filterOverlapCombine")
         if unpaired:
-            d=filterOverlapCombineUnpaired(data,args.minLen)
+            d=filterOverlapCombineUnpaired(data,args)
         else:
-            d=filterOverlapCombine(data,args.minLen)
+            d=filterOverlapCombine(data,args)
         d=d[(d["entropyScore_hum"]>args.minEntropy)&(d["entropyScore_hiv"]>args.minEntropy)]
 
         dataHighMAPQ=d[d['HUM_MAPQ']>=args.minQual]
         dataLowMAPQ=d[(d['HUM_MAPQ']<args.minQual)&~(d["QNAME"].isin(set(dataHighMAPQ["QNAME"])))]
 
-        dataHighMAPQ.to_csv("./data.csv")
+        # dataHighMAPQ.to_csv("./data.csv")
 
-        dataPosHighMAPQ=findSupport(dataHighMAPQ,minLen,args,unpaired)
-        dataPosLowMAPQ=findSupport(dataLowMAPQ,minLen,args,unpaired)
+        # print("findSupport")
+        dataPosHighMAPQ=findSupport(dataHighMAPQ,minLen,unpaired)
+        # dataPosHighMAPQ["r_seqs"].replace(np.nan,"",inplace=True,regex=True)
+        # dataPosHighMAPQ["seqs"].replace(np.nan,"",inplace=True)
+        # dataPosHighMAPQ["seq"]=dataPosHighMAPQ["seqs"]+dataPosHighMAPQ["r_seqs"]
+        # dataPosHighMAPQ.drop(["seqs","r_seqs"],inplace=True,axis=1)
+
+        # print("findSupport")
+        dataPosLowMAPQ=findSupport(dataLowMAPQ,minLen,unpaired)
+        # dataPosLowMAPQ["r_seqs"].replace(np.nan,"",inplace=True,regex=True)
+        # dataPosLowMAPQ["seqs"].replace(np.nan,"",inplace=True)
+        # dataPosLowMAPQ["seq"]=dataPosLowMAPQ["seqs"]+dataPosLowMAPQ["r_seqs"]
+        # dataPosLowMAPQ.drop(["seqs","r_seqs"],inplace=True,axis=1)
 
         if len(dataPosHighMAPQ)>0:
             rest(dataPosHighMAPQ,args,data,"",unpaired,baseName,outDir,dirPath)
@@ -1698,7 +1800,8 @@ def main(args):
         baseName=fileName.split(".")[0]
         ext=".".join(fileName.split(".")[1:-1])
 
-        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,end,args)
+        if not baseName=="154_pos_12_S4":
+            resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,end,args)
 
     else:
         print('not real path')
@@ -1756,3 +1859,17 @@ def main(args):
 # to see if anything can be revealed through that script
 # for now will check manually
 # the manual analysis has shown that the position is nowhere to be found in the results page
+
+# It would be much more efficient to not hold read names and sequences in the memory and to not add them to the final results
+# Instead It makes sense to output a bed file with positions
+# bedtools intersect could then be used to show the actual reads in the alignments
+# An option could be preserved to report read names and sequences as they are now
+
+# workflow for building the graph when begin developing C++ code for the software:
+# 0. Perhaps a network flow would work well for the task?
+# 1. create a disjoint graph of all reads from HIV (whichever alignment has fewer reads)
+# 2. when parsing through the second alignment, populate corresponding nodes with information
+# 3. when performing collapsing - create edges between nodes
+
+# Currently filterOverlapCombineUnpaired is missing critical information from the filterOverlapCombine
+# There is likely to be other errors as well

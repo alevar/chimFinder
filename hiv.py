@@ -13,10 +13,10 @@ def hiv(argv):
 
 #==========================================
 #==================STEP1===================
-#==Run Krakem, Hisat2, Bowtie2 and other===
-#==tools and output unfiltered data =======
+#==== Take two alignments and output ======
+#=========== suggested chimeras ===========
 #==========================================
-#./hiv.py step1 -i ./data/YHo060517 -k ./customDB -v ./refs/hiv89.6/hiv89.6 -g ./refs/bowtie2/hg38 -a /ccb/salz7-data/genomes/hg38/annotation/hg38_p8.refseq.gff3 -t 12 -o ./out 
+#./hiv.py step1 -i1 hiv.sam -i2 hum.sam -o outDir-t 12 --minLen 30 -a annotation -w --spliced hum.hisat.sam
 
     parser_step1 = subparsers.add_parser('step1',
                                 help='step1 help')
@@ -49,7 +49,7 @@ def hiv(argv):
                               help="the minimum number of reads supporting an integration site.")
     parser_step1.add_argument('--maxCountPenalty',
                               required=False,
-                              default=0.5,
+                              default=0.85,
                               type=float,
                               help="the maximum penalty to give for minCount when hit.")
     parser_step1.add_argument('--weightCount',
@@ -100,7 +100,7 @@ def hiv(argv):
     parser_step1.add_argument('-s',
                               '--score',
                               required=False,
-                              default=0.3,
+                              default=0.6,
                               type=float,
                               help="the minimum overall score to keep.")
     parser_step1.add_argument('--close',
