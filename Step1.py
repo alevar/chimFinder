@@ -196,6 +196,107 @@ def filterReads(dataHUM,dataHIV):
     return dataHUM, dataHIV
 
 def createData(data,dataHUM,dataHIV):
+    dataHUM=dataHUM[dataHUM['QNAME'].isin(set(data['QNAME']))]
+    dataHUMR1=pd.DataFrame([])
+    dataHUMR1[["QNAME",
+                "R1HUM_TS",
+                "R1HUM_TE",
+                "R1HUM_ID",
+                "R1HUM_RS",
+                "R1HUM_RE",
+                "READ_LEN_R1",
+                "R1HUM_SEQ",
+                "QUAL_R1",
+                "R1HUM_MAPQ",
+                "R1HUM_reversedCurr"]]=dataHUM[dataHUM['firstRead']==64][["QNAME",
+                                                                            "Template_start",
+                                                                            "Template_end",
+                                                                            "RNAME",
+                                                                            "Reference_start",
+                                                                            "Reference_end",
+                                                                            "READ_LEN",
+                                                                            "SEQ",
+                                                                            "QUAL",
+                                                                            "MAPQ",
+                                                                            "reversedCurr"]]
+    dataHUMR2=pd.DataFrame([])
+    dataHUMR2[["QNAME",
+                "R2HUM_TS",
+                "R2HUM_TE",
+                "R2HUM_ID",
+                "R2HUM_RS",
+                "R2HUM_RE",
+                "READ_LEN_R2",
+                "R2HUM_SEQ",
+                "QUAL_R2",
+                "R2HUM_MAPQ",
+                "R2HUM_reversedCurr"]]=dataHUM[dataHUM['lastRead']==128][["QNAME",
+                                                                            "Template_start",
+                                                                            "Template_end",
+                                                                            "RNAME",
+                                                                            "Reference_start",
+                                                                            "Reference_end",
+                                                                            "READ_LEN",
+                                                                            "SEQ",
+                                                                            "QUAL",
+                                                                            "MAPQ",
+                                                                            "reversedCurr"]]
+    dataHIVR1=pd.DataFrame([])
+    dataHIVR1[["QNAME",
+                "R1HIV_TS",
+                "R1HIV_TE",
+                "R1HIV_ID",
+                "R1HIV_RS",
+                "R1HIV_RE",
+                "R1HIV_SEQ",
+                "R1HIV_MAPQ",
+                "R1HIV_reversedCurr"]]=dataHIV[dataHIV['firstRead']==64][["QNAME",
+                                                                            "Template_start",
+                                                                            "Template_end",
+                                                                            "RNAME",
+                                                                            "Reference_start",
+                                                                            "Reference_end",
+                                                                            "SEQ",
+                                                                            "MAPQ",
+                                                                            "reversedCurr"]]
+    dataHIVR2=pd.DataFrame([])
+    dataHIVR2[["QNAME",
+                "R2HIV_TS",
+                "R2HIV_TE",
+                "R2HIV_ID",
+                "R2HIV_RS",
+                "R2HIV_RE",
+                "R2HIV_SEQ",
+                "R2HIV_MAPQ",
+                "R2HIV_reversedCurr"]]=dataHIV[dataHIV['lastRead']==128][["QNAME",
+                                                                        "Template_start",
+                                                                        "Template_end",
+                                                                        "RNAME",
+                                                                        "Reference_start",
+                                                                        "Reference_end",
+                                                                        "SEQ",
+                                                                        "MAPQ",
+                                                                        "reversedCurr"]]
+    data=data.merge(dataHUMR1,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataHUMR2,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataHIVR1,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataHIVR2,left_on='QNAME', right_on='QNAME', how='left')
+    data[["R1HUM_ID",
+        "R2HUM_ID",
+        "R1HIV_ID",
+        "R2HIV_ID",
+        "R1HUM_MAPQ",
+        "R2HUM_MAPQ",
+        "R1HIV_MAPQ",
+        "R2HIV_MAPQ",
+        "R1HUM_reversedCurr",
+        "R2HUM_reversedCurr",
+        "R1HIV_reversedCurr",
+        "R2HIV_reversedCurr"]].fillna('',inplace=True)
+    data.fillna(0,inplace=True)
+    return data
+
+def createDataOld(data,dataHUM,dataHIV):
     df=pd.DataFrame([])
     dataHUM=dataHUM[dataHUM['QNAME'].isin(set(data['QNAME']))]
     dataHUMR1=dataHUM[dataHUM['firstRead']==64][["QNAME",
@@ -334,6 +435,65 @@ def createData(data,dataHUM,dataHIV):
     return df
 
 def createDataUnpaired(data,dataHUM,dataHIV):
+    df=pd.DataFrame([])
+    dataHUM=dataHUM[dataHUM['QNAME'].isin(set(data['QNAME']))]
+    dataHUM[["QNAME",
+            "HUM_TS",
+            "HUM_TE",
+            "HUM_ID",
+            "HUM_RS",
+            "HUM_RE",
+            "READ_LEN",
+            "HUM_SEQ",
+            "QUAL",
+            "HUM_MAPQ",
+            "HUM_reversedCurr"]]=dataHUM[["QNAME",
+                                            "Template_start",
+                                            "Template_end",
+                                            "RNAME",
+                                            "Reference_start",
+                                            "Reference_end",
+                                            "READ_LEN",
+                                            "SEQ",
+                                            "QUAL",
+                                            "MAPQ",
+                                            "reversedCurr"]]
+    dataHIV[["QNAME",
+            "HIV_TS",
+            "HIV_TE",
+            "HIV_ID",
+            "HIV_RS",
+            "HIV_RE",
+            "HIV_SEQ",
+            "HIV_MAPQ",
+            "HIV_reversedCurr"]]=dataHIV[["QNAME",
+                                            "Template_start",
+                                            "Template_end",
+                                            "RNAME",
+                                            "Reference_start",
+                                            "Reference_end",
+                                            "READ_LEN",
+                                            "SEQ",
+                                            "QUAL",
+                                            "MAPQ",
+                                            "reversedCurr"]]
+    data=data.merge(dataHUM,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataHIV,left_on='QNAME', right_on='QNAME', how='left')
+    
+    df[["HUM_ID",
+        "HUM_ID",
+        "HIV_ID",
+        "HIV_ID",
+        "HUM_MAPQ",
+        "HUM_MAPQ",
+        "HIV_MAPQ",
+        "HIV_MAPQ",
+        "HUM_reversedCurr",
+        "HIV_reversedCurr"]].fillna('',inplace=True)
+    df.fillna(0,inplace=True)
+    return df
+
+def createDataUnpairedOld(data,dataHUM,dataHIV):
     df=pd.DataFrame([])
     dataHUM=dataHUM[dataHUM['QNAME'].isin(set(data['QNAME']))]
     dataHUM=dataHUM[["QNAME",
@@ -533,6 +693,7 @@ def filterOverlapCombine(data,args):
     dataR1Right=dataR1Right[~((dataR1Right["R1HIV_TS"]<dataR1Right["R1HUM_TS"])&(dataR1Right["R1HIV_TE"]>dataR1Right["R1HUM_TE"]))]
     dataR1Right["ins"]=dataR1Right["R1HIV_TS"]-dataR1Right["R1HUM_TE"]
     dataR1Right["split"]=dataR1Right['R1HUM_RE'].astype(int).astype(str)+":"+dataR1Right['R1HIV_RS'].astype(int).astype(str)
+    dataR1Right['HUM']=dataR1Right['R1HUM_RE'].astype(int)
     dataR1Right["comb"]=dataR1Right.split+"@"+dataR1Right.R1HUM_ID+":"+dataR1Right.R1HIV_ID
     dataR1Right["orient"]="R1-hum:hiv"
     dataR1Right["overlap"]=dataR1Right["overlapR1"]
@@ -581,6 +742,7 @@ def filterOverlapCombine(data,args):
     dataR1Left=dataR1Left[~((dataR1Left["R1HIV_TS"]<dataR1Left["R1HUM_TS"])&(dataR1Left["R1HIV_TE"]>dataR1Left["R1HUM_TE"]))]
     dataR1Left["ins"]=dataR1Left["R1HUM_TS"]-dataR1Left["R1HIV_TE"]
     dataR1Left["split"]=dataR1Left['R1HIV_RE'].astype(int).astype(str)+":"+dataR1Left['R1HUM_RS'].astype(int).astype(str)
+    dataR1Left['HUM']=dataR1Left['R1HUM_RS'].astype(int)
     dataR1Left["comb"]=dataR1Left.split+"@"+dataR1Left.R1HIV_ID+":"+dataR1Left.R1HUM_ID
     dataR1Left["orient"]="R1-hiv:hum"
     dataR1Left["overlap"]=dataR1Left["overlapR1"]
@@ -630,6 +792,7 @@ def filterOverlapCombine(data,args):
     dataR2Right=dataR2Right[~((dataR2Right["R2HIV_TS"]<dataR2Right["R2HUM_TS"])&(dataR2Right["R2HIV_TE"]>dataR2Right["R2HUM_TE"]))]
     dataR2Right["ins"]=dataR2Right["R2HIV_TS"]-dataR2Right["R2HUM_TE"]
     dataR2Right["split"]=dataR2Right['R2HUM_RE'].astype(int).astype(str)+":"+dataR2Right['R2HIV_RS'].astype(int).astype(str)
+    dataR2Right['HUM']=dataR2Right['R2HUM_RE'].astype(int)
     dataR2Right["comb"]=dataR2Right.split+"@"+dataR2Right.R2HUM_ID+":"+dataR2Right.R2HIV_ID
     dataR2Right["orient"]="R2-hum:hiv"
     dataR2Right["overlap"]=dataR2Right["overlapR2"]
@@ -678,6 +841,7 @@ def filterOverlapCombine(data,args):
     dataR2Left=dataR2Left[~((dataR2Left["R2HIV_TS"]<dataR2Left["R2HUM_TS"])&(dataR2Left["R2HIV_TE"]>dataR2Left["R2HUM_TE"]))]
     dataR2Left["ins"]=dataR2Left["R2HUM_TS"]-dataR2Left["R2HIV_TE"]
     dataR2Left["split"]=dataR2Left['R2HIV_RE'].astype(int).astype(str)+":"+dataR2Left['R2HUM_RS'].astype(int).astype(str)
+    dataR2Left['HUM']=dataR2Left['R2HUM_RS'].astype(int)
     dataR2Left["comb"]=dataR2Left.split+"@"+dataR2Left.R2HIV_ID+":"+dataR2Left.R2HUM_ID
     dataR2Left["orient"]="R2-hiv:hum"
     dataR2Left["overlap"]=dataR2Left["overlapR2"]
@@ -725,8 +889,8 @@ def filterOverlapCombine(data,args):
     frames=[dataR1Right,dataR1Left,dataR2Right,dataR2Left]
     df=pd.concat(frames).reset_index(drop=True)
     
-    df["HIV_AL"]=(df["READ_LEN"]/2)-((df["HIV_AL"]-df["READ_LEN"]/2).abs())
-    df["HUM_AL"]=(df["READ_LEN"]/2)-((df["HUM_AL"]-df["READ_LEN"]/2).abs())
+    # df["HIV_AL"]=(df["READ_LEN"]/2)-((df["HIV_AL"]-df["READ_LEN"]/2).abs())
+    # df["HUM_AL"]=(df["READ_LEN"]/2)-((df["HUM_AL"]-df["READ_LEN"]/2).abs())
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
@@ -757,7 +921,7 @@ def filterOverlapCombine(data,args):
                   "jointAlLen"],axis=1,inplace=True)
     df=df.round({'scorePrelim': 4})
     df=df[df["scorePrelim"]>=args.score]
-    df["SEQ"]=list(zip(df.scorePrelim, df.SEQ))
+    df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.HUM))))
     
     return df
 
@@ -774,6 +938,7 @@ def filterOverlapCombineUnpaired(data,args):
     dataRight=dataRight[~((dataRight["HIV_TS"]<dataRight["HUM_TS"])&(dataRight["HIV_TE"]>dataRight["HUM_TE"]))]
     dataRight["ins"]=dataRight["HIV_TS"]-dataRight["HUM_TE"]
     dataRight["split"]=dataRight['HUM_RE'].astype(int).astype(str)+":"+dataRight['HIV_RS'].astype(int).astype(str)
+    dataRight['HUM']=dataRight['HUM_RE'].astype(int)
     dataRight["comb"]=dataRight.split+"@"+dataRight.HUM_ID+":"+dataRight.HIV_ID
     dataRight["orient"]="hum:hiv"
     dataRight["HUM_TS"]=dataRight["HUM_TS"].astype(int)
@@ -818,6 +983,7 @@ def filterOverlapCombineUnpaired(data,args):
     dataLeft=dataLeft[~((dataLeft["HIV_TS"]<dataLeft["HUM_TS"])&(dataLeft["HIV_TE"]>dataLeft["HUM_TE"]))]
     dataLeft["ins"]=dataLeft["HUM_TS"]-dataLeft["HIV_TE"]
     dataLeft["split"]=dataLeft['HIV_RE'].astype(int).astype(str)+":"+dataLeft['HUM_RS'].astype(int).astype(str)
+    dataLeft['HUM']=dataLeft['HUM_RS'].astype(int)
     dataLeft["comb"]=dataLeft.split+"@"+dataLeft.HIV_ID+":"+dataLeft.HUM_ID
     dataLeft["orient"]="hiv:hum"
     dataLeft["HUM_TS"]=dataLeft["HUM_TS"].astype(int)
@@ -859,6 +1025,38 @@ def filterOverlapCombineUnpaired(data,args):
 
     frames=[dataRight,dataLeft]
     df=pd.concat(frames).reset_index(drop=True)
+
+    k=float(args.minLen)
+    ssAl=args.steepSlopeAL
+    df["HIV_AL_score"]=(((((df['HIV_AL']-k)/k) \
+                        /(((ssAl/k)+((df['HIV_AL']-k)/k)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxAlLenPenalty))) \
+                                +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
+
+    df["HUM_AL_score"]=(((((df['HUM_AL']-k)/k) \
+                        /(((ssAl/k)+((df['HUM_AL']-k)/k)**2.0)**0.5)) \
+                                /2.0 \
+                                +0.5) \
+                                /(1.0/(1.0-args.maxAlLenPenalty))) \
+                                +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+
+    df['jointEntropy']=((df['entropyScore_hiv'] \
+                    +df['entropyScore_hum']) \
+                    /(2))
+    df['jointAlLen']=((df['HUM_AL_score'] \
+                    +df['HIV_AL_score']) \
+                    /(2))
+    df["scorePrelim"]=(df['jointEntropy'] \
+                    *df['jointAlLen'])
+
+    df.drop(["jointEntropy",
+                  "jointAlLen"],axis=1,inplace=True)
+    df=df.round({'scorePrelim': 4})
+    df=df[df["scorePrelim"]>=args.score]
+    df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.HUM))))
+
     return df
 
 def addSpan(data,dataPos):
@@ -1543,85 +1741,71 @@ def rest(dataPos,args,data,ext,unpaired,baseName,outDir,dirPath):
         dataPos.loc[dataPos['spanR1-R2'].isnull(),['spanR1-R2']]=dataPos.loc[dataPos['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
 
     dataBed=dataPos[['chr','HUM_RS','HUM_RE']].drop_duplicates()
-    # dataBed.to_csv(os.path.abspath(args.out)+".bed",sep='\t',header=False,index=False)
-    # annotate(os.path.abspath(args.out)+".bed",os.path.abspath(args.annotation),dataPos)
-    dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
-    dataPos=dataPos[~(dataPos['hum_nearest_SS']=='-')].reset_index(drop=True)
-    dataPos=approxCloseness(dataPos,args)
-
-    # bedCMD='bedtools intersect -a '+outDir+'/beds/'+baseName+'.bed'+' -b '+args.annotation+' -wo > '+outDir+'/beds/'+baseName+'.bed.out'
-    # os.system(bedCMD)
-    dataPos["reads"]=dataPos["reads"].str.join(";")
-    if not unpaired:
-        dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
-        dataPos["spanR1-R2"].replace("","-",inplace=True)
-
-    # dataPos.to_csv("./unsplit"+ext+".csv")
-
-    #Now add the nearest human splice site for each chimeric position
-    # dataPos[['hum_nearest_5SS',
-    #         'hum_nearest_3SS']]=dataPos.apply(lambda row: addAnnotation(row,baseName,outDir),axis=1)
-    # dataPos.to_csv(os.path.abspath(args.out)+"_Test"+end+".csv",index=False)
-
-    # dataTMP=dataPos[dataPos['HUM_MAPQ']>=args.minQual]
-    # dataPosMultiAlignment=dataPos[(dataPos['HUM_MAPQ']<args.minQual)&~(dataPos["uid"]).isin(set(dataTMP["uid"]))].reset_index(drop=True)
-    # dataPos=dataPos[dataPos["uid"].isin(set(dataTMP["uid"]))].reset_index(drop=True)
-
-    if unpaired:
-        dataPos=groupBySpliceSitesUnpaired(dataPos)
-    else:
-        dataPos=groupBySpliceSites(dataPos)
-
-    dataPos=score(dataPos,args,args.minLen)
-    dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
-
-    print("!!!!saving data!!!!")
-
-    dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+ext+".csv",index=False)
-    dataPosClean=dataPos[~(dataPos['hum_nearest_SS']=="-") \
-                    &(dataPos['entropyScore_hiv']>args.minEntropy) \
-                    &(dataPos['entropyScore_hum']>args.minEntropy) \
-                    &(dataPos['score']>args.score)]
-
-    colsOrder=["hum_nearest_SS",
-               "chr",
-               "comb",
-               "R",
-               "seq",
-               "count",
-               "score",
-               "fileName"]
-    if unpaired:
-        colsOrder.remove("R")
-
-    if unpaired:
-        dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
-    else:
-        dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
-
-    dataPosClean[colsOrder].to_csv(os.path.abspath(args.out)+"_Pos"+ext+".clean.csv",index=False)
-
-    # completely forgot that we can write reads from the sam file
-    # should make it much faster
-    # for each comb in the Pos.csv file
-    # find corresponding positions in the original human file
-    # save to csv with \n delimeter
-    if args.writeReads:
+    if len(dataPos)>0:
+        dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
+        dataPos=approxCloseness(dataPos,args)
+        dataPos["reads"]=dataPos["reads"].str.join(";")
         if not unpaired:
-            # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
-            # dataPosMultiAlignmnte=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
-            fileNameR1=baseName+"_R1.fastq"
-            fileNameR2=baseName+"_R2.fastq"
-            dataPosClean[dataPosClean['score']>0.8].apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
-            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
-            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+            dataPos["spanR1-R2"]=dataPos["spanR1-R2"].str.join(";")
+            dataPos["spanR1-R2"].replace("","-",inplace=True)
+
+        if unpaired:
+            dataPos=groupBySpliceSitesUnpaired(dataPos)
         else:
-            # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
-            # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
-            fileName=baseName+".fastq"
-            dataPosClean[dataPosClean['score']>0.8].apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R1"+baseEnd+".fastq")
-            # os.remove(os.path.abspath(outDir)+"/tempF/"+baseName+"_R2"+baseEnd+".fastq")
+            dataPos=groupBySpliceSites(dataPos)
+
+        dataPos=score(dataPos,args,args.minLen)
+        dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
+        dataPos[['seq','hum_pos']]=dataPos['seq'].apply(pd.Series)
+
+        dataPos.to_csv(os.path.abspath(args.out)+"_Pos"+ext+".csv",index=False)
+        dataPosClean=dataPos[(dataPos['entropyScore_hiv']>args.minEntropy) \
+                            &(dataPos['entropyScore_hum']>args.minEntropy) \
+                            &(dataPos['score']>args.score)]
+
+        colsOrder=["hum_nearest_SS",
+                   "chr",
+                   "hum_pos",
+                   "R",
+                   "seq",
+                   "count",
+                   "score",
+                   "fileName"]
+        if unpaired:
+            colsOrder.remove("R")
+        if args.writeReads is None:
+            colsOrder.remove("fileName")
+
+        if unpaired:
+            dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
+        else:
+            dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
+
+        dataPosClean[colsOrder].to_csv(os.path.abspath(args.out)+"_Pos"+ext+".clean.csv",index=False)
+
+        # completely forgot that we can write reads from the sam file
+        # should make it much faster
+        # for each comb in the Pos.csv file
+        # find corresponding positions in the original human file
+        # save to csv with \n delimeter
+        if args.writeReads:
+            if not unpaired:
+                # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
+                # dataPosMultiAlignmnte=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
+                fileNameR1=baseName+"_R1.fastq"
+                fileNameR2=baseName+"_R2.fastq"
+                dataPosClean=dataPosClean[dataPosClean['score']>0.9]
+                dataPosClean.apply(lambda row: writeReadNames(os.path.abspath(outDir),row,fileNameR1,fileNameR2,baseName,dirPath),axis=1)
+                # os.remove(os.path.abspath(outDir)+"/tmp/fq/"+baseName+"_R1"+baseEnd+".fastq")
+                # os.remove(os.path.abspath(outDir)+"/tmp/fq/"+baseName+"_R2"+baseEnd+".fastq")
+            else:
+                # dataPos=pd.read_csv(os.path.abspath(args.out)+"_Pos"+end+".clean.csv")
+                # dataPosMultiAlignment=pd.read_csv(os.path.abspath(args.out)+"_Pos_lowMAPQ"+end+".clean.csv")
+                fileName=baseName+".fastq"
+                dataPosClean=dataPosClean[dataPosClean['score']>0.9]
+                dataPosClean.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
+                # os.remove(os.path.abspath(outDir)+"/tmp/fq/"+baseName+"_R1"+baseEnd+".fastq")
+                # os.remove(os.path.abspath(outDir)+"/tmp/fq/"+baseName+"_R2"+baseEnd+".fastq")
 
 
 def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
@@ -1650,7 +1834,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
                                                                                                                     'QUAL'])
 
     if (len(dataHIV)==0 or len(dataHUM)==0): #exit if either alignment is empty
-        # print("Alignment is empty")
         return
     
     outDirPOS=outDir+"/Positions/"
@@ -1691,28 +1874,19 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
                 dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
                 dataHUM["tid"]=dataHUM['QNAME']+dataHUM['firstRead'].astype(str)+dataHUM['lastRead'].astype(str)
                 dataHIV["tid"]=dataHIV['QNAME']+dataHIV['firstRead'].astype(str)+dataHIV['lastRead'].astype(str)
-                # print("!!!!splicing!!!!")
-                # print(len(dataHUM))
-                # print(len(dataHIV))
-                # dataHUM=dataHUM[~dataHUM['tid'].isin(set(dataSpliced['tid']))]
                 dataHIV=dataHIV[~dataHIV['tid'].isin(set(dataSpliced['tid']))]
-                # dataHUM.drop(['tid'],axis=1,inplace=True)
                 dataHUM=dataHUM[dataHUM['tid'].isin(set(dataHIV['tid']))]
                 dataHIV=dataHIV[dataHIV['tid'].isin(set(dataHUM['tid']))]
                 dataHIV.drop(['tid'],axis=1,inplace=True)
                 dataHUM.drop(['tid'],axis=1,inplace=True)
-                # print(len(dataHUM))
-                # print(len(dataHIV))
             
             else:
                 print("Spliced file does not exist")
 
         # extract start and end for both template and reference
-        # print("extractStartEnd")
         dataHIV=extractStartEnd(dataHIV)
         dataHUM=extractStartEnd(dataHUM)
 
-        # print("filterReads")
         dataHUM,dataHIV=filterReads(dataHUM,dataHIV)
         if len(dataHUM)==0:
             return
@@ -1720,62 +1894,39 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         data=pd.DataFrame(dataHIV["QNAME"]).reset_index(drop=True)
         dataHUM=dataHUM.reset_index(drop=True)
         dataHIV=dataHIV.reset_index(drop=True)
-        # print("createData")
         if unpaired:
             data=createDataUnpaired(data,dataHUM,dataHIV)
         else:
             data=createData(data,dataHUM,dataHIV)
 
+        del dataHUM
+        del dataHIV
         data.replace('', np.nan,inplace=True)
         data.fillna(0,inplace=True)
-        # print("leftRightOverlap")
         if unpaired:
             data=leftRightUnpaired(data,minLen)
             data=overlapUnpaired(data)
         else:
             data=leftRight(data,minLen)
             data=overlap(data)
-        # data.to_csv(os.path.abspath(args.out)+".chim"+end+".csv",index=False)
-        # drop duplicated reads - preserve first occurence
         data.drop_duplicates(inplace=True)
 
-        # data.to_csv("./data.csv")
-        # unpaired=False
-        # data=pd.read_csv("./data.csv")
-
         d=pd.DataFrame([])
-        # if there are multiple minLen in the minLenList then check the the highest does yild more than one
-        # if not, then discard and check the next minLen before constructing the dataPos
-        # print("filterOverlapCombine")
         if unpaired:
             d=filterOverlapCombineUnpaired(data,args)
         else:
             d=filterOverlapCombine(data,args)
         d=d[(d["entropyScore_hum"]>args.minEntropy)&(d["entropyScore_hiv"]>args.minEntropy)]
-
-        dataHighMAPQ=d[d['HUM_MAPQ']>=args.minQual]
-        dataLowMAPQ=d[(d['HUM_MAPQ']<args.minQual)&~(d["QNAME"].isin(set(dataHighMAPQ["QNAME"])))]
-
-        # dataHighMAPQ.to_csv("./data.csv")
-
-        # print("findSupport")
-        dataPosHighMAPQ=findSupport(dataHighMAPQ,minLen,unpaired)
-        # dataPosHighMAPQ["r_seqs"].replace(np.nan,"",inplace=True,regex=True)
-        # dataPosHighMAPQ["seqs"].replace(np.nan,"",inplace=True)
-        # dataPosHighMAPQ["seq"]=dataPosHighMAPQ["seqs"]+dataPosHighMAPQ["r_seqs"]
-        # dataPosHighMAPQ.drop(["seqs","r_seqs"],inplace=True,axis=1)
-
-        # print("findSupport")
-        dataPosLowMAPQ=findSupport(dataLowMAPQ,minLen,unpaired)
-        # dataPosLowMAPQ["r_seqs"].replace(np.nan,"",inplace=True,regex=True)
-        # dataPosLowMAPQ["seqs"].replace(np.nan,"",inplace=True)
-        # dataPosLowMAPQ["seq"]=dataPosLowMAPQ["seqs"]+dataPosLowMAPQ["r_seqs"]
-        # dataPosLowMAPQ.drop(["seqs","r_seqs"],inplace=True,axis=1)
-
-        if len(dataPosHighMAPQ)>0:
-            rest(dataPosHighMAPQ,args,data,"",unpaired,baseName,outDir,dirPath)
-        if len(dataPosLowMAPQ)>0:
-            rest(dataPosLowMAPQ,args,data,"_LowMAPQ",unpaired,baseName,outDir,dirPath)
+        dataPos=d.copy(deep=True)
+        # dataHighMAPQ=d[d['HUM_MAPQ']>=args.minQual]
+        # dataLowMAPQ=d[(d['HUM_MAPQ']<args.minQual)&~(d["QNAME"].isin(set(dataHighMAPQ["QNAME"])))]
+        # dataPosHighMAPQ=findSupport(dataHighMAPQ,minLen,unpaired)
+        # dataPosLowMAPQ=findSupport(dataLowMAPQ,minLen,unpaired)
+        dataPos=findSupport(dataPos,minLen,unpaired)
+        if len(dataPos)>0:
+            rest(dataPos,args,data,"",unpaired,baseName,outDir,dirPath)
+        # os.remove(os.path.abspath(outDir)+"/tmp/fq/"+baseName+"_R1"+baseEnd+".fastq")
+        # os.remove(os.path.abspath(outDir)+"/tmp/fq/"+baseName+"_R2"+baseEnd+".fastq")
     
     return 1
 
@@ -1873,3 +2024,38 @@ def main(args):
 
 # Currently filterOverlapCombineUnpaired is missing critical information from the filterOverlapCombine
 # There is likely to be other errors as well
+
+# investigate the 154_pos_17_S5_001_Pos.clean.csv
+# there is multiple top hits for which BLAT and BLAST indicate a completely overlapping alignments for HIV and human
+
+# How do we subtract spliced alignments from single-end alignments?
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Could it be that the issue which manifests itself in that one alignment is a subset of another
+# like the majority of outHIV_HCV results
+# could it be that it is due to not taking into account CIGAR string deletions and insertions properly?
+# Need to check and figure this out with confidence once and for all
+# Either it is something else or it further increases sensitivity of the results/method!
+# Also try viewing alignments in IGV
+# This might help understand the interpretation of the cigar string better
+# Perhaps this will uncover what is missing from the extractStartEnd procedure
+# I really need to figure this one out!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# Also remove all combs from comb column
+# replace them with the central number
+# verify how this approximation works
+
+# To do so, extract the final reads from the sam files in HIV_HCV experiment
+# This will yield a much smaller set of data to work with
+# Analyze the CIGAR string composition of these records
+
+# Test bwa and STAR
+# create a joint human HIV reference for the controls
+# align with both bwa and STAR
+# see if the same is reported
+
+# It is important to try this out.
+# If STAR and BWA actually seem to work - it would be bset to try a simulation study
+
+# Need to rewrite createDataUnpaired as createData
