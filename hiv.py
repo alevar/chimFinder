@@ -125,19 +125,19 @@ def extractStartEnd(data):
     data["END"]=data.READ_LEN-data.CIGAR_POST
     data["CIGAR_PRE"]=data.CIGAR.str.extract("^([0-9]+)[S]").replace(np.nan,0).astype(int)
 
-    dataHIV6=data[data["reversedCurr"]==16]
+    data16=data[data["reversedCurr"]==16]
     data0=data[data["reversedCurr"]==0]
-    dataHIV6["Template_start"]=dataHIV6.READ_LEN-dataHIV6.END
-    dataHIV6["Template_end"]=dataHIV6.READ_LEN-dataHIV6.CIGAR_PRE-1
+    data16["Template_start"]=data16.READ_LEN-data16.END
+    data16["Template_end"]=data16.READ_LEN-data16.CIGAR_PRE-1
     data0["Template_start"]=data0.CIGAR_PRE
     data0["Template_end"]=data0.END
 
-    dataHIV6["Reference_start"]=dataHIV6.READ_LEN-dataHIV6.END+dataHIV6.POS-dataHIV6.Template_start
-    dataHIV6["Reference_end"]=dataHIV6.READ_LEN-dataHIV6.CIGAR_PRE-1+dataHIV6.POS-dataHIV6.Template_start
+    data16["Reference_start"]=data16.READ_LEN-data16.END+data16.POS-data16.Template_start
+    data16["Reference_end"]=data16.READ_LEN-data16.CIGAR_PRE-1+data16.POS-data16.Template_start
     data0["Reference_start"]=data0.POS
     data0["Reference_end"]=data0.END+data0.POS-data0.CIGAR_PRE
 
-    data=pd.concat([dataHIV6,data0]).reset_index(drop=True)
+    data=pd.concat([data16,data0]).reset_index(drop=True)
     data.drop(["CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
     return data
 
@@ -320,6 +320,12 @@ def topologicalNormalizedEntropy(s):
     maxSubstringLen=findCF(len(s))
     n=countSubString(s,maxSubstringLen)
     return math.log(n,4)/maxSubstringLen
+
+# calculate the expected entropy
+def expectedEntropy(n):
+    fourN=float(4**n)
+    logTerm=(fourN-(fourN*((1.0-(1.0/fourN))**fourN)))
+    return math.log(logTerm,4)/float(n)
 
 # How to compute the mimimum entropy for a string of a given length and characters
 
@@ -1922,3 +1928,20 @@ if __name__=="__main__":
 
 # specify donors/acceptors as a command line argument
 # calculate and report the offset from the nearest donor/acceptor on HIV
+
+# Perhaps would be better to read sam/bam in lines and perform all initial calculations and filtering then
+# For instance
+# Begin parsing HIV BAM/SAM (note that by using pysam we can work with both BAM and SAM files)
+# have a cascade of filters (increasing order of computational complexity:
+# if end-to-end - pass to the next read
+# if len alignment less than threshold (30bp) - pass
+# etc
+# Then begin parsing human in the same manner, this time:
+# if not in HIV set - pass
+# if end-to-end - remove from HIV-set and pass
+# etc.
+# The rest of the calculations can be done afterwards
+
+# It would certainly speedup the process to first align against HIV-1 and use only mapped reads to align against the hg38
+# check bowtie2 for the option to output aligned sequences (like the unal option)
+# could be done using the --al and --al-conc options in bowtie and merging two files together (perhaps --al-conc is not necessary since we are aligning single-end sequences)
