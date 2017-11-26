@@ -317,15 +317,24 @@ def topologicalNormalizedEntropy(s):
             substrings.append(s[i:i+l])
         return len(set(substrings))
 
+    # calculate the expected entropy
+    def expectedEntropy(n):
+        fourN=float(4**n)
+        logTerm=(fourN-(fourN*((1.0-(1.0/fourN))**fourN)))
+        return math.log(logTerm,4)/float(n)
+
     maxSubstringLen=findCF(len(s))
     n=countSubString(s,maxSubstringLen)
-    return math.log(n,4)/maxSubstringLen
+    res=math.log(n,4)/maxSubstringLen
 
-# calculate the expected entropy
-def expectedEntropy(n):
-    fourN=float(4**n)
-    logTerm=(fourN-(fourN*((1.0-(1.0/fourN))**fourN)))
-    return math.log(logTerm,4)/float(n)
+    # expected=0.1#expectedEntropy(maxSubstringLen)
+    # ent=bool(res>=expected)
+    # res=res if ent else 0
+    # temp="CACTTACATTGGGGAGTCAGGCTTCTCATCCACAGCCATGCCGTTCACACCCAGTCGCCGCCCCTCGCCTCTTGCTGTGCGCGCTTCAGCAAGCCGAGTCCTGCGTCGAGAGATCTCCTCTGGTTTTCCTTTCGCTTTCAGGTCCCTGCCG"
+    # if s in temp:
+    #     print(maxSubstringLen,expected,res)
+
+    return res
 
 # How to compute the mimimum entropy for a string of a given length and characters
 
@@ -353,7 +362,7 @@ def processAligns(seqHum,seqHIV,qual,i1_hiv,i2_hiv,i1_hum,i2_hum,readLen,rHUM,rH
         else:
             meanQual_hiv=0
 
-    s_hiv=""
+    s_hum=""
     if rHUM==True: # if reverse complemented take into account
         s_hum=seqHum[readLen-i2_hum:readLen-i1_hum]
     else:
@@ -647,19 +656,22 @@ def filterOverlapCombine(data,args):
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
-    df["HIV_AL_score"]=(((((df['HIV_AL']-k)/k) \
-                        /(((ssAl/k)+((df['HIV_AL']-k)/k)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxAlLenPenalty))) \
-                                +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
+    # df["HIV_AL_score"]=(((((df['HIV_AL']-k)/k) \
+    #                     /(((ssAl)+((df['HIV_AL']-k))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
+    #                             +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
 
-    df["HUM_AL_score"]=(((((df['HUM_AL']-k)/k) \
-                        /(((ssAl/k)+((df['HUM_AL']-k)/k)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxAlLenPenalty))) \
-                                +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+    df["HIV_AL_score"]=((df['HIV_AL']-k)/((ssAl+(df['HIV_AL']-k)**2.0)**0.5)+1.0)/2.0
+    df["HUM_AL_score"]=((df['HUM_AL']-k)/((ssAl+(df['HUM_AL']-k)**2.0)**0.5)+1.0)/2.0
+
+    # df["HUM_AL_score"]=(((((df['HUM_AL']-k)/k) \
+    #                     /(((ssAl)+((df['HUM_AL']-k))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
+    #                             +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
 
     df['jointEntropy']=((df['entropyScore_hiv'] \
                     +df['entropyScore_hum']) \
@@ -793,19 +805,22 @@ def filterOverlapCombineUnpaired(data,args):
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
-    df["HIV_AL_score"]=(((((df['HIV_AL']-k)/k) \
-                        /(((ssAl/k)+((df['HIV_AL']-k)/k)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxAlLenPenalty))) \
-                                +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
+    # df["HIV_AL_score"]=(((((df['HIV_AL']-k)/k) \
+    #                     /(((ssAl)+((df['HIV_AL']-k))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
+    #                             +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
 
-    df["HUM_AL_score"]=(((((df['HUM_AL']-k)/k) \
-                        /(((ssAl/k)+((df['HUM_AL']-k)/k)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxAlLenPenalty))) \
-                                +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+    # df["HUM_AL_score"]=(((((df['HUM_AL']-k)/k) \
+    #                     /(((ssAl)+((df['HUM_AL']-k))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
+    #                             +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+
+    df["HIV_AL_score"]=((df['HIV_AL']-k)/((ssAl+(df['HIV_AL']-k)**2.0)**0.5)+1.0)/2.0
+    df["HUM_AL_score"]=((df['HUM_AL']-k)/((ssAl+(df['HUM_AL']-k)**2.0)**0.5)+1.0)/2.0
 
     df['jointEntropy']=((df['entropyScore_hiv'] \
                     +df['entropyScore_hum']) \
@@ -944,27 +959,34 @@ def score(dataPos,args,minLen):
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
-    dataPos["HIV_AL_score"]=(((((dataPos['HIV_AL']-k)/k) \
-                        /(((ssAl/k)+((dataPos['HIV_AL']-k)/k)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxAlLenPenalty))) \
-                                +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
+    # dataPos["HIV_AL_score"]=(((((dataPos['HIV_AL']-k)) \
+    #                     /(((ssAl)+((dataPos['HIV_AL']-k))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
+    #                             +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
 
-    dataPos["HUM_AL_score"]=(((((dataPos['HUM_AL']-k)/k) \
-                        /(((ssAl/k)+((dataPos['HUM_AL']-k)/k)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxAlLenPenalty))) \
-                                +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+    # dataPos["HUM_AL_score"]=(((((dataPos['HUM_AL']-k)) \
+    #                     /(((ssAl)+((dataPos['HUM_AL']-k))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
+    #                             +args.maxAlLenPenalty # algebraic sigmoid function of HIV alignment length score
+
+    dataPos["HIV_AL_score"]=((dataPos['HIV_AL']-k)/((ssAl+(dataPos['HIV_AL']-k)**2.0)**0.5)+1.0)/2.0
+    dataPos["HUM_AL_score"]=((dataPos['HUM_AL']-k)/((ssAl+(dataPos['HUM_AL']-k)**2.0)**0.5)+1.0)/2.0
 
     m=float(args.minCount)/2.0
-    dataPos["count_score"]=(((((dataPos['count']-m)/m) \
-                        /(((1.0/m)+((dataPos['count']-m)/m)**2.0)**0.5)) \
-                                /2.0 \
-                                +0.5) \
-                                /(1.0/(1.0-args.maxCountPenalty))) \
+    dataPos["count_score"]=((dataPos['count']-m)/((1.0+(dataPos['count']-m)**2.0)**0.5)+1.0)/2.0 \
+                                *(1.0-args.maxCountPenalty) \
                                 +args.maxCountPenalty # algebraic sigmoid function of read count score
+
+    # dataPos["count_score"]=(((((dataPos['count']-m)) \
+    #                     /(((1.0)+((dataPos['count']-m))**2.0)**0.5)) \
+    #                             /2.0 \
+    #                             +0.5) \
+    #                             /(1.0/(1.0-args.maxCountPenalty))) \
+    #                             +args.maxCountPenalty # algebraic sigmoid function of read count score
     
     # dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["HIV_MAPQ"]/10)))
     # dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["HUM_MAPQ"]/10)))
@@ -984,6 +1006,7 @@ def score(dataPos,args,minLen):
     dataPos=dataPos.round({'score': 4})
     return dataPos
 
+# the following function orders the integration events by distance and computes distance to the next site
 def approxCloseness(data,args):
     data.sort_values(by=["HUM_RS","hum_nearest_SS"],inplace=True)
     data["diff1"]=abs(data['HUM_RS']-data['HUM_RS'].shift(-1))
@@ -1621,7 +1644,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
                                                                                                                                 'TLEN',
                                                                                                                                 'SEQ',
                                                                                                                                 'QUAL'])
-                dataSpliced=dataSpliced[dataSpliced['CIGAR'].str.contains("N")]
+                # dataSpliced=dataSpliced[dataSpliced['CIGAR'].str.contains("N")]
                 extractFlagBits(dataSpliced)
                 dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
                 dataHUM["tid"]=dataHUM['QNAME']+dataHUM['firstRead'].astype(str)+dataHUM['lastRead'].astype(str)
@@ -1680,6 +1703,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args):
         d=pd.DataFrame([])
         if unpaired:
             d=filterOverlapCombineUnpaired(data,args)
+            # print(d[d["QNAME"]=="NB501749:128:HFHJVBGX3:2:13304:6468:2639"])
         else:
             d=filterOverlapCombine(data,args)
         d=d[(d["entropyScore_hum"]>args.minEntropy)&(d["entropyScore_hiv"]>args.minEntropy)]
@@ -1751,7 +1775,7 @@ def hiv(argv):
                               help="the number of threads to use in the computation")
     parser.add_argument('--minCount',
                               required=False,
-                              default=5,
+                              default=1,
                               type=float,
                               help="the minimum number of reads supporting an integration site.")
     parser.add_argument('--maxCountPenalty',
@@ -1807,7 +1831,7 @@ def hiv(argv):
     parser.add_argument('-s',
                               '--score',
                               required=False,
-                              default=0.6,
+                              default=0.5,
                               type=float,
                               help="the minimum overall score to keep.")
     parser.add_argument('--overlap',
@@ -1854,3 +1878,90 @@ def hiv(argv):
 
 if __name__=="__main__":
     hiv(sys.argv[1:])
+
+# at the very end need to build python environment and requirements.txt
+# since the code should work with both python2 and python3 need to do this for both
+
+# implement writeReads function without grepping
+
+# What really needs to be implemented is the following function
+# The function will take as an input all weights and scoring arguments passed
+# and it will calculate the minimum overall score for the desired combination
+# unless the minimum score is specified, in which case it should override the calculation
+
+# In the end the fasta records will have to be written from the dataframe,
+# since the raw sequence data is not supplied to the application and for that matter should not be supplied
+# This should not be a priority however at the moment.
+
+# Should we consider the number of insertions/deletions/mismatches in the score calculations?
+
+# Another idea for span reads:
+# 1. Add only those that are fully hiv on one side and fully human on the other side
+# should not contain a fragmented HIV HUMan read on either side
+# it could be fragmented if it appears to indicate the same splice site
+
+# Supply human splicing annotation to hisat and do not include novel splice sites
+# use the same as the one used by the UCSC BLAT
+
+# question: when provided with known splice sites, does hisat2 still report novel ones or only align in accordance with those provided
+
+# perhaps the ITGAE gene is in the 1B6 sample, but is not detected in the annotation,
+# because we are only annotating the 3'SS. Try adding Ellas script to the output once again,
+# to see if anything can be revealed through that script
+# for now will check manually
+# the manual analysis has shown that the position is nowhere to be found in the results page
+
+# It would be much more efficient to not hold read names and sequences in the memory and to not add them to the final results
+# Instead It makes sense to output a bed file with positions
+# bedtools intersect could then be used to show the actual reads in the alignments
+# An option could be preserved to report read names and sequences as they are now
+
+# workflow for building the graph when begin developing C++ code for the software:
+# 0. Perhaps a network flow would work well for the task?
+# 1. create a disjoint graph of all reads from HIV (whichever alignment has fewer reads)
+# 2. when parsing through the second alignment, populate corresponding nodes with information
+# 3. when performing collapsing - create edges between nodes
+
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+# Could it be that the issue which manifests itself in that one alignment is a subset of another
+# like the majority of outHIV_HCV results
+# could it be that it is due to not taking into account CIGAR string deletions and insertions properly?
+# Need to check and figure this out with confidence once and for all
+# Either it is something else or it further increases sensitivity of the results/method!
+# Also try viewing alignments in IGV
+# This might help understand the interpretation of the cigar string better
+# Perhaps this will uncover what is missing from the extractStartEnd procedure
+# I really need to figure this one out!!!!!
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+# Also remove all combs from comb column
+# replace them with the central number
+# verify how this approximation works
+
+# To do so, extract the final reads from the sam files in HIV_HCV experiment
+# This will yield a much smaller set of data to work with
+# Analyze the CIGAR string composition of these records
+
+#PARALLELIZATION!!!!!!!!!!!!!!!!!!!!!!!!
+# Should be very easy to achive
+# simply split the human dataframe into n chunks
+# run the rest of the analysis in parallel on each chunk
+# merge resulting dataframes together
+# sort by score
+# save
+
+# specify donors/acceptors as a command line argument
+# calculate and report the offset from the nearest donor/acceptor on HIV
+
+# Perhaps would be better to read sam/bam in lines and perform all initial calculations and filtering then
+# For instance
+# Begin parsing HIV BAM/SAM (note that by using pysam we can work with both BAM and SAM files)
+# have a cascade of filters (increasing order of computational complexity:
+# if end-to-end - pass to the next read
+# if len alignment less than threshold (30bp) - pass
+# etc
+# Then begin parsing human in the same manner, this time:
+# if not in HIV set - pass
+# if end-to-end - remove from HIV-set and pass
+# etc.
+# The rest of the calculations can be done afterwards

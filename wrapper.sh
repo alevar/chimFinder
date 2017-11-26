@@ -31,8 +31,6 @@ mkdir -p ${outputDir}/tmp
 mkdir -p ${outputDir}/alns
 mkdir -p ${outputDir}/consensus
 
-conspiracy=false
-
 for file in ${inputDir}/*R1*fastq.gz ; do
 	sampleR1Base=$(basename ${file})
 	sampleR1="${sampleR1Base%.*.*}"
@@ -54,26 +52,26 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 		# echo DONE IN ${DUR}
 		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo BOWTIE2 ALIGNING R1 TO HIV
-		bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --al ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# SECONDS=0
+		# echo BOWTIE2 ALIGNING R1 TO HIV
+		# bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --al ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo BOWTIE2 ALIGNING R1 TO HG38
-		bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# SECONDS=0
+		# echo BOWTIE2 ALIGNING R1 TO HG38
+		# bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo HISAT ALIGNING R1 TO HG38
-		hisat2 -p ${threads} --very-sensitive --end-to-end --known-splicesite-infile ${humanSplicing} --no-unal --phred33 -x ${humanDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# SECONDS=0
+		# echo HISAT ALIGNING R1 TO HG38
+		# hisat2 -p ${threads} --very-sensitive --end-to-end --known-splicesite-infile ${humanSplicing} --no-unal --phred33 -x ${humanDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		# SECONDS=0
 		# echo HISAT ALIGNING R1 TO HXB2
@@ -90,29 +88,29 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 		# echo DONE IN ${DUR}
 		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo INDEXING R1
-		samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam -
-		samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam
+		# SECONDS=0
+		# echo INDEXING R1
+		# samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam -
+		# samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam
 
-		samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam -
-		samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam
+		# samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam -
+		# samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam
 
-		samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.bam -
-		samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.bam
+		# samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.bam -
+		# samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.bam
 
 		# samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.hxb2.bowtie.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.hxb2.bowtie.bam -
 		# samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.hxb2.bowtie.bam
 
 		# samtools view -S -@ ${threads} -b ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.hxb2.hisat.sam | samtools sort -o ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.hxb2.hisat.bam -
 		# samtools index -@ ${threads} ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.hxb2.hisat.bam
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		SECONDS=0
 		echo ANALYZING R1
-		./hiv.py -i1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R1/${sample}${baseEnd} -t 12 --minLen 30 -a ${annotation} --overlap 5 --gap 5
+		./hiv.py -i1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R1/${sample}${baseEnd} -t 12 --minLen 20 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
@@ -127,26 +125,26 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 		# echo DONE IN ${DUR}
 		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo BOWTIE2 ALIGNING R2 TO HIV
-		bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --al ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# SECONDS=0
+		# echo BOWTIE2 ALIGNING R2 TO HIV
+		# bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --al ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo BOWTIE2 ALIGNING R2 TO HG38
-		bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# SECONDS=0
+		# echo BOWTIE2 ALIGNING R2 TO HG38
+		# bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo HISAT ALIGNING R2 TO HG38
-		hisat2 -p ${threads} --very-sensitive --end-to-end --known-splicesite-infile ${humanSplicing} --no-unal --phred33 -x ${humanDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# SECONDS=0
+		# echo HISAT ALIGNING R2 TO HG38
+		# hisat2 -p ${threads} --very-sensitive --end-to-end --known-splicesite-infile ${humanSplicing} --no-unal --phred33 -x ${humanDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		# SECONDS=0
 		# echo HISAT ALIGNING R2 TO HXB2
@@ -163,29 +161,29 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 		# echo DONE IN ${DUR}
 		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		SECONDS=0
-		echo INDEXING R2
-		samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam -
-		samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam
+		# SECONDS=0
+		# echo INDEXING R2
+		# samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam -
+		# samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.bam
 
-		samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam -
-		samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam
+		# samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam -
+		# samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.bam
 
-		samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.bam -
-		samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.bam
+		# samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.bam -
+		# samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.bam
 
 		# samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.hxb2.bowtie.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.hxb2.bowtie.bam -
 		# samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.hxb2.bowtie.bam
 
 		# samtools view -S -@ ${threads} -b ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.hxb2.hisat.sam | samtools sort -o ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.hxb2.hisat.bam -
 		# samtools index -@ ${threads} ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.hxb2.hisat.bam
-		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		echo DONE IN ${DUR}
-		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		# echo DONE IN ${DUR}
+		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		SECONDS=0
 		echo ANALYZING R2
-		./hiv.py -i1 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R2/${sample}${baseEnd} -t 12 --minLen 30 -a ${annotation} --overlap 5 --gap 5
+		./hiv.py -i1 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R2/${sample}${baseEnd} -t 12 --minLen 20 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))

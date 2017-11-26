@@ -38,6 +38,10 @@ def main():
 	data=pd.read_csv("./out.psl",sep="\t",comment='@',names=columns)
 	toRemove=list(set(data[data["matches"]>100]["qName"]))
 
+	data=data[data["matches"]>100][["qName","matches","qSize","qStart","qEnd","tName","tStart","tEnd"]].sort_values(by="qName").reset_index(drop=True)
+	data.columns=["Accession Number","Alignment Length","Sequence Length","Sequence Start","Sequence End","Chromosome","Human Start Position","Human End Position"]
+	data.to_csv("./contaminantsTable.csv")
+
 	fout=open("./seqFiltered.fasta","w+")
 	with open("./sequence.fasta") as fin:
 	    curSeq=""
