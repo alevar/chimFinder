@@ -1,8 +1,8 @@
-##Motivation
+## Motivation
 
 chimFinder is designed to identify reads from RNA and DNA sequencing experiments which align to two distinct genomes. This tool was developed as part of the work on identification of fusion transcripts resulting from HIV type 1 integrations in human CD4+ T cells.
 
-##Prerequisites
+## Prerequisites
 Along with chimFinder this repository contains several scripts designed to automate all steps of the pipeline described in the manuscript:
 1. database cleanup (contamination.py)
 2. read trimming and preprocessing
@@ -23,14 +23,16 @@ Several prerequisites are assumed to be installed and properly configured to be 
 
 chimFinder uses as input two sam-formatted files. Users may choose to perform upstream analysis using other tools and pipelines which generate alignments in the appropriate sam format.
 
-##Installation
+## Installation
 chimFinder is implemented in Python and assumes minimum requirements.
 1. git clone
 2. pip install -r requirements.txt
 (Optional) - wrapper.sh may be used to run the entire pipeline in an automated fashion. Please ensure all software is installed and properly configured on the machine
 3. ./chimFinder.py -i1 <hiv.bowtie.sam> -i2 <hum.bowtie.sam> --spliced <hum.hisat.sam> -o <> -a <> <other parameters>
 
-##Parameters
+## Parameters
+-h, --help, help page
+
 -i1, --input1, first alignment
 
 -i2, --input2, second alignment
@@ -79,7 +81,7 @@ chimFinder is implemented in Python and assumes minimum requirements.
 
 --spliced, spliced end-to-end alignment. Reads will be subtracted from the main alignments and will not be reported in the final report of integrations sites
 
-##Output
+## Output
 chimFinder outputs the following three files per run:
 1. .csv - standard ouput of integration sites grouped by position
 2. .full.csv - same as .csv but contains additional information about the reads in each group, such as read name
