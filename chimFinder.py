@@ -1654,7 +1654,7 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
 #     os._exit(0)
 
 # # multithreaded version of the algorithm
-# def wrapperThreaded(outDir,baseName,dirPath,fileName,minLen,end,args):
+# def wrapperThreaded(outDir,baseName,dirPath,fileName,minLen,args):
 #     dataG2=pd.read_csv(os.path.abspath(args.input1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
 #                                                                                                                     'FLAG',
 #                                                                                                                     'RNAME',
@@ -1709,7 +1709,7 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
 #                 childPIDS[-1].join()
 #                 childPIDS.remove(childPIDS[-1])
 
-def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,end,args):
+def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     def extractFlagBits(data):
         data["paired"]=data["FLAG"]               &1 #template having multiple segments in sequencing
         data["aligned2Mates"]=data["FLAG"]        &2 #each segment properly aligned according to the aligner
@@ -2462,7 +2462,7 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,end,args):
 
         dataPos_Clean[colsOrder].to_csv(os.path.abspath(args.out)+".span.csv",index=False)
 
-def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args,in1,in2,s,mate):
+def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
     # load data from local alignments
     dataG2=pd.read_csv(os.path.abspath(in1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
                                                                                                         'FLAG',
@@ -2633,10 +2633,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,end,args,in1,in2,s,mate):
     return 1
 
 def main(args):
-    end=""
-    if args.end==True:
-        end='.no_dup'
-
     outDir="/".join(os.path.abspath(args.out).split("/")[:-1])
     if not os.path.exists(outDir):
         print('output directory does not exist')
@@ -2657,19 +2653,19 @@ def main(args):
         baseName=fileName.split(".")[0]
         ext=".".join(fileName.split(".")[1:-1])
 
-        # resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,end,args,args.input1r1,args.input2r1,args.splicedR1,"r1")
+        # resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r1,args.input2r1,args.splicedR1,"r1")
         # if args.quiet:
         #     printReport()
 
         # global reportDF
         # reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
 
-        # resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,end,args,args.input1r2,args.input2r2,args.splicedR2,"r2")
+        # resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r2,args.input2r2,args.splicedR2,"r2")
         # if args.quiet:
         #     printReport()
 
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
-        wrapperSpan(outDir,baseName,dirPath,fileName,args.minLen,end,args)
+        wrapperSpan(outDir,baseName,dirPath,fileName,args.minLen,args)
 
     else:
         print('not real path')
@@ -2803,11 +2799,6 @@ def chimFinder(argv):
                               required=True,
                               type=str,
                               help="annotation for the human genome")
-    parser.add_argument('-e',
-                              '--end',
-                              default="",
-                              type=str,
-                              help="suffix to append to the end of the ouput name")
     parser.add_argument('-w',
                               '--writeReads',
                               action="store_true",

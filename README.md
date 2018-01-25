@@ -33,53 +33,96 @@ chimFinder is implemented in Python and assumes minimum requirements.
 ## Parameters
 -h, --help, help page
 
--i1, --input1, first alignment
+-i1r1 INPUT1R1, --input1r1 INPUT1R1
+                    first alignment r1
 
--i2, --input2, second alignment
+-i1r2 INPUT1R2, --input1r2 INPUT1R2
+                    first alignment r2
 
--o, --out, default value ./out, output file
+-i2r1 INPUT2R1, --input2r1 INPUT2R1
+                    second alignment r1
 
--t, --threads, default value 1, the number of threads to use in the computation
+-i2r2 INPUT2R2, --input2r2 INPUT2R2
+                    second alignment r2
 
---minCount, default value 1, the minimum number of reads supporting an integration site.
+-o OUT, --out OUT     
+					output file
 
---maxCountPenalty, default value 0.85, the maximum penalty to give for minCount when hit.
+-t THREADS, --threads THREADS
+                    the number of threads to use in the computation
 
---weightCount, default value 1.0, Weight of the number of reads score in the cumulative score equation
+--minCount MINCOUNT   the minimum number of reads supporting an integration
+                    site.
 
---minEntropy, default value 0.75, minimum alignment entropy score.
+--maxCountPenalty MAXCOUNTPENALTY
+                    the maximum penalty to give for minCount when hit.
 
---weightEntropy, default value 1.0, Weight of the entropy score in the cumulative score equation
+--weightCount WEIGHTCOUNT
+                    Weight of the number of reads score in the cumulative
+                    score equation
 
---minQual, default value 10, minimum mean mapping quality of sequenced read. Everything below this threshold will be reported as multialignment for which no assumption can be made from the annotation
+--minEntropy MINENTROPY
+                    minimum alignment entropy score.
 
---weightQual, default value 1.0, Weight of the mapping score in the cumulative score equation
+--weightEntropy WEIGHTENTROPY
+                    Weight of the entropy score in the cumulative score
+                    equation
 
---minLen, default value 30, the minimum number of nucleotides in alignment to keep a read.
+--minQual MINQUAL     minimum mean mapping quality of sequenced read.
+                    Everything below this threshold will be reported as
+                    multialignment for which no assumption can be made
+                    from the annotation
 
---weightLen, default value 1.0, Weight of the alignment length score in the cumulative score equation
+--weightQual WEIGHTQUAL
+                    Weight of the mapping score in the cumulative score
+                    equation
 
---steepSlopeAL, default value 0.1, Weight of the alignment length score in the cumulative score equation
+--minLen MINLEN       the minimum number of nucleotides in alignment to keep
+                    a read.
 
---maxAlLenPenalty, default value 0.0, the maximum penalty to give for minLen when hit.
+--maxLenUnmapped MAXLENUNMAPPED
+                    minimum percent of the read to be aligned correctly in
+                    spanning read search
 
--s, --score, default value 0.5, the minimum overall score to keep.
+--weightLen WEIGHTLEN
+                    Weight of the alignment length score in the cumulative
+                    score equation
 
---overlap, default value -1, overlap threshold
+--steepSlopeAL STEEPSLOPEAL
+                    Weight of the alignment length score in the cumulative
+                    score equation
 
---gap, default value -1, gap threshold
+--maxAlLenPenalty MAXALLENPENALTY
+                    the maximum penalty to give for minLen when hit.
 
---close, default value 30, distance between two integration sites to group together
+-s SCORE, --score SCORE
+                    the minimum overall score to keep.
 
--a, --annotation, annotation for the human genome
+--overlap OVERLAP     overlap threshold
 
--w, --writeReads, write reads to fasta files
+--gap GAP             gap threshold
 
--p, --plot, plot snapshots
+--close CLOSE         distance between two integration sites to group
+                    together
 
--q, --quiet, do not print to std out. report will still be saved
+-a ANNOTATION, --annotation ANNOTATION
+                    annotation for the human genome
 
---spliced, spliced end-to-end alignment. Reads will be subtracted from the main alignments and will not be reported in the final report of integrations sites
+-w, --writeReads      write reads to fasta files
+
+-p, --plot            plot snapshots
+
+-q, --quiet           do not print to std out. report will still be saved
+
+--splicedR1 SPLICEDR1
+                    spliced end-to-end alignment r1. Reads will be
+                    subtracted from the main alignments and will not be
+                    reported in the final report of integrations sites
+
+--splicedR2 SPLICEDR2
+                    spliced end-to-end alignment r2. Reads will be
+                    subtracted from the main alignments and will not be
+                    reported in the final report of integrations sites
 
 ## Output
 chimFinder outputs the following three files per run:
