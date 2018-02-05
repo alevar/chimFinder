@@ -44,35 +44,61 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 		echo BEGIN DATE: ${date}
 		TOTAL_TIME=0
 
-		# echo ADAPTOR AND QUALITY TRIMMING R1
-		# ${trim_galore} --trim-n -q 5 --phred33 --length 45 -o ./${outputDir}_R1/tmp/trim/ --dont_gzip ${inputDir}/${sampleR1Base}
-		# trimmedFQ=./${outputDir}_R1/tmp/trim/"${sampleR1%_R1*}"_R1"${sampleR1##*_R1}"_trimmed.fq
-		# mv ${trimmedFQ} ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq
-		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		# echo DONE IN ${DUR}
-		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		echo ADAPTOR AND QUALITY TRIMMING R1
+		${trim_galore} --trim-n \
+						-q 5 \
+						--phred33 \
+						--length 45 \
+						-o ./${outputDir}_R1/tmp/trim/ \
+						--dont_gzip ${inputDir}/${sampleR1Base}
+		trimmedFQ=./${outputDir}_R1/tmp/trim/"${sampleR1%_R1*}"_R1"${sampleR1##*_R1}"_trimmed.fq
+		mv ${trimmedFQ} ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq
+		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		echo DONE IN ${DUR}
+		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		# echo ADAPTOR AND QUALITY TRIMMING R2
-		# ${trim_galore} --trim-n -q 5 --phred33 --length 45 -o ./${outputDir}_R2/tmp/trim/ --dont_gzip ${inputDir}/${sampleR2Base}
-		# trimmedFQ=./${outputDir}_R2/tmp/trim/"${sampleR1%_R1*}"_R2"${sampleR1##*_R1}"_trimmed.fq
-		# mv ${trimmedFQ} ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq
-		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		# echo DONE IN ${DUR}
-		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		echo ADAPTOR AND QUALITY TRIMMING R2
+		${trim_galore} --trim-n \
+						-q 5 -\
+						-phred33 \
+						--length 45 \
+						-o ./${outputDir}_R2/tmp/trim/ \
+						--dont_gzip ${inputDir}/${sampleR2Base}
+		trimmedFQ=./${outputDir}_R2/tmp/trim/"${sampleR1%_R1*}"_R2"${sampleR1##*_R1}"_trimmed.fq
+		mv ${trimmedFQ} ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq
+		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		echo DONE IN ${DUR}
+		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		# SECONDS=0
-		# echo BOWTIE2 ALIGNING R1 TO HIV
-		# bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --al ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq
-		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		# echo DONE IN ${DUR}
-		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		SECONDS=0
+		echo BOWTIE2 ALIGNING R1 TO HIV
+		bowtie2 --very-sensitive-local \
+				--no-unal \
+				--local \
+				--phred33 \
+				-p ${threads} \
+				-x ${hivDB} \
+				-U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq \
+				-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam \
+				--al ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq
+		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		echo DONE IN ${DUR}
+		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
-		# SECONDS=0
-		# echo BOWTIE2 ALIGNING R2 TO HIV
-		# bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${hivDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --al ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq
-		# DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
-		# echo DONE IN ${DUR}
-		# TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
+		SECONDS=0
+		echo BOWTIE2 ALIGNING R2 TO HIV
+		bowtie2 --very-sensitive-local \
+				--no-unal \
+				--local \
+				--phred33 \
+				-p ${threads} \
+				-x ${hivDB} \
+				-U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq \
+				-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam \
+				--al ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq
+		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
+		echo DONE IN ${DUR}
+		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 		
 		# extract read names into separate file for r1
 		sed -n '1~4p' ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq > ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.reads
@@ -89,35 +115,81 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 
 		SECONDS=0
 		echo BOWTIE2 ALIGNING R1 TO HG38
-		bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
+		bowtie2 --very-sensitive-local \
+				--no-unal \
+				--local \
+				--phred33 \
+				-p ${threads} \
+				-x ${humanDB} \
+				-U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq \
+				-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		SECONDS=0
 		echo HISAT ALIGNING R1 TO HG38
-		hisat2 -p ${threads} --very-sensitive --end-to-end --known-splicesite-infile ${humanSplicing} --no-unal --phred33 -x ${humanDB} -U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq -S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
+		hisat2 -p ${threads} \
+				--very-sensitive \
+				--end-to-end \
+				--known-splicesite-infile ${humanSplicing} \
+				--no-unal \
+				--phred33 \
+				-x ${humanDB} \
+				-U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq \
+				-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		SECONDS=0
 		echo BOWTIE2 ALIGNING R2 TO HG38
-		bowtie2 --very-sensitive-local --no-unal --local --phred33 -p ${threads} -x ${humanDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
+		bowtie2 --very-sensitive-local \
+				--no-unal \
+				--local \
+				--phred33 \
+				-p ${threads} \
+				-x ${humanDB} \
+				-U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq \
+				-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		SECONDS=0
 		echo HISAT ALIGNING R2 TO HG38
-		hisat2 -p ${threads} --very-sensitive --end-to-end --known-splicesite-infile ${humanSplicing} --no-unal --phred33 -x ${humanDB} -U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq -S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
+		hisat2 -p ${threads} \
+				--very-sensitive \
+				--end-to-end \
+				--known-splicesite-infile ${humanSplicing} \
+				--no-unal \
+				--phred33 \
+				-x ${humanDB} \
+				-U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq \
+				-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 		SECONDS=0
 		echo ANALYZING
-		./chimFinder.py --input1r1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --input2r1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --input1r2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam --input2r2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --splicedR1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam --splicedR2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}/${sample}${baseEnd} -t 12 --minLen 20 --maxLenUnmapped 30 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q
+		./chimFinder.py --input1r1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam \
+						--input2r1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam \
+						--input1r2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam \
+						--input2r2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam \
+						--splicedR1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam \
+						--splicedR2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam \
+						-o ${outputDir}/${sample}${baseEnd} \
+						-t 12 \
+						--minLen 20 \
+						--maxLenUnmapped 30 \
+						-a ${annotation} \
+						--overlap 5 \
+						--gap 5 \
+						--minEntropy 0.84 \
+						--close 5 \
+						--score 0.75 \
+						-q
 		DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 		echo DONE IN ${DUR}
 		TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))

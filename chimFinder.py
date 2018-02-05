@@ -2390,8 +2390,8 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     dataHumR2_HIVR1.replace('', np.nan,inplace=True)
     dataHumR2_HIVR1.fillna(0,inplace=True)
 
-    dataHumR1_HIVR2[~(dataHumR1_HIVR2["HUM_SEQ"]==dataHumR1_HIVR2["HIV_SEQ"])]
-    dataHumR2_HIVR1[~(dataHumR2_HIVR1["HUM_SEQ"]==dataHumR2_HIVR1["HIV_SEQ"])]
+    dataHumR1_HIVR2=dataHumR1_HIVR2[~(dataHumR1_HIVR2["HUM_SEQ"]==dataHumR1_HIVR2["HIV_SEQ"])]
+    dataHumR2_HIVR1=dataHumR2_HIVR1[~(dataHumR2_HIVR1["HUM_SEQ"]==dataHumR2_HIVR1["HIV_SEQ"])]
 
     dataPosHumR1_HIVR2=pd.DataFrame([])
     dataPosHumR1_HIVR2=filterOverlapCombine(dataHumR1_HIVR2)
@@ -2435,13 +2435,8 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         dataPosHumR2_HIVR1=dataPosHumR2_HIVR1.sort_values(by='score',ascending=False).reset_index(drop=True)
         dataPosHumR2_HIVR1[['hum_seq','hiv_seq','hum_rs','hum_re','hiv_rs','hiv_re']]=dataPosHumR2_HIVR1['seq'].apply(pd.Series)
 
-    if len(dataPosHumR1_HIVR2)>0 and len(dataPosHumR2_HIVR1)>0:
-        dataPos=pd.concat([dataPosHumR1_HIVR2,dataPosHumR2_HIVR1],axis=0)
-    elif len(dataPosHumR1_HIVR2)>0 and not len(dataPosHumR2_HIVR1)>0:
-        dataPos=dataPosHumR1_HIVR2.copy(deep=True)
-    elif not len(dataPosHumR1_HIVR2)>0 and len(dataPosHumR2_HIVR1)>0:
-        dataPos=dataPosHumR2_HIVR1.copy(deep=True)
-    else:
+    dataPos=pd.concat([pd.DataFrame(dataPosHumR1_HIVR2),pd.DataFrame(dataPosHumR2_HIVR1)])
+    if not len(dataPos)>0:
         return
     colsOrder=["hum_nearest_SS",
                "chr",
@@ -2454,12 +2449,12 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
                "count",
                "score"]
 
-    if not dataPos is None and len(dataPos)>0:
-        dataPos.to_csv(os.path.abspath(args.out)+".span.full.csv",index=False)
-        dataPos_Clean=dataPos[(dataPos['entropyScore_hiv']>args.minEntropy) \
+    dataPos.to_csv(os.path.abspath(args.out)+".span.full.csv",index=False)
+    dataPos_Clean=dataPos[(dataPos['entropyScore_hiv']>args.minEntropy) \
                             &(dataPos['entropyScore_hum']>args.minEntropy) \
                             &(dataPos['score']>args.score)]
 
+    if not dataPos_Clean is None and len(dataPos_Clean)>0:
         dataPos_Clean[colsOrder].to_csv(os.path.abspath(args.out)+".span.csv",index=False)
 
 def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
@@ -2653,16 +2648,16 @@ def main(args):
         baseName=fileName.split(".")[0]
         ext=".".join(fileName.split(".")[1:-1])
 
-        # resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r1,args.input2r1,args.splicedR1,"r1")
-        # if args.quiet:
-        #     printReport()
+        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r1,args.input2r1,args.splicedR1,"r1")
+        if not args.quiet:
+            printReport()
 
-        # global reportDF
-        # reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
+        global reportDF
+        reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
 
-        # resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r2,args.input2r2,args.splicedR2,"r2")
-        # if args.quiet:
-        #     printReport()
+        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r2,args.input2r2,args.splicedR2,"r2")
+        if not args.quiet:
+            printReport()
 
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
         wrapperSpan(outDir,baseName,dirPath,fileName,args.minLen,args)
