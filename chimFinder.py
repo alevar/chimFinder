@@ -1611,9 +1611,9 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
                 colsOrder.remove("fileName")
 
             if unpaired:
-                dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
+                dataPosClean["fileName"]="tmp"#dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
             else:
-                dataPosClean["fileName"]=dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
+                dataPosClean["fileName"]="tmp"#dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
 
             dataPosClean[colsOrder].to_csv(os.path.abspath(args.out)+"."+mate+".csv",index=False)
 
