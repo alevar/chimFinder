@@ -129,3 +129,14 @@ chimFinder outputs the following three files per run:
 1. .csv - standard ouput of integration sites grouped by position
 2. .full.csv - same as .csv but contains additional information about the reads in each group, such as read name
 3. .report - read statistics for each of the applied filters
+
+## Additional Scripts
+sam2splice.py - used to extract relevant splice-sites. A dictionary of known HIV-1 (HXB2) donor and acceptor sites is hard-coded
+-i, --input - spliced alignment in SAM format
+-o, --output - output csv file with the results
+-f , --filter - flag to filter out any splice junctions in the LTR region of HIV-1 as defined for the HXB2 genome.
+--fasta - flag to output spliced reads to a separate file
+
+runChimFinderOnAll.sh - used to run aligned samples in bulk through chimFinder, sam2splice.py and pileup
+
+wrapper.sh - run the full pipeline from start to finish in bulk
