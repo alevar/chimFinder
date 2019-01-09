@@ -132,9 +132,13 @@ chimFinder outputs the following three files per run:
 
 ## Additional Scripts
 sam2splice.py - used to extract relevant splice-sites. A dictionary of known HIV-1 (HXB2) donor and acceptor sites is hard-coded
+
 -i, --input - spliced alignment in SAM format
+
 -o, --output - output csv file with the results
+
 -f , --filter - flag to filter out any splice junctions in the LTR region of HIV-1 as defined for the HXB2 genome.
+
 --fasta - flag to output spliced reads to a separate file
 
 runChimFinderOnAll.sh - used to run aligned samples in bulk through chimFinder, sam2splice.py and pileup
