@@ -2,21 +2,16 @@
 
 import pandas as pd
 import numpy as np
-# import numba
 import math
 import os
 import subprocess
 import multiprocessing
 import signal
-# import shutil
 import sys
 import glob
 import itertools
 import argparse
-# import scipy
-# import warnings
 from pybedtools import BedTool
-# warnings.filterwarnings('ignore')
 
 # the report function should report statistics about the each run
 # The following fields can be filled in:
