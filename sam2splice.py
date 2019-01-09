@@ -152,7 +152,7 @@ def sam2splice(args):
                                                                                                             'QUAL'])
     df=df[df["CIGAR"].str.contains("N")].reset_index(drop=True)
     # df.to_csv(args.out+".spliced.sam",index=False,header=False,sep="\t")
-    df[["QNAME","SEQ"]].to_csv(args.out+".spliced.fastq",sep="\n",index=False,header=False)
+    # df[["QNAME","SEQ"]].to_csv(args.out+".spliced.fastq",sep="\n",index=False,header=False)
     if len(df)==0:
         return
     extractFlagBits(df)
@@ -185,10 +185,11 @@ def sam2splice(args):
     tdf=tdf.merge(df[["QNAME","MAPQ","SEQ","CIGAR","blockSizes","ss"]],on="QNAME",how="left")
     tdf.columns=["ss","QNAME","MAPQ","SEQ","CIGAR","blockSizes","fullSS"]
 
-    seqdf=tdf[["QNAME","SEQ","ss"]]
-    seqdf["QNAME"]=seqdf["QNAME"].str.split("_")[0]
-    for sj in list(seqdf["ss"]):
-        seqdf[seqdf["ss"]==sj][["QNAME","SEQ"]].to_csv(args.out+"_"+sj+".fasta",delimiter="\n",index=False,header=False)
+    if args.fasta:
+        seqdf=tdf[["QNAME","SEQ","ss"]].reset_index(drop=True)
+        seqdf["QNAME"]=">"+seqdf["QNAME"].str.split("_",expand=True)[0]
+        for sj in list(set(seqdf["ss"])):
+            seqdf[seqdf["ss"]==sj][["QNAME","SEQ"]].to_csv(args.out+"_"+sj+".fasta",sep="\n",index=False,header=False)
 
     # create a copy and compute best reads by alignment quality
     seqDF=tdf.copy(deep=True)
@@ -286,6 +287,9 @@ def main(argv):
                         '--filter',
                         action="store_true",
                         help="filter LTR splice junctions")
+    parser.add_argument('--fasta',
+                        action="store_true",
+                        help="write out fasta")
     
     parser.set_defaults(func=sam2splice)
 
