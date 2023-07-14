@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#./chimFinder.py --input1r1 ./r1/154_pos_21_S7_001.hiv.bowtie.sam --input2r1 ./r1/154_pos_21_S7_001.hum.bowtie.sam --input1r2 ./r2/154_pos_21_S7_001.hiv.bowtie.sam --input2r2 ./r2/154_pos_21_S7_001.hum.bowtie.sam --splicedR1 ./r1/154_pos_21_S7_001.hum.hisat.sam --splicedR2 ./r2/154_pos_21_S7_001.hum.hisat.sam -o ./res -t 12 --minLen 20 --maxLenUnmapped 30 -a ./data/hg38_p8.refseq.gff3 --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q
+#./chimFinder.py --input1r1 ./r1/154_pos_21_S7_001.i1.bowtie.sam --input2r1 ./r1/154_pos_21_S7_001.hum.bowtie.sam --input1r2 ./r2/154_pos_21_S7_001.i1.bowtie.sam --input2r2 ./r2/154_pos_21_S7_001.hum.bowtie.sam --splicedR1 ./r1/154_pos_21_S7_001.hum.hisat.sam --splicedR2 ./r2/154_pos_21_S7_001.hum.hisat.sam -o ./res -t 12 --minLen 20 --maxLenUnmapped 30 -a ./data/hg38_p8.refseq.gff3 --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q
 
 import pandas as pd
 import numpy as np
@@ -15,27 +15,14 @@ import itertools
 import argparse
 from pybedtools import BedTool
 
-# the report function should report statistics about the each run
-# The following fields can be filled in:
-# 1. initial number of reads
-# 2. read length mean prefiltering
-# 3. read length std prefiltering
-# 4. read length max prefiltering
-# 5. read length min prefiltering
-# 6. number of reads removed due to observed end-to-end splicing in human genome
-# 7. number of reads filtered due to overlap/gap threshold
-# 8. number of reads filtered due to insufficient alignment length
-# 9. number of reads filtered due to complexity
-# 10. number of reads filtered due to cumulative score
-# 11. see if there are any other places where filtering might occur.
-# 12. read length mean postfiltering
-# 13. read length std postfiltering
-# 14. read length max postfiltering
-# 15. read length min postfiltering
+sam_colnames = ['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL']
+
 reportDF=pd.DataFrame([[]])
 
 def printReport():
     global reportDF
+    if reportDF.empty:
+        return
     for i in list(reportDF):
         print(i+str(": ")+str(reportDF[i].iloc[0]))
 
@@ -139,31 +126,6 @@ def extractFlagBits(data):
     data["noPassFilter"]=data["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
     data["PCRdup"]=data["FLAG"]               &1024 #PCR or optical duplicate
     data["suppAl"]=data["FLAG"]               &2048 #supplementary alignment
-
-# def extractStartEnd(data):
-#     data["CIGAR"].replace("*",np.nan,inplace=True)
-#     data.dropna(axis=0,inplace=True)
-
-#     data["READ_LEN"]=data.SEQ.str.len()
-#     data["CIGAR_POST"]=data.CIGAR.str.extract("[M]([0-9]+)[A-Z]$").replace(np.nan,0).astype(int)
-#     data["END"]=data.READ_LEN-data.CIGAR_POST
-#     data["CIGAR_PRE"]=data.CIGAR.str.extract("^([0-9]+)[S]").replace(np.nan,0).astype(int)
-
-#     data16=data[data["reversedCurr"]==16]
-#     data0=data[data["reversedCurr"]==0]
-#     data16["Template_start"]=data16.READ_LEN-data16.END
-#     data16["Template_end"]=data16.READ_LEN-data16.CIGAR_PRE-1
-#     data0["Template_start"]=data0.CIGAR_PRE
-#     data0["Template_end"]=data0.END
-
-#     data16["Reference_start"]=data16.READ_LEN-data16.END+data16.POS-data16.Template_start
-#     data16["Reference_end"]=data16.READ_LEN-data16.CIGAR_PRE-1+data16.POS-data16.Template_start
-#     data0["Reference_start"]=data0.POS
-#     data0["Reference_end"]=data0.END+data0.POS-data0.CIGAR_PRE
-
-#     data=pd.concat([data16,data0]).reset_index(drop=True)
-#     data.drop(["CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
-#     return data
 
 def extractStartEnd(data):
     data["CIGAR"].replace("*",np.nan,inplace=True)
@@ -398,13 +360,6 @@ def topologicalNormalizedEntropy(s):
     n=countSubString(s,maxSubstringLen)
     res=math.log(n,4)/maxSubstringLen
 
-    # expected=0.1#expectedEntropy(maxSubstringLen)
-    # ent=bool(res>=expected)
-    # res=res if ent else 0
-    # temp="CACTTACATTGGGGAGTCAGGCTTCTCATCCACAGCCATGCCGTTCACACCCAGTCGCCGCCCCTCGCCTCTTGCTGTGCGCGCTTCAGCAAGCCGAGTCCTGCGTCGAGAGATCTCCTCTGGTTTTCCTTTCGCTTTCAGGTCCCTGCCG"
-    # if s in temp:
-    #     print(maxSubstringLen,expected,res)
-
     return res
 
 # How to compute the mimimum entropy for a string of a given length and characters
@@ -580,8 +535,6 @@ def filterOverlapCombine(data,args):
     dataR1Left["G1_ID"]=dataR1Left["R1_G1_ID"]
     dataR1Left["G2_ID"]=dataR1Left["R1_G2_ID"]
     dataR1Left["SEQ"]=dataR1Left["R1_G1_SEQ"]
-#     dataR1Left["SEQ"]=dataR1Left[dataR1Left['R1_G1_reversedCurr']==0]["R1_G1_SEQ"]
-#     dataR1Left["R_SEQ"]=dataR1Left[dataR1Left['R1_G1_reversedCurr']==16]["R1_G1_SEQ"]
     dataR1Left["G2_MAPQ"]=dataR1Left["R1_G2_MAPQ"].astype(int)
     dataR1Left["G1_MAPQ"]=dataR1Left["R1_G1_MAPQ"].astype(int)
     dataR1Left["G2_AL"]=dataR1Left["G2_TE"]-dataR1Left["G2_TS"]-dataR1Left["overlap"]
@@ -631,8 +584,6 @@ def filterOverlapCombine(data,args):
     dataR2Right["G1_ID"]=dataR2Right["R2_G1_ID"]
     dataR2Right["G2_ID"]=dataR2Right["R2_G2_ID"]
     dataR2Right["SEQ"]=dataR2Right["R2_G1_SEQ"]
-#     dataR2Right["SEQ"]=dataR2Right[dataR2Right['R2_G1_reversedCurr']==0]["R2_G1_SEQ"]
-#     dataR2Right["R_SEQ"]=dataR2Right[dataR2Right['R2_G1_reversedCurr']==16]["R2_G1_SEQ"]
     dataR2Right["G2_MAPQ"]=dataR2Right["R2_G2_MAPQ"].astype(int)
     dataR2Right["G1_MAPQ"]=dataR2Right["R2_G1_MAPQ"].astype(int)
     dataR2Right["G2_AL"]=dataR2Right["G2_TE"]-dataR2Right["G2_TS"]-dataR2Right["overlap"]
@@ -681,8 +632,6 @@ def filterOverlapCombine(data,args):
     dataR2Left["G1_ID"]=dataR2Left["R2_G1_ID"]
     dataR2Left["G2_ID"]=dataR2Left["R2_G2_ID"]
     dataR2Left["SEQ"]=dataR2Left["R2_G1_SEQ"]
-#     dataR2Left["SEQ"]=dataR2Left[dataR2Left['R2_G1_reversedCurr']==0]["R2_G1_SEQ"]
-#     dataR2Left["R_SEQ"]=dataR2Left[dataR2Left['R2_G1_reversedCurr']==16]["R2_G1_SEQ"]
     dataR2Left["G2_MAPQ"]=dataR2Left["R2_G2_MAPQ"].astype(int)
     dataR2Left["G1_MAPQ"]=dataR2Left["R2_G1_MAPQ"].astype(int)
     dataR2Left["G2_AL"]=dataR2Left["G2_TE"]-dataR2Left["G2_TS"]-dataR2Left["overlap"]
@@ -736,28 +685,12 @@ def filterOverlapCombine(data,args):
     reportDF["read len std after overlap/gap cutoff"]=dataLen.std()
     reportDF["read len min after overlap/gap cutoff"]=dataLen.min()
     reportDF["read len max after overlap/gap cutoff"]=dataLen.max()
-    
-    # df["G2_AL"]=(df["READ_LEN"]/2)-((df["G2_AL"]-df["READ_LEN"]/2).abs())
-    # df["G1_AL"]=(df["READ_LEN"]/2)-((df["G1_AL"]-df["READ_LEN"]/2).abs())
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
-    # df["G2_AL_score"]=(((((df['G2_AL']-k)/k) \
-    #                     /(((ssAl)+((df['G2_AL']-k))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
-    #                             +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
 
     df["G2_AL_score"]=((df['G2_AL']-k)/((ssAl+(df['G2_AL']-k)**2.0)**0.5)+1.0)/2.0
     df["G1_AL_score"]=((df['G1_AL']-k)/((ssAl+(df['G1_AL']-k)**2.0)**0.5)+1.0)/2.0
-
-    # df["G1_AL_score"]=(((((df['G1_AL']-k)/k) \
-    #                     /(((ssAl)+((df['G1_AL']-k))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
-    #                             +args.maxAlLenPenalty # algebraic sigmoid function of G2 alignment length score
 
     df['jointEntropy']=((df['entropyScore_g2'] \
                     +df['entropyScore_g1']) \
@@ -799,7 +732,7 @@ def filterOverlapCombineUnpaired(data,args):
     dataRight["split"]=dataRight['G1_RE'].astype(int).astype(str)+":"+dataRight['G2_RS'].astype(int).astype(str)
     dataRight['G1']=dataRight['G1_RE'].astype(int)
     dataRight["comb"]=dataRight.split+"@"+dataRight.G1_ID+":"+dataRight.G2_ID
-    dataRight["orient"]="`"
+    dataRight["orient"]="g1:g2"
     dataRight["overlap"]=dataRight["overlap"]
     dataRight["gap"]=dataRight["gap"]
     dataRight["G1_TS"]=dataRight["G1_TS"].astype(int)
@@ -813,12 +746,10 @@ def filterOverlapCombineUnpaired(data,args):
     dataRight["G2_MAPQ"]=dataRight["G2_MAPQ"].astype(int)
     dataRight["G1_MAPQ"]=dataRight["G1_MAPQ"].astype(int)
     dataRight["SEQ"]=dataRight["G1_SEQ"]
-#     dataRight["SEQ"]=dataRight[dataRight['G1_reversedCurr']==0]["G1_SEQ"]
-#     dataRight["R_SEQ"]=dataRight[dataRight['G1_reversedCurr']==16]["G1_SEQ"]
     dataRight["G2_AL"]=dataRight["G2_TE"]-dataRight["G2_TS"]-dataRight["overlap"]
     dataRight["G1_AL"]=dataRight["G1_TE"]-dataRight["G1_TS"]-dataRight["overlap"]
     dataRight=dataRight[(dataRight['G2_AL']>args.minLen)&(dataRight['G1_AL']>args.minLen)]
-    if len(dataRight>0):
+    if len(dataRight)>0:
         dataRight[['entropyScore_g2',
                      'meanQual_g2',
                      'entropyScore_g1',
@@ -860,8 +791,6 @@ def filterOverlapCombineUnpaired(data,args):
     dataLeft["G2_MAPQ"]=dataLeft["G2_MAPQ"].astype(int)
     dataLeft["G1_MAPQ"]=dataLeft["G1_MAPQ"].astype(int)
     dataLeft["SEQ"]=dataLeft["G1_SEQ"]
-#     dataLeft["SEQ"]=dataLeft[dataLeft['G1_reversedCurr']==0]["G1_SEQ"]
-#     dataLeft["R_SEQ"]=dataLeft[dataLeft['G1_reversedCurr']==16]["G1_SEQ"]
     dataLeft["G2_AL"]=dataLeft["G2_TE"]-dataLeft["G2_TS"]-dataLeft["overlap"]
     dataLeft["G1_AL"]=dataLeft["G1_TE"]-dataLeft["G1_TS"]-dataLeft["overlap"]
     dataLeft=dataLeft[(dataLeft["G2_AL"]>args.minLen)&(dataLeft["G1_AL"]>args.minLen)]
@@ -914,19 +843,6 @@ def filterOverlapCombineUnpaired(data,args):
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
-    # df["G2_AL_score"]=(((((df['G2_AL']-k)/k) \
-    #                     /(((ssAl)+((df['G2_AL']-k))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
-    #                             +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
-
-    # df["G1_AL_score"]=(((((df['G1_AL']-k)/k) \
-    #                     /(((ssAl)+((df['G1_AL']-k))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
-    #                             +args.maxAlLenPenalty # algebraic sigmoid function of G2 alignment length score
 
     df["G2_AL_score"]=((df['G2_AL']-k)/((ssAl+(df['G2_AL']-k)**2.0)**0.5)+1.0)/2.0
     df["G1_AL_score"]=((df['G1_AL']-k)/((ssAl+(df['G1_AL']-k)**2.0)**0.5)+1.0)/2.0
@@ -945,14 +861,6 @@ def filterOverlapCombineUnpaired(data,args):
     df=df.round({'scorePrelim': 4})
     df=df[df["scorePrelim"]>=args.score]
     df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.G1,df.G2,df.overlap,df.gap))))
-
-    # global reportDF
-    # dataLen=df["SEQ"].str.len()
-    # reportDF["number of reads after intermediate score cutoff"]=len(df)
-    # reportDF["read len mean after intermediate score cutoff"]=dataLen.mean()
-    # reportDF["read len std after intermediate score cutoff"]=dataLen.std()
-    # reportDF["read len min after intermediate score cutoff"]=dataLen.min()
-    # reportDF["read len max after intermediate score cutoff"]=dataLen.max()
 
     return df
 
@@ -994,55 +902,6 @@ def addSpan(data,dataPos):
 # 2. add a column of high confidence support reads from the first parameter DF
 # 3. add a column of low confidence support reads from the second parameter DF
 def findSupport(data,minLen,unpaired):
-    aggregations={
-        'QNAME':{
-            'count':'count',
-            'reads': lambda x: set(x)
-        },
-        'SEQ':{
-            'seq': lambda x: (max(dict(list(x)), key=float),dict(list(x))[max(dict(list(x)), key=float)])
-        },
-        'G1_RS':{
-            'G1_RS':'min'
-        },
-        'G1_RE':{
-            'G1_RE':'max'
-        },
-        'G2_RS':{
-            'G2_RS':'min'
-        },
-        'G2_RE':{
-            'G2_RE':'max'
-        },
-        'G2_AL':{
-            'G2_AL':'sum'
-        },
-        'G1_AL':{
-            'G1_AL':'sum'
-        },
-        'READ_LEN':{
-            'READ_LEN':'sum'
-        },
-        'entropyScore_g2':{
-            'entropyScore_g2':'sum'
-        },
-        'entropyScore_g1':{
-            'entropyScore_g1':'sum'
-        },
-        'meanQual_g2':{
-            'meanQual_g2':'sum'
-        },
-        'meanQual_g1':{
-            'meanQual_g1':'sum'
-        },
-        'G2_MAPQ':{
-            'G2_MAPQ':'sum'
-        },
-        'G1_MAPQ':{
-            'G1_MAPQ':'sum'
-        }
-    }
-
     dataPos=pd.DataFrame(data.groupby(by=["comb","split","G1_ID","R","orient"])[["QNAME",
                                                                                     "G1_RS",
                                                                                     "G1_RE",
@@ -1057,7 +916,22 @@ def findSupport(data,minLen,unpaired):
                                                                                     "meanQual_g1",
                                                                                     "G2_MAPQ",
                                                                                     "G1_MAPQ",
-                                                                                    "SEQ"]].agg(aggregations)).reset_index()
+                                                                                    "SEQ"]].agg(count=("QNAME", "count"),
+                                                                                                reads=("QNAME", lambda x: set(x)),
+                                                                                                seq=("SEQ", lambda x: (max(dict(list(x)), key=float),dict(list(x))[max(dict(list(x)), key=float)])),
+                                                                                                G1_RS=('G1_RS', 'min'),
+                                                                                                G1_RE=('G1_RE', 'max'),
+                                                                                                G2_RS=('G2_RS','min'),
+                                                                                                G2_RE=('G2_RE','max'),
+                                                                                                G2_AL=('G2_AL','sum'),
+                                                                                                G1_AL=('G1_AL','sum'),
+                                                                                                READ_LEN=('READ_LEN','sum'),
+                                                                                                entropyScore_g2=('entropyScore_g2','sum'),
+                                                                                                entropyScore_g1=('entropyScore_g1','sum'),
+                                                                                                meanQual_g2=('meanQual_g2','sum'),
+                                                                                                meanQual_g1=('meanQual_g1','sum'),
+                                                                                                G2_MAPQ=('G2_MAPQ','sum'),
+                                                                                                G1_MAPQ=('G1_MAPQ','sum'))).reset_index()
     dataPos.rename(columns={'G1_ID':'chr'}, inplace=True)            
     return dataPos
 
@@ -1076,19 +950,6 @@ def score(dataPos,args,minLen):
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
-    # dataPos["G2_AL_score"]=(((((dataPos['G2_AL']-k)) \
-    #                     /(((ssAl)+((dataPos['G2_AL']-k))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
-    #                             +args.maxAlLenPenalty # algebraic sigmoid function of human alignment length score
-
-    # dataPos["G1_AL_score"]=(((((dataPos['G1_AL']-k)) \
-    #                     /(((ssAl)+((dataPos['G1_AL']-k))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxAlLenPenalty))) \
-    #                             +args.maxAlLenPenalty # algebraic sigmoid function of G2 alignment length score
 
     dataPos["G2_AL_score"]=((dataPos['G2_AL']-k)/((ssAl+(dataPos['G2_AL']-k)**2.0)**0.5)+1.0)/2.0
     dataPos["G1_AL_score"]=((dataPos['G1_AL']-k)/((ssAl+(dataPos['G1_AL']-k)**2.0)**0.5)+1.0)/2.0
@@ -1097,16 +958,6 @@ def score(dataPos,args,minLen):
     dataPos["count_score"]=((dataPos['count']-m)/((1.0+(dataPos['count']-m)**2.0)**0.5)+1.0)/2.0 \
                                 *(1.0-args.maxCountPenalty) \
                                 +args.maxCountPenalty # algebraic sigmoid function of read count score
-
-    # dataPos["count_score"]=(((((dataPos['count']-m)) \
-    #                     /(((1.0)+((dataPos['count']-m))**2.0)**0.5)) \
-    #                             /2.0 \
-    #                             +0.5) \
-    #                             /(1.0/(1.0-args.maxCountPenalty))) \
-    #                             +args.maxCountPenalty # algebraic sigmoid function of read count score
-    
-    # dataPos["HIV_MAPQ_score"]=1-(10**(-(dataPos["G2_MAPQ"]/10)))
-    # dataPos["HUM_MAPQ_score"]=1-(10**(-(dataPos["G1_MAPQ"]/10)))
 
     dataPos['jointEntropy']=((dataPos['entropyScore_g2'] \
                     +dataPos['entropyScore_g1']) \
@@ -1258,48 +1109,6 @@ def groupBySpliceSites(data):
     colNames=["orient"]
         
     data.drop(colNames,axis=1,inplace=True)
-    aggregations={
-        'reads':{
-            'groupsCount':'count',
-            'reads': lambda x: ';'.join(set(x))
-        },
-        'seq':{
-            'seq': lambda x: dict(list(x))[max(dict(list(x)), key=float)]
-        },
-        'spanR1-R2':{
-            'spanReads':lambda x: ';'.join(list(set([el for el in x if not el=='-'])))
-        },
-        'spanCount':{
-            'spanCount':'sum'
-        },
-        'count':{
-            'count':'sum'
-        },
-        'comb':{
-            'comb': lambda x: ';'.join(set(x))
-        },
-        'entropyScore_g1':{
-            'entropyScore_g1':'sum'
-        },
-        'entropyScore_g2':{
-            'entropyScore_g2':'sum'
-        },
-        'G2_AL':{
-            'G2_AL':'sum'
-        },
-        'G1_AL':{
-            'G1_AL':'sum'
-        },
-        'READ_LEN':{
-            'READ_LEN':'sum'
-        },
-        'G2_MAPQ':{
-            'G2_MAPQ':'sum'
-        },
-        'G1_MAPQ':{
-            'G1_MAPQ':'sum'
-        }
-    }
     
     dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
                                       "chr",
@@ -1316,7 +1125,20 @@ def groupBySpliceSites(data):
                                                 "READ_LEN",
                                                 "G2_MAPQ",
                                                 "G1_MAPQ",
-                                                "seq"]].agg(aggregations)).reset_index()
+                                                "seq"]].agg(groupsCount=('reads','count'),
+                                                            reads=('reads',lambda x: ';'.join(set(x))),
+                                                            seq=('seq',lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
+                                                            spanReads=('spanR1-R2',lambda x: ';'.join(list(set([el for el in x if not el=='-'])))),
+                                                            spanCount=('spanCount','sum'),
+                                                            count=('count','sum'),
+                                                            comb=('comb',lambda x: ';'.join(set(x))),
+                                                            entropyScore_g1=('entropyScore_g1','sum'),
+                                                            entropyScore_g2=('entropyScore_g2','sum'),
+                                                            G2_AL=('G2_AL','sum'),
+                                                            G1_AL=('G1_AL','sum'),
+                                                            READ_LEN=('READ_LEN','sum'),
+                                                            G2_MAPQ=('G2_MAPQ','sum'),
+                                                            G1_MAPQ=('G1_MAPQ','sum'))).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1324,42 +1146,6 @@ def groupBySpliceSitesUnpaired(data):
     colNames=["orient"]
         
     data.drop(colNames,axis=1,inplace=True)
-    aggregations={
-        'reads':{
-            'groupsCount':'count',
-            'reads': lambda x: ';'.join(set(x))
-        },
-        'seq':{
-            'seq': lambda x: dict(list(x))[max(dict(list(x)), key=float)]
-        },
-        'count':{
-            'count':'sum'
-        },
-        'comb':{
-            'comb': lambda x: ';'.join(set(x))
-        },
-        'entropyScore_g1':{
-            'entropyScore_g1':'sum'
-        },
-        'entropyScore_g2':{
-            'entropyScore_g2':'sum'
-        },
-        'G2_AL':{
-            'G2_AL':'sum'
-        },
-        'G1_AL':{
-            'G1_AL':'sum'
-        },
-        'READ_LEN':{
-            'READ_LEN':'sum'
-        },
-        'G2_MAPQ':{
-            'G2_MAPQ':'sum'
-        },
-        'G1_MAPQ':{
-            'G1_MAPQ':'sum'
-        }
-    }
     
     dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
                                       "chr",
@@ -1374,7 +1160,18 @@ def groupBySpliceSitesUnpaired(data):
                                                 "READ_LEN",
                                                 "G2_MAPQ",
                                                 "G1_MAPQ",
-                                                "seq"]].agg(aggregations)).reset_index()
+                                                "seq"]].agg(groupsCount=("reads","count"),
+                                                            reads=("reads",lambda x: ';'.join(set(x))),
+                                                            seq=("seq",lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
+                                                            count=('count','sum'),
+                                                            comb=("comb",lambda x: ';'.join(set(x))),
+                                                            entropyScore_g1=('entropyScore_g1','sum'),
+                                                            entropyScore_g2=('entropyScore_g2','sum'),
+                                                            G2_AL=('G2_AL','sum'),
+                                                            G1_AL=('G1_AL','sum'),
+                                                            READ_LEN=('READ_LEN','sum'),
+                                                            G2_MAPQ=('G2_MAPQ','sum'),
+                                                            G1_MAPQ=('G1_MAPQ','sum'))).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1420,60 +1217,20 @@ def annotate(dataBed,annPath,data):
                   8:"tRNA",
                   9:"locus"}
 
+    df = df[df["ord"].isin(list(order))].reset_index(drop=True) # remove any unknown features
     df=df.replace({'ord':order})
     df["queryPair"]=df["startQuery"].astype(str)+":"+df['endQuery'].astype(str)
 
     df[["parent","notID"]]=df["useful_info"].str.extract('ID=(.+?)\;(.*)',expand=True)
     parentDF=df.dropna(axis=0) # this shall be used for pulling information from links
 
-    df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
-    linksDF=pd.DataFrame([])
-    if len(df)>0:
-        df["link"]=df["useful_info"].str.extract('Parent=(.*)',expand=False)
-        linksDF=df.dropna(subset=["link"],axis=0)# contains all which need to be linked
+    df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.loc[x['ord'].idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
 
-    readyDF=df[~df.index.isin(linksDF.index)] # contains all which can do not need anything else done to them except extracting info
-    readyDF=readyDF.replace({'ord':reverseOrder})
-    if len(readyDF)>0:
-        readyDF["gene_name"]=readyDF["notID"].str.extract('gene_name=(.+?)\;',expand=False)
-        readyDF['hum_nearest_SS']=readyDF['ord']+":"+readyDF['gene_name']
-        readyDF.drop(['remove1',
-                      'ord',
-                      'useful_info',
-                      'remove2',
-                      'queryPair',
-                      'parent',
-                      'notID',
-                      'link',
-                      'gene_name'],inplace=True,axis=1)
-
-    # now lets work on the links
-    setLink=set(linksDF['link'])
-    parentDF=parentDF[parentDF["parent"].isin(setLink)]
-    parentDF=parentDF.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True)
-    parentDF=parentDF.replace({'ord':reverseOrder})
-    if len(parentDF)>0:
-        parentDF["gene_name"]=parentDF["notID"].str.extract('gene_name=(.+?)\;',expand=False)
-        parentDF['hum_nearest_SS']=parentDF['ord']+":"+parentDF['gene_name']
-        parentDF.drop(['remove1',
-                      'ord',
-                      'useful_info',
-                      'remove2',
-                      'queryPair',
-                      'parent',
-                      'notID',
-                      'gene_name'],inplace=True,axis=1)
-
-    finalBed=pd.DataFrame([])
-    if len(parentDF)>0 and len(readyDF)>0:
-        finalBed=pd.concat([readyDF,parentDF]).reset_index(drop=True)
-    if len(parentDF)>0 and len(readyDF)==0:
-        finalBed=parentDF.copy(deep=True)
-    if len(parentDF)==0 and len(readyDF)>0:
-        finalBed=readyDF.copy(deep=True)
+    finalBed = df.copy(deep=True)
 
     if len(finalBed)==0:
-        return
+        data['hum_nearest_SS']="-"
+        return data
 
     finalBed.drop(["startRegionPos",
                    "endRegionPos",
@@ -1496,73 +1253,6 @@ def annotate(dataBed,annPath,data):
     data1['hum_nearest_SS']="-"
 
     return pd.concat([finalDF,data1]).reset_index(drop=True)
-
-#this function should find the closest known acceptor/donor for each of the final records
-# we could also implement passing the known donor acceptor lists as parameters
-# we could also score, if required by how close the alignment is to the known donor/acceptor
-
-# should be done right before the results cleanup
-
-# also makes sense to keep G2 alignment information
-# needs to be kept along with the best sequence information in the tuple
-
-# What needs to be done:
-# this has to be done separately based on which side of the sequence the G2 is aligned
-# If aligned first half - search for donors and acceptors to the end of the hiv alignment
-# if aligned second half of the read - search for donors and acceptors to the beginning of the hiv
-
-# need to read what is meant by donor and acceptor
-def donorAcceptor(dataPos):
-    donors=[("D1b",725),
-            ("D1",742),
-            ("D1c",746),
-            ("D1a",4720),
-            ("D2",4961),
-            ("D3",5462),
-            ("D4",6043),
-            ("D5",6729),
-            ("D6",8422),
-            ("End",9713)]
-    acceptors=[("Beg",1),
-            ("A1a",4542),
-            ("A1",4912),
-            ("A2",5389),
-            ("A3",5776),
-            ("A4c",5935),
-            ("A4a",5953),
-            ("A4b",5959),
-            ("A5",5975),
-            ("A5a",5979),
-            ("A5b",5982),
-            ("A6",6602),
-            ("A6a",6654),
-            ("A7a",8334),
-            ("A7b",8340),
-            ("A7c",8344),
-            ("A7d",8362),
-            ("A7",8368),
-            ("A7e",8381),
-            ("A7f",8485),
-            ("A8d",9128),
-            ("A8a",9144),
-            ("A8c",9156),
-            ("A8",9164),
-            ("A8b",9177),
-            ("A8e",9183),
-            ("A8f",9221)]
-
-    donorsDF=pd.DataFrame(donors)
-    acceptorsDF=pd.DataFrame(acceptors)
-
-    def findClosest(val,df):
-        df['diff']=abs(df[1]-val)
-        return df.sort_values(by="diff",ascending=True).reset_index(drop=True).iloc[0][0]
-
-    dataPos.reset_index(drop=True,inplace=True)
-    dataPos["nearestDonor"]=dataPos.apply(lambda row: findClosest(row["G2"]),axis=1)
-    dataPos["nearestAcceptor"]=dataPos.apply(lambda row: findClosest(row["G2"]),axis=1)
-
-    return dataPos
 
 def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
     if not unpaired:
@@ -1632,82 +1322,6 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
                     fileName=baseName+".fastq"
                     dataPosClean=dataPosClean[dataPosClean['score']>0.9]
                     dataPosClean.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
-
-# def child(path,outDir,covRange,numReps,sequenceRef,annotationRef,threads,cont):
-#     baseDirName = path.split("/")[-1].split(".")[:-1][0]
-#     finDir = outDir+"/"+baseDirName+"/"+baseDirName
-#     if not cont==False:
-#         # If this method with the script works - consider writing the config file from here rather than passing parameters
-#         for scalefactor in xfrange(cont,covRange[1],covRange[2]):
-#             randSeed = random.sample(range(1,10000),numReps) # Need to think where to place this line
-#             for rep in range(numReps):
-#                 scriptCMD = "./rnaseq_al_pipe.sh "+path+" "+finDir+" "+str(randSeed[rep]+scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef+" "+str(threads)
-#                 os.system(scriptCMD)
-#     else:
-#         # If this method with the script works - consider writing the config file from here rather than passing parameters
-#         for scalefactor in xfrange(covRange[0],covRange[1],covRange[2]):
-#             randSeed = random.sample(range(1,10000),numReps) # Need to think where to place this line
-#             for rep in range(numReps):
-#                 scriptCMD = "./rnaseq_al_pipe.sh "+path+" "+finDir+" "+str(randSeed[rep]+scalefactor)+" "+str(rep)+" "+sequenceRef+" "+annotationRef+" "+str(threads)
-#                 os.system(scriptCMD)
-#     os.remove(finDir+".sam")
-#     os._exit(0)
-
-# # multithreaded version of the algorithm
-# def wrapperThreaded(outDir,baseName,dirPath,fileName,minLen,args):
-#     dataG2=pd.read_csv(os.path.abspath(args.input1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-#                                                                                                                     'FLAG',
-#                                                                                                                     'RNAME',
-#                                                                                                                     'POS',
-#                                                                                                                     'MAPQ',
-#                                                                                                                     'CIGAR',
-#                                                                                                                     'RNEXT',
-#                                                                                                                     'PNEXT',
-#                                                                                                                     'TLEN',
-#                                                                                                                     'SEQ',
-#                                                                                                                     'QUAL'])
-#     dataG1=pd.read_csv(os.path.abspath(args.input2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-#                                                                                                                     'FLAG',
-#                                                                                                                     'RNAME',
-#                                                                                                                     'POS',
-#                                                                                                                     'MAPQ',
-#                                                                                                                     'CIGAR',
-#                                                                                                                     'RNEXT',
-#                                                                                                                     'PNEXT',
-#                                                                                                                     'TLEN',
-#                                                                                                                     'SEQ',
-#                                                                                                                     'QUAL'])
-
-#     if (len(dataG2)==0 or len(dataG1)==0): #exit if either alignment is empty
-#         return
-    
-#     outDirPOS=outDir+"/Positions/"
-#     if not os.path.exists(os.path.abspath(outDir+"/Positions/")):
-#         os.mkdir(os.path.abspath(outDir+"/Positions/"))
-#     if not os.path.exists(os.path.abspath(outDir+"/Positions/"+baseName)):
-#         os.mkdir(os.path.abspath(outDir+"/Positions/"+baseName))
-
-#     if len(dataG2)>0 and len(dataG1)>0:
-#         # first calculate how many parts the dataFrame will have
-#         # also, should preprocess dataG2 as much as possible before parallelization
-#         # dont forget about unpaired option.
-#         extractFlagBits(dataG2)
-#         extractFlagBits(dataG1)
-
-#         childPIDS = []
-#         def parent():
-#             for dfPart in dfParts:
-#                 if len(childPIDS) >= tf[0]:
-#                         childPIDS[0].join()
-#                         childPIDS.remove(childPIDS[0])
-#                 else:
-#                     p = multiprocessing.Process(target=child, args=(dfPart,))
-#                     childPIDS.append(p)
-#                     p.start()
-
-#             while(len(childPIDS) > 0):
-#                 childPIDS[-1].join()
-#                 childPIDS.remove(childPIDS[-1])
 
 def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     def extractFlagBits(data):
@@ -1865,7 +1479,7 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         df["HIV_AL"]=df["HIV_TE"]-df["HIV_TS"]
         df["HUM_AL"]=df["HUM_TE"]-df["HUM_TS"]
         df=df[(df['HIV_AL']>minLen)&((df["HIV_LEN"]-df['HIV_AL'])<args.maxLenUnmapped)&(df['HUM_AL']>minLen)&((df["HUM_LEN"]-df['HUM_AL'])<args.maxLenUnmapped)]
-        if len(df>0):
+        if len(df)>0:
             df[['entropyScore_hiv',
                   'meanQual_hiv',
                   'entropyScore_hum',
@@ -1909,58 +1523,7 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         return df
 
     def findSupport(data,minLen,unpaired):
-        aggregations={
-            'QNAME':{
-                'count':'count',
-                'reads': lambda x: set(x)
-            },
-            'SEQ':{
-                'seq': lambda x: (max(dict(list(x)), key=float),dict(list(x))[max(dict(list(x)), key=float)])
-            },
-            'HUM_RS':{
-                'HUM_RS':'min'
-            },
-            'HUM_RE':{
-                'HUM_RE':'max'
-            },
-            'HIV_RS':{
-                'HIV_RS':'min'
-            },
-            'HIV_RE':{
-                'HIV_RE':'max'
-            },
-            'HIV_AL':{
-                'HIV_AL':'sum'
-            },
-            'HUM_AL':{
-                'HUM_AL':'sum'
-            },
-            'HUM_LEN':{
-                'HUM_LEN':'sum'
-            },
-            'HIV_LEN':{
-                'HIV_LEN':'sum'
-            },
-            'entropyScore_hiv':{
-                'entropyScore_hiv':'sum'
-            },
-            'entropyScore_hum':{
-                'entropyScore_hum':'sum'
-            },
-            'meanQual_hiv':{
-                'meanQual_hiv':'sum'
-            },
-            'meanQual_hum':{
-                'meanQual_hum':'sum'
-            },
-            'HIV_MAPQ':{
-                'HIV_MAPQ':'sum'
-            },
-            'HUM_MAPQ':{
-                'HUM_MAPQ':'sum'
-            }
-        }
-
+        
         dataPos=pd.DataFrame(data.groupby(by=["comb","HUM_ID"])[["QNAME",
                                                                 "HUM_RS",
                                                                 "HUM_RE",
@@ -1976,7 +1539,23 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
                                                                 "meanQual_hum",
                                                                 "HIV_MAPQ",
                                                                 "HUM_MAPQ",
-                                                                "SEQ"]].agg(aggregations)).reset_index()
+                                                                "SEQ"]].agg(count=('QNAME','count'),
+                                                                            reads=('QNAME', lambda x: set(x)),
+                                                                            seq=('SEQ',lambda x: (max(dict(list(x)), key=float),dict(list(x))[max(dict(list(x)), key=float)])),
+                                                                            HUM_RS=('HUM_RS','min'),
+                                                                            HUM_RE=('HUM_RE','max'),
+                                                                            HIV_RS=('HIV_RS','min'),
+                                                                            HIV_RE=('HIV_RE','max'),
+                                                                            HIV_AL=('HIV_AL','sum'),
+                                                                            HUM_AL=('HUM_AL','sum'),
+                                                                            HUM_LEN=('HUM_LEN','sum'),
+                                                                            HIV_LEN=('HIV_LEN','sum'),
+                                                                            entropyScore_hiv=('entropyScore_hiv','sum'),
+                                                                            entropyScore_hum=('entropyScore_hum','sum'),
+                                                                            meanQual_hiv=('meanQual_hiv','sum'),
+                                                                            meanQual_hum=('meanQual_hum','sum'),
+                                                                            HIV_MAPQ=('HIV_MAPQ','sum'),
+                                                                            HUM_MAPQ=('HUM_MAPQ','sum'))).reset_index()
         dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)            
         return dataPos
 
@@ -2022,13 +1601,16 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
                       8:"tRNA",
                       9:"locus"}
 
+        df = df[df["ord"].isin(order.keys())].reset_index(drop=True)
         df=df.replace({'ord':order})
         df["queryPair"]=df["startQuery"].astype(str)+":"+df['endQuery'].astype(str)
 
         df[["parent","notID"]]=df["useful_info"].str.extract('ID=(.+?)\;(.*)',expand=True)
         parentDF=df.dropna(axis=0) # this shall be used for pulling information from links
 
-        df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
+
+        df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.loc[x['ord'].idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
+        # df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
         linksDF=pd.DataFrame([])
         if len(df)>0:
             df["link"]=df["useful_info"].str.extract('Parent=(.*)',expand=False)
@@ -2052,7 +1634,8 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         # now lets work on the links
         setLink=set(linksDF['link'])
         parentDF=parentDF[parentDF["parent"].isin(setLink)]
-        parentDF=parentDF.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True)
+        parentDF=parentDF.groupby('queryPair', group_keys=False).apply(lambda x: x.loc[x['ord'].idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
+        # parentDF=parentDF.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True)
         parentDF=parentDF.replace({'ord':reverseOrder})
         if len(parentDF)>0:
             parentDF["gene_name"]=parentDF["notID"].str.extract('gene_name=(.+?)\;',expand=False)
@@ -2131,45 +1714,6 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         return data.drop(['diff1','diff2','t1','t2','t'],axis=1).reset_index(drop=True)
 
     def groupBySpliceSites(data):
-        aggregations={
-            'reads':{
-                'groupsCount':'count',
-                'reads': lambda x: ';'.join(set(x))
-            },
-            'seq':{
-                'seq': lambda x: dict(list(x))[max(dict(list(x)), key=float)]
-            },
-            'count':{
-                'count':'sum'
-            },
-            'comb':{
-                'comb': lambda x: ';'.join(set(x))
-            },
-            'entropyScore_hum':{
-                'entropyScore_hum':'sum'
-            },
-            'entropyScore_hiv':{
-                'entropyScore_hiv':'sum'
-            },
-            'HIV_AL':{
-                'HIV_AL':'sum'
-            },
-            'HUM_AL':{
-                'HUM_AL':'sum'
-            },
-            'HUM_LEN':{
-                'HUM_LEN':'sum'
-            },
-            'HIV_LEN':{
-                'HIV_LEN':'sum'
-            },
-            'HIV_MAPQ':{
-                'HIV_MAPQ':'sum'
-            },
-            'HUM_MAPQ':{
-                'HUM_MAPQ':'sum'
-            }
-        }
         
         dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
                                           "chr",
@@ -2184,7 +1728,19 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
                                                     "HIV_LEN",
                                                     "HIV_MAPQ",
                                                     "HUM_MAPQ",
-                                                    "seq"]].agg(aggregations)).reset_index()
+                                                    "seq"]].agg(groupsCount=('reads','count'),
+                                                                reads=('reads',lambda x: ';'.join(set(x))),
+                                                                seq=('seq',lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
+                                                                count=('count','sum'),
+                                                                comb=('comb',lambda x: ';'.join(set(x))),
+                                                                entropyScore_hum=('entropyScore_hum','sum'),
+                                                                entropyScore_hiv=('entropyScore_hiv','sum'),
+                                                                HIV_AL=('HIV_AL','sum'),
+                                                                HUM_AL=('HUM_AL','sum'),
+                                                                HUM_LEN=('HUM_LEN','sum'),
+                                                                HIV_LEN=('HIV_LEN','sum'),
+                                                                HIV_MAPQ=('HIV_MAPQ','sum'),
+                                                                HUM_MAPQ=('HUM_MAPQ','sum'))).reset_index()
 
         return dfg.reset_index(drop=True)
 
@@ -2224,51 +1780,12 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
                       "jointAlLen"],axis=1,inplace=True)
         dataPos=dataPos.round({'score': 4})
         return dataPos
-
-    dataHIV_R1=pd.read_csv(os.path.abspath(args.input1r1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                                        'FLAG',
-                                                                                                                        'RNAME',
-                                                                                                                        'POS',
-                                                                                                                        'MAPQ',
-                                                                                                                        'CIGAR',
-                                                                                                                        'RNEXT',
-                                                                                                                        'PNEXT',
-                                                                                                                        'TLEN',
-                                                                                                                        'SEQ',
-                                                                                                                        'QUAL'])
-    dataHum_R1=pd.read_csv(os.path.abspath(args.input2r1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                                        'FLAG',
-                                                                                                                        'RNAME',
-                                                                                                                        'POS',
-                                                                                                                        'MAPQ',
-                                                                                                                        'CIGAR',
-                                                                                                                        'RNEXT',
-                                                                                                                        'PNEXT',
-                                                                                                                        'TLEN',
-                                                                                                                        'SEQ',
-                                                                                                                        'QUAL'])
-    dataHIV_R2=pd.read_csv(os.path.abspath(args.input1r2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                                        'FLAG',
-                                                                                                                        'RNAME',
-                                                                                                                        'POS',
-                                                                                                                        'MAPQ',
-                                                                                                                        'CIGAR',
-                                                                                                                        'RNEXT',
-                                                                                                                        'PNEXT',
-                                                                                                                        'TLEN',
-                                                                                                                        'SEQ',
-                                                                                                                        'QUAL'])
-    dataHum_R2=pd.read_csv(os.path.abspath(args.input2r2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                                        'FLAG',
-                                                                                                                        'RNAME',
-                                                                                                                        'POS',
-                                                                                                                        'MAPQ',
-                                                                                                                        'CIGAR',
-                                                                                                                        'RNEXT',
-                                                                                                                        'PNEXT',
-                                                                                                                        'TLEN',
-                                                                                                                        'SEQ',
-                                                                                                                        'QUAL'])
+    
+    global sam_colnames
+    dataHIV_R1=pd.read_csv(os.path.abspath(args.input1r1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataHum_R1=pd.read_csv(os.path.abspath(args.input2r1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataHIV_R2=pd.read_csv(os.path.abspath(args.input1r2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataHum_R2=pd.read_csv(os.path.abspath(args.input2r2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
 
     if ((len(dataHIV_R1)==0 and len(dataHum_R2)==0) or (len(dataHIV_R2)==0 or len(dataHum_R1)==0)): #exit if either alignment is empty
         print("incorrect")
@@ -2298,92 +1815,16 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     dataHumR2_HIVR1=dataHumR2_HIVR1.merge(dataHIV_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
     dataHumR2_HIVR1=dataHumR2_HIVR1[dataHumR2_HIVR1["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
 
-    dataHumR1_HIVR2=dataHumR1_HIVR2[['QNAME',
-                                     'RNAME_x',
-                                     'MAPQ_x',
-                                     'QUAL_y',
-                                     'SEQ_x',
-                                     'reversedCurr_x',
-                                     'Template_start_x',
-                                     'Template_end_x',
-                                     'Reference_start_x',
-                                     'Reference_end_x',
-                                     'READ_LEN_x',
-                                     'RNAME_y',
-                                     'MAPQ_y',
-                                     'QUAL_y',
-                                     'SEQ_y',
-                                     'reversedCurr_y',
-                                     'Template_start_y',
-                                     'Template_end_y',
-                                     'Reference_start_y',
-                                     'Reference_end_y',
-                                     'READ_LEN_y']]
+    colnames = ['QNAME','RNAME_x','MAPQ_x','QUAL_x','SEQ_x','reversedCurr_x','Template_start_x','Template_end_x',
+                'Reference_start_x','Reference_end_x','READ_LEN_x','RNAME_y','MAPQ_y','QUAL_y','SEQ_y','reversedCurr_y',
+                'Template_start_y','Template_end_y','Reference_start_y','Reference_end_y','READ_LEN_y']
+    dataHumR1_HIVR2=dataHumR1_HIVR2[colnames]
+    dataHumR2_HIVR1=dataHumR2_HIVR1[colnames]
 
-    dataHumR1_HIVR2.columns=['QNAME',
-                             'HUM_ID',
-                             'HUM_MAPQ',
-                             'HUM_QUAL',
-                             'HUM_SEQ',
-                             'HUM_reversedCurr',
-                             'HUM_TS',
-                             'HUM_TE',
-                             'HUM_RS',
-                             'HUM_RE',
-                             'HUM_LEN',
-                             'HIV_ID',
-                             'HIV_MAPQ',
-                             'HIV_QUAL',
-                             'HIV_SEQ',
-                             'HIV_reversedCurr',
-                             'HIV_TS',
-                             'HIV_TE',
-                             'HIV_RS',
-                             'HIV_RE',
-                             'HIV_LEN']
-    dataHumR2_HIVR1=dataHumR2_HIVR1[['QNAME',
-                                     'RNAME_x',
-                                     'MAPQ_x',
-                                     'QUAL_x',
-                                     'SEQ_x',
-                                     'reversedCurr_x',
-                                     'Template_start_x',
-                                     'Template_end_x',
-                                     'Reference_start_x',
-                                     'Reference_end_x',
-                                     'READ_LEN_x',
-                                     'RNAME_y',
-                                     'MAPQ_y',
-                                     'QUAL_y',
-                                     'SEQ_y',
-                                     'reversedCurr_y',
-                                     'Template_start_y',
-                                     'Template_end_y',
-                                     'Reference_start_y',
-                                     'Reference_end_y',
-                                     'READ_LEN_y']]
-
-    dataHumR2_HIVR1.columns=['QNAME',
-                             'HUM_ID',
-                             'HUM_MAPQ',
-                             'HUM_QUAL',
-                             'HUM_SEQ',
-                             'HUM_reversedCurr',
-                             'HUM_TS',
-                             'HUM_TE',
-                             'HUM_RS',
-                             'HUM_RE',
-                             'HUM_LEN',
-                             'HIV_ID',
-                             'HIV_MAPQ',
-                             'HIV_QUAL',
-                             'HIV_SEQ',
-                             'HIV_reversedCurr',
-                             'HIV_TS',
-                             'HIV_TE',
-                             'HIV_RS',
-                             'HIV_RE',
-                             'HIV_LEN']
+    colnames = ['QNAME','HUM_ID','HUM_MAPQ','HUM_QUAL','HUM_SEQ','HUM_reversedCurr','HUM_TS','HUM_TE','HUM_RS','HUM_RE','HUM_LEN',
+                'HIV_ID','HIV_MAPQ','HIV_QUAL','HIV_SEQ','HIV_reversedCurr','HIV_TS','HIV_TE','HIV_RS','HIV_RE','HIV_LEN']
+    dataHumR1_HIVR2.columns=colnames
+    dataHumR2_HIVR1.columns=colnames
 
     dataHumR1_HIVR2.replace('', np.nan,inplace=True)
     dataHumR1_HIVR2.fillna(0,inplace=True)
@@ -2459,28 +1900,9 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
 
 def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
     # load data from local alignments
-    dataG2=pd.read_csv(os.path.abspath(in1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                        'FLAG',
-                                                                                                        'RNAME',
-                                                                                                        'POS',
-                                                                                                        'MAPQ',
-                                                                                                        'CIGAR',
-                                                                                                        'RNEXT',
-                                                                                                        'PNEXT',
-                                                                                                        'TLEN',
-                                                                                                        'SEQ',
-                                                                                                        'QUAL'])
-    dataG1=pd.read_csv(os.path.abspath(in2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                        'FLAG',
-                                                                                                        'RNAME',
-                                                                                                        'POS',
-                                                                                                        'MAPQ',
-                                                                                                        'CIGAR',
-                                                                                                        'RNEXT',
-                                                                                                        'PNEXT',
-                                                                                                        'TLEN',
-                                                                                                        'SEQ',
-                                                                                                        'QUAL'])
+    global sam_colnames
+    dataG2=pd.read_csv(os.path.abspath(in1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataG1=pd.read_csv(os.path.abspath(in2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
 
     if (len(dataG2)==0 or len(dataG1)==0): #exit if either alignment is empty
         return
@@ -2509,21 +1931,9 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
         # need to verify that both paired and unpaired work below.
         # i guess for paired we need to consider the case when splicing occurs on one mate, and thus we only want to remove that mate
         # but not the other mate, since that might still contain a chimeric site, provided it is not an end-to-tnd alignment
-
         if s is not None:
             if os.path.exists(os.path.abspath(s)):
-                dataSpliced=pd.read_csv(os.path.abspath(s),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=['QNAME',
-                                                                                                                       'FLAG',
-                                                                                                                       'RNAME',
-                                                                                                                       'POS',
-                                                                                                                       'MAPQ',
-                                                                                                                       'CIGAR',
-                                                                                                                       'RNEXT',
-                                                                                                                       'PNEXT',
-                                                                                                                       'TLEN',
-                                                                                                                       'SEQ',
-                                                                                                                       'QUAL'])
-                # dataSpliced=dataSpliced[dataSpliced['CIGAR'].str.contains("N")]
+                dataSpliced=pd.read_csv(os.path.abspath(s),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
                 extractFlagBits(dataSpliced)
                 dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
                 dataG1["tid"]=dataG1['QNAME']+dataG1['firstRead'].astype(str)+dataG1['lastRead'].astype(str)
@@ -2534,7 +1944,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
                 dataG2.drop(['tid'],axis=1,inplace=True)
                 dataG1.drop(['tid'],axis=1,inplace=True)
 
-                # global reportDF
                 dataLen=dataG1["SEQ"].str.len()
                 reportDF["number of reads shared between G2 and human post splicing"]=len(dataG1)
                 reportDF["read len mean shared between G2 and human post splicing"]=dataLen.mean()
@@ -2550,7 +1959,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
             dataG1=dataG1[dataG1['tid'].isin(set(dataG2['tid']))]
             dataG2.drop(['tid'],axis=1,inplace=True)
             dataG1.drop(['tid'],axis=1,inplace=True)
-            # global reportDF
             dataLen=dataG1["SEQ"].str.len()
             reportDF["number of reads shared between G2 and human post splicing"]=len(dataG1)
             reportDF["read len mean shared between G2 and human post splicing"]=dataLen.mean()
@@ -2564,7 +1972,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
             dataG1=dataG1[dataG1['tid'].isin(set(dataG2['tid']))]
             dataG2.drop(['tid'],axis=1,inplace=True)
             dataG1.drop(['tid'],axis=1,inplace=True)
-            # global reportDF
             dataLen=dataG1["SEQ"].str.len()
             reportDF["number of reads shared between G2 and human post splicing"]=len(dataG1)
             reportDF["read len mean shared between G2 and human post splicing"]=dataLen.mean()
@@ -2577,7 +1984,6 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
         dataG1=extractStartEnd(dataG1)
 
         dataG1,dataG2=filterReads(dataG1,dataG2)
-        # global reportDF
         dataLen=dataG1["SEQ"].str.len()
         reportDF["number of reads after sam flag filtering"]=len(dataG1)
         reportDF["read len mean after sam flag filtering"]=dataLen.mean()
@@ -2610,17 +2016,10 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
         dataPos=pd.DataFrame([])
         if unpaired:
             dataPos=filterOverlapCombineUnpaired(data,args)
-            # print(d[d["QNAME"]=="NB501749:128:HFHJVBGX3:2:13304:6468:2639"])
         else:
             dataPos=filterOverlapCombine(data,args)
         dataPos=dataPos[(dataPos["entropyScore_g1"]>args.minEntropy)&(dataPos["entropyScore_g2"]>args.minEntropy)]
-        # global reportDF
-        # dataLen=dataPos["SEQ"].str.len()
-        # reportDF["number of reads after minimum entropy cutoff"]=len(dataPos)
-        # reportDF["read len mean after minimum entropy cutoff"]=dataLen.mean()
-        # reportDF["read len std after minimum entropy cutoff"]=dataLen.std()
-        # reportDF["read len min after minimum entropy cutoff"]=dataLen.min()
-        # reportDF["read len max after minimum entropy cutoff"]=dataLen.max()
+
         dataPos=findSupport(dataPos,minLen,unpaired)
         if len(dataPos)>0:
             rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate)
@@ -2650,13 +2049,16 @@ def main(args):
 
         resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r1,args.input2r1,args.splicedR1,"r1")
         if not args.quiet:
+            print("report after wrapper r1")
             printReport()
 
         global reportDF
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
 
+        reportDF=pd.DataFrame([])
         resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r2,args.input2r2,args.splicedR2,"r2")
         if not args.quiet:
+            print("report after wrapper r2")
             printReport()
 
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
@@ -2821,100 +2223,3 @@ def chimFinder(argv):
 
 if __name__=="__main__":
     chimFinder(sys.argv[1:])
-
-# at the very end need to build python environment and requirements.txt
-# since the code should work with both python2 and python3 need to do this for both
-
-# implement writeReads function without grepping
-
-# What really needs to be implemented is the following function
-# The function will take as an input all weights and scoring arguments passed
-# and it will calculate the minimum overall score for the desired combination
-# unless the minimum score is specified, in which case it should override the calculation
-
-# In the end the fasta records will have to be written from the dataframe,
-# since the raw sequence data is not supplied to the application and for that matter should not be supplied
-# This should not be a priority however at the moment.
-
-# Should we consider the number of insertions/deletions/mismatches in the score calculations?
-
-# Another idea for span reads:
-# 1. Add only those that are fully hiv on one side and fully human on the other side
-# should not contain a fragmented G2 HUMan read on either side
-# it could be fragmented if it appears to indicate the same splice site
-
-# Supply human splicing annotation to hisat and do not include novel splice sites
-# use the same as the one used by the UCSC BLAT
-
-# question: when provided with known splice sites, does hisat2 still report novel ones or only align in accordance with those provided
-
-# perhaps the ITGAE gene is in the 1B6 sample, but is not detected in the annotation,
-# because we are only annotating the 3'SS. Try adding Ellas script to the output once again,
-# to see if anything can be revealed through that script
-# for now will check manually
-# the manual analysis has shown that the position is nowhere to be found in the results page
-
-# It would be much more efficient to not hold read names and sequences in the memory and to not add them to the final results
-# Instead It makes sense to output a bed file with positions
-# bedtools intersect could then be used to show the actual reads in the alignments
-# An option could be preserved to report read names and sequences as they are now
-
-# workflow for building the graph when begin developing C++ code for the software:
-# 0. Perhaps a network flow would work well for the task?
-# 1. create a disjoint graph of all reads from G2 (whichever alignment has fewer reads)
-# 2. when parsing through the second alignment, populate corresponding nodes with information
-# 3. when performing collapsing - create edges between nodes
-
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-# Could it be that the issue which manifests itself in that one alignment is a subset of another
-# like the majority of outHIV_HCV results
-# could it be that it is due to not taking into account CIGAR string deletions and insertions properly?
-# Need to check and figure this out with confidence once and for all
-# Either it is something else or it further increases sensitivity of the results/method!
-# Also try viewing alignments in IGV
-# This might help understand the interpretation of the cigar string better
-# Perhaps this will uncover what is missing from the extractStartEnd procedure
-# I really need to figure this one out!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-# Also remove all combs from comb column
-# replace them with the central number
-# verify how this approximation works
-
-# To do so, extract the final reads from the sam files in HIV_HCV experiment
-# This will yield a much smaller set of data to work with
-# Analyze the CIGAR string composition of these records
-
-#PARALLELIZATION!!!!!!!!!!!!!!!!!!!!!!!!
-# Should be very easy to achive
-# simply split the human dataframe into n chunks
-# run the rest of the analysis in parallel on each chunk
-# merge resulting dataframes together
-# sort by score
-# save
-
-# specify donors/acceptors as a command line argument
-# calculate and report the offset from the nearest donor/acceptor on G2
-
-# Perhaps would be better to read sam/bam in lines and perform all initial calculations and filtering then
-# For instance
-# Begin parsing G2 BAM/SAM (note that by using pysam we can work with both BAM and SAM files)
-# have a cascade of filters (increasing order of computational complexity:
-# if end-to-end - pass to the next read
-# if len alignment less than threshold (30bp) - pass
-# etc
-# Then begin parsing human in the same manner, this time:
-# if not in G2 set - pass
-# if end-to-end - remove from G2-set and pass
-# etc.
-# The rest of the calculations can be done afterwards
-
-# So here is the problem with the report.
-# After data is grouped the number of reads retained must be computed not as length of the dataframe, but rather the sum of counts in the dataFrame
-# additionally, sequence length must be estimated from the tuples that belong to each record
-# that is going to complicate things a bit
-
-# try adopting a sliding window approach to entropy calculation
-# calculate entropy for each kmer of size (minimum alignment length) - report highest score
-# also compute entropy of the full sequence and if higher than that of individual kmers then report full
-# this will ensure that at least part of the sequence conforms to the desired entropy
