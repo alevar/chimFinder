@@ -109,7 +109,7 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 
 	SECONDS=0
 	echo ANALYZING R1
-	./chimFinder.py -i1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R1/${sample}${baseEnd} -t 12 --minLen 20 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q #> ${outputDir}_R1/${sample}${baseEnd}.report
+	./chimFinder_old_noSpan.py -i1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R1/${sample}${baseEnd} -t 12 --minLen 20 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q #> ${outputDir}_R1/${sample}${baseEnd}.report
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
@@ -182,7 +182,7 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 
 	SECONDS=0
 	echo ANALYZING R2
-	./chimFinder.py -i1 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R2/${sample}${baseEnd} -t 12 --minLen 20 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q #> ${outputDir}_R2/${sample}${baseEnd}.report
+	./chimFinder_old_noSpan.py -i1 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hiv.bowtie.sam -i2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.bowtie.sam --spliced ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.hum.hisat.sam -o ${outputDir}_R2/${sample}${baseEnd} -t 12 --minLen 20 -a ${annotation} --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q #> ${outputDir}_R2/${sample}${baseEnd}.report
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
