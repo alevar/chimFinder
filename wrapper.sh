@@ -3,10 +3,10 @@
 inputDir=${1}
 outputDir=${2}
 genome1DB=${3}
-humanDB=${4}
+genome2DB=${4}
 genome2_annotation=${5}
 threads=${6}
-humanSplicing=${7}
+genome2Splicing=${7}
 trim_galore=${8}
 
 mkdir -p ${outputDir}_R1
@@ -125,7 +125,7 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 	hisat2 -p ${threads} \
 			--very-sensitive \
 			--end-to-end \
-			--known-splicesite-infile ${humanSplicing} \
+			--known-splicesite-infile ${genome2Splicing} \
 			--no-unal \
 			--phred33 \
 			-x ${genome2DB} \
@@ -154,7 +154,7 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 	hisat2 -p ${threads} \
 			--very-sensitive \
 			--end-to-end \
-			--known-splicesite-infile ${humanSplicing} \
+			--known-splicesite-infile ${genome2Splicing} \
 			--no-unal \
 			--phred33 \
 			-x ${genome2DB} \
@@ -187,3 +187,5 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 	SECONDS=0
+
+done;

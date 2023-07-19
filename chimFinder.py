@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-#./chimFinder.py --input1r1 ./r1/154_pos_21_S7_001.i1.bowtie.sam --input2r1 ./r1/154_pos_21_S7_001.hum.bowtie.sam --input1r2 ./r2/154_pos_21_S7_001.i1.bowtie.sam --input2r2 ./r2/154_pos_21_S7_001.hum.bowtie.sam --splicedR1 ./r1/154_pos_21_S7_001.hum.hisat.sam --splicedR2 ./r2/154_pos_21_S7_001.hum.hisat.sam -o ./res -t 12 --minLen 20 --maxLenUnmapped 30 -a ./data/hg38_p8.refseq.gff3 --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q
+#./chimFinder.py --pathogenR1 ./r1/154_pos_21_S7_001.i1.bowtie.sam --hostR1 ./r1/154_pos_21_S7_001.host.bowtie.sam --pathogenR2 ./r2/154_pos_21_S7_001.i1.bowtie.sam --hostR2 ./r2/154_pos_21_S7_001.host.bowtie.sam --splicedR1 ./r1/154_pos_21_S7_001.host.hisat.sam --splicedR2 ./r2/154_pos_21_S7_001.host.hisat.sam -o ./res -t 12 --minLen 20 --maxLenUnmapped 30 -a ./data/hg38_p8.refseq.gff3 --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q
 
 import pandas as pd
 import numpy as np
@@ -15,6 +15,8 @@ import itertools
 import argparse
 from pybedtools import BedTool
 
+
+gff3cols = ["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"]
 sam_colnames = ['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL']
 
 reportDF=pd.DataFrame([[]])
@@ -29,19 +31,19 @@ def printReport():
 # Instead just write to a report file on separate lines
 # those files can then be used to parse by the results.sh script
 
-# Find chimeric reads (even if < 31nt alignment length to hiv or hum) from full alignments
-def getFromSplits(dataG2,dataG1):
-    cleanG1=dataG1[(dataG1["paired"]==1)&(dataG1["secondaryAlignment"]==0)&(dataG1["aligned2Mates"]==0)&(dataG1["unmappedCurr"]==0)&(dataG1["unmappedMate"]==8)]
-    cleanG1_First=cleanG1[(cleanG1["firstRead"]==64)&(cleanG1["lastRead"]==0)]
-    cleanG1_Last=cleanG1[(cleanG1["firstRead"]==0)&(cleanG1["lastRead"]==128)]
+# Find chimeric reads (even if < 31nt alignment length to pathogen or host) from full alignments
+def getFromSplits(datapathogen,dataHost):
+    cleanHost=dataHost[(dataHost["paired"]==1)&(dataHost["secondaryAlignment"]==0)&(dataHost["aligned2Mates"]==0)&(dataHost["unmappedCurr"]==0)&(dataHost["unmappedMate"]==8)]
+    cleanHost_First=cleanHost[(cleanHost["firstRead"]==64)&(cleanHost["lastRead"]==0)]
+    cleanHost_Last=cleanHost[(cleanHost["firstRead"]==0)&(cleanHost["lastRead"]==128)]
 
-    cleanG2=dataG2[(dataG2["paired"]==1)&(dataG2["secondaryAlignment"]==0)&(dataG2["aligned2Mates"]==0)&(dataG2["unmappedCurr"]==0)&(dataG2["unmappedMate"]==8)]
-    cleanG2_First=cleanG2[(cleanG2["firstRead"]==64)&(cleanG2["lastRead"]==0)]
-    cleanG2_Last=cleanG2[(cleanG2["firstRead"]==0)&(cleanG2["lastRead"]==128)]
-    #find mates within paired-end reads which aligned to both hiv and hum
-    setG2_First=set(cleanG2_First["QNAME"])
-    setG1_First=set(cleanG1_First["QNAME"])
-    splitMates=setG2_First.intersection(setG1_First)
+    cleanPathogen=datapathogen[(datapathogen["paired"]==1)&(datapathogen["secondaryAlignment"]==0)&(datapathogen["aligned2Mates"]==0)&(datapathogen["unmappedCurr"]==0)&(datapathogen["unmappedMate"]==8)]
+    cleanPathogen_First=cleanPathogen[(cleanPathogen["firstRead"]==64)&(cleanPathogen["lastRead"]==0)]
+    cleanPathogen_Last=cleanPathogen[(cleanPathogen["firstRead"]==0)&(cleanPathogen["lastRead"]==128)]
+    #find mates within paired-end reads which aligned to both pathogen and host
+    setPathogen_First=set(cleanPathogen_First["QNAME"])
+    setHost_First=set(cleanHost_First["QNAME"])
+    splitMates=setPathogen_First.intersection(setHost_First)
 
 # the function below will calculate and return start:end of the alignment within template read
 def calcAlignmentStartEnd(row,reference,start):
@@ -62,43 +64,43 @@ def calcAlignmentStartEnd(row,reference,start):
     else:
         pass
 
-# mark reads that have G2 on the right side
+# mark reads that have PATHOGEN on the right side
 def leftRight(data,minLen):
-    data["G2"]=""
-    data["G2_R1"]=""
-    data["G2_R2"]=""
+    data["PATHOGEN"]=""
+    data["PATHOGEN_R1"]=""
+    data["PATHOGEN_R2"]=""
     data["sepR1"]=""
     data["sepR2"]=""
 
-    data.loc[~(data["R1_G1_ID"]==0)&~(data["R1_G2_ID"]==0)&(data["R1_G2_TS"]-data["R1_G1_TS"]>minLen)&(data["R1_G2_TE"]-data["R1_G1_TE"]>minLen),"G2_R1"]="R1:r"
-    data.loc[~(data["R1_G1_ID"]==0)&~(data["R1_G2_ID"]==0)&(data["R1_G1_TS"]-data["R1_G2_TS"]>minLen)&(data["R1_G1_TE"]-data["R1_G2_TE"]>minLen),"G2_R1"]="R1:l"
+    data.loc[~(data["R1_HOST_ID"]==0)&~(data["R1_PATHOGEN_ID"]==0)&(data["R1_PATHOGEN_TS"]-data["R1_HOST_TS"]>minLen)&(data["R1_PATHOGEN_TE"]-data["R1_HOST_TE"]>minLen),"PATHOGEN_R1"]="R1:r"
+    data.loc[~(data["R1_HOST_ID"]==0)&~(data["R1_PATHOGEN_ID"]==0)&(data["R1_HOST_TS"]-data["R1_PATHOGEN_TS"]>minLen)&(data["R1_HOST_TE"]-data["R1_PATHOGEN_TE"]>minLen),"PATHOGEN_R1"]="R1:l"
 
-    data.loc[~(data["R2_G1_ID"]==0)&~(data["R2_G2_ID"]==0)&(data["R2_G2_TS"]-data["R2_G1_TS"]>minLen)&(data["R2_G2_TE"]-data["R2_G1_TE"]>minLen),"G2_R2"]="R2:r"
-    data.loc[~(data["R2_G1_ID"]==0)&~(data["R2_G2_ID"]==0)&(data["R2_G1_TS"]-data["R2_G2_TS"]>minLen)&(data["R2_G1_TE"]-data["R2_G2_TE"]>minLen),"G2_R2"]="R2:l"
+    data.loc[~(data["R2_HOST_ID"]==0)&~(data["R2_PATHOGEN_ID"]==0)&(data["R2_PATHOGEN_TS"]-data["R2_HOST_TS"]>minLen)&(data["R2_PATHOGEN_TE"]-data["R2_HOST_TE"]>minLen),"PATHOGEN_R2"]="R2:r"
+    data.loc[~(data["R2_HOST_ID"]==0)&~(data["R2_PATHOGEN_ID"]==0)&(data["R2_HOST_TS"]-data["R2_PATHOGEN_TS"]>minLen)&(data["R2_HOST_TE"]-data["R2_PATHOGEN_TE"]>minLen),"PATHOGEN_R2"]="R2:l"
 
-    data.loc[(~(data["R1_G1_ID"].astype(str)=="0")&~(data["R2_G2_ID"].astype(str)=="0")&(data["R2_G1_ID"].astype(str)=="0")), "sepR1"]="sepR1:2"
-    data.loc[(~(data["R2_G1_ID"].astype(str)=="0")&~(data["R1_G2_ID"].astype(str)=="0")&(data["R1_G1_ID"].astype(str)=="0")), "sepR2"]="sepR2:1"
+    data.loc[(~(data["R1_HOST_ID"].astype(str)=="0")&~(data["R2_PATHOGEN_ID"].astype(str)=="0")&(data["R2_HOST_ID"].astype(str)=="0")), "sepR1"]="sepR1:2"
+    data.loc[(~(data["R2_HOST_ID"].astype(str)=="0")&~(data["R1_PATHOGEN_ID"].astype(str)=="0")&(data["R1_HOST_ID"].astype(str)=="0")), "sepR2"]="sepR2:1"
 
-    data["G2"]=data["G2_R1"]+data["G2_R2"]+data["sepR1"]+data["sepR2"]
-    data=data[data['G2'].str.len()>0]
-    return data.drop(["G2_R1","G2_R2","sepR1","sepR2"],axis=1)
+    data["PATHOGEN"]=data["PATHOGEN_R1"]+data["PATHOGEN_R2"]+data["sepR1"]+data["sepR2"]
+    data=data[data['PATHOGEN'].str.len()>0]
+    return data.drop(["PATHOGEN_R1","PATHOGEN_R2","sepR1","sepR2"],axis=1)
 
 def leftRightUnpaired(data,minLen):
-    data["G2"]=""
+    data["PATHOGEN"]=""
 
-    data.loc[~(data["G1_ID"]==0)&~(data["G2_ID"]==0)&(data["G2_TS"]-data["G1_TS"]>minLen)&(data["G2_TE"]-data["G1_TE"]>minLen),"G2"]="r"
-    data.loc[~(data["G1_ID"]==0)&~(data["G2_ID"]==0)&(data["G1_TS"]-data["G2_TS"]>minLen)&(data["G1_TE"]-data["G2_TE"]>minLen),"G2"]="l"
+    data.loc[~(data["HOST_ID"]==0)&~(data["PATHOGEN_ID"]==0)&(data["PATHOGEN_TS"]-data["HOST_TS"]>minLen)&(data["PATHOGEN_TE"]-data["HOST_TE"]>minLen),"PATHOGEN"]="r"
+    data.loc[~(data["HOST_ID"]==0)&~(data["PATHOGEN_ID"]==0)&(data["HOST_TS"]-data["PATHOGEN_TS"]>minLen)&(data["HOST_TE"]-data["PATHOGEN_TE"]>minLen),"PATHOGEN"]="l"
 
-    data=data[data['G2'].str.len()>0]
+    data=data[data['PATHOGEN'].str.len()>0]
     return data
 
 def overlap(data):
     data.reset_index(inplace=True,drop=True)
-    data["overlapR1"]=data[['R1_G1_TE','R1_G2_TE']].min(axis=1)-data[['R1_G1_TS','R1_G2_TS']].max(axis=1) #min end - max start
+    data["overlapR1"]=data[['R1_HOST_TE','R1_PATHOGEN_TE']].min(axis=1)-data[['R1_HOST_TS','R1_PATHOGEN_TS']].max(axis=1) #min end - max start
     data["gapR1"]=0
     data.loc[data['overlapR1']<0,['gapR1']]=data.loc[data['overlapR1']<0,['overlapR1']]["overlapR1"].abs()
     data.loc[data['overlapR1']<0,['overlapR1']]=0
-    data["overlapR2"]=data[['R2_G1_TE','R2_G2_TE']].min(axis=1)-data[['R2_G1_TS','R2_G2_TS']].max(axis=1)
+    data["overlapR2"]=data[['R2_HOST_TE','R2_PATHOGEN_TE']].min(axis=1)-data[['R2_HOST_TS','R2_PATHOGEN_TS']].max(axis=1)
     data["gapR2"]=0
     data.loc[data['overlapR2']<0,['gapR2']]=data.loc[data['overlapR2']<0,['overlapR2']]["overlapR2"].abs()
     data.loc[data['overlapR2']<0,['overlapR2']]=0
@@ -106,7 +108,7 @@ def overlap(data):
 
 def overlapUnpaired(data):
     data.reset_index(inplace=True,drop=True)
-    data["overlap"]=data[['G1_TE','G2_TE']].min(axis=1)-data[['G1_TS','G2_TS']].max(axis=1) #min end - max start
+    data["overlap"]=data[['HOST_TE','PATHOGEN_TE']].min(axis=1)-data[['HOST_TS','PATHOGEN_TS']].max(axis=1) #min end - max start
     data["gap"]=0
     data.loc[data['overlap']<0,['gap']]=data.loc[data['overlap']<0,['overlap']]["overlap"].abs()
     data.loc[data['overlap']<0,['overlap']]=0
@@ -154,26 +156,26 @@ def extractStartEnd(data):
     return data
 
 # filtering the reads based on the flags:
-def filterReads(dataG1,dataG2):
+def filterReads(dataHost,dataPathogen):
     #remove all reads that belong to secondary or supplementary alignments and did not have PCR duplicates
-    dataG1=dataG1[(dataG1["secondaryAlignment"]==0)&(dataG1["PCRdup"]==0)&(dataG1["suppAl"]==0)&(dataG1["noPassFilter"]==0)]
-    dataG2=dataG2[(dataG2["secondaryAlignment"]==0)&(dataG2["PCRdup"]==0)&(dataG2["suppAl"]==0)&(dataG2["noPassFilter"]==0)]
-    return dataG1, dataG2
+    dataHost=dataHost[(dataHost["secondaryAlignment"]==0)&(dataHost["PCRdup"]==0)&(dataHost["suppAl"]==0)&(dataHost["noPassFilter"]==0)]
+    dataPathogen=dataPathogen[(dataPathogen["secondaryAlignment"]==0)&(dataPathogen["PCRdup"]==0)&(dataPathogen["suppAl"]==0)&(dataPathogen["noPassFilter"]==0)]
+    return dataHost, dataPathogen
 
-def createData(data,dataG1,dataG2):
-    dataG1=dataG1[dataG1['QNAME'].isin(set(data['QNAME']))]
-    dataG1R1=pd.DataFrame([])
-    dataG1R1[["QNAME",
-                "R1_G1_TS",
-                "R1_G1_TE",
-                "R1_G1_ID",
-                "R1_G1_RS",
-                "R1_G1_RE",
+def createData(data,dataHost,dataPathogen):
+    dataHost=dataHost[dataHost['QNAME'].isin(set(data['QNAME']))]
+    dataHostR1=pd.DataFrame([])
+    dataHostR1[["QNAME",
+                "R1_HOST_TS",
+                "R1_HOST_TE",
+                "R1_HOST_ID",
+                "R1_HOST_RS",
+                "R1_HOST_RE",
                 "READ_LEN_R1",
-                "R1_G1_SEQ",
+                "R1_HOST_SEQ",
                 "QUAL_R1",
-                "R1_G1_MAPQ",
-                "R1_G1_reversedCurr"]]=dataG1[dataG1['firstRead']==64][["QNAME",
+                "R1_HOST_MAPQ",
+                "R1_HOST_reversedCurr"]]=dataHost[dataHost['firstRead']==64][["QNAME",
                                                                             "Template_start",
                                                                             "Template_end",
                                                                             "RNAME",
@@ -184,18 +186,18 @@ def createData(data,dataG1,dataG2):
                                                                             "QUAL",
                                                                             "MAPQ",
                                                                             "reversedCurr"]]
-    dataG1R2=pd.DataFrame([])
-    dataG1R2[["QNAME",
-                "R2_G1_TS",
-                "R2_G1_TE",
-                "R2_G1_ID",
-                "R2_G1_RS",
-                "R2_G1_RE",
+    dataHostR2=pd.DataFrame([])
+    dataHostR2[["QNAME",
+                "R2_HOST_TS",
+                "R2_HOST_TE",
+                "R2_HOST_ID",
+                "R2_HOST_RS",
+                "R2_HOST_RE",
                 "READ_LEN_R2",
-                "R2_G1_SEQ",
+                "R2_HOST_SEQ",
                 "QUAL_R2",
-                "R2_G1_MAPQ",
-                "R2_G1_reversedCurr"]]=dataG1[dataG1['lastRead']==128][["QNAME",
+                "R2_HOST_MAPQ",
+                "R2_HOST_reversedCurr"]]=dataHost[dataHost['lastRead']==128][["QNAME",
                                                                             "Template_start",
                                                                             "Template_end",
                                                                             "RNAME",
@@ -206,16 +208,16 @@ def createData(data,dataG1,dataG2):
                                                                             "QUAL",
                                                                             "MAPQ",
                                                                             "reversedCurr"]]
-    dataG2R1=pd.DataFrame([])
-    dataG2R1[["QNAME",
-                "R1_G2_TS",
-                "R1_G2_TE",
-                "R1_G2_ID",
-                "R1_G2_RS",
-                "R1_G2_RE",
-                "R1_G2_SEQ",
-                "R1_G2_MAPQ",
-                "R1_G2_reversedCurr"]]=dataG2[dataG2['firstRead']==64][["QNAME",
+    dataPathogenR1=pd.DataFrame([])
+    dataPathogenR1[["QNAME",
+                "R1_PATHOGEN_TS",
+                "R1_PATHOGEN_TE",
+                "R1_PATHOGEN_ID",
+                "R1_PATHOGEN_RS",
+                "R1_PATHOGEN_RE",
+                "R1_PATHOGEN_SEQ",
+                "R1_PATHOGEN_MAPQ",
+                "R1_PATHOGEN_reversedCurr"]]=dataPathogen[dataPathogen['firstRead']==64][["QNAME",
                                                                             "Template_start",
                                                                             "Template_end",
                                                                             "RNAME",
@@ -224,16 +226,16 @@ def createData(data,dataG1,dataG2):
                                                                             "SEQ",
                                                                             "MAPQ",
                                                                             "reversedCurr"]]
-    dataG2R2=pd.DataFrame([])
-    dataG2R2[["QNAME",
-                "R2_G2_TS",
-                "R2_G2_TE",
-                "R2_G2_ID",
-                "R2_G2_RS",
-                "R2_G2_RE",
-                "R2_G2_SEQ",
-                "R2_G2_MAPQ",
-                "R2_G2_reversedCurr"]]=dataG2[dataG2['lastRead']==128][["QNAME",
+    dataPathogenR2=pd.DataFrame([])
+    dataPathogenR2[["QNAME",
+                "R2_PATHOGEN_TS",
+                "R2_PATHOGEN_TE",
+                "R2_PATHOGEN_ID",
+                "R2_PATHOGEN_RS",
+                "R2_PATHOGEN_RE",
+                "R2_PATHOGEN_SEQ",
+                "R2_PATHOGEN_MAPQ",
+                "R2_PATHOGEN_reversedCurr"]]=dataPathogen[dataPathogen['lastRead']==128][["QNAME",
                                                                         "Template_start",
                                                                         "Template_end",
                                                                         "RNAME",
@@ -242,51 +244,51 @@ def createData(data,dataG1,dataG2):
                                                                         "SEQ",
                                                                         "MAPQ",
                                                                         "reversedCurr"]]
-    data=data.merge(dataG1R1,left_on='QNAME', right_on='QNAME', how='left')
-    data=data.merge(dataG1R2,left_on='QNAME', right_on='QNAME', how='left')
-    data=data.merge(dataG2R1,left_on='QNAME', right_on='QNAME', how='left')
-    data=data.merge(dataG2R2,left_on='QNAME', right_on='QNAME', how='left')
-    data[["R1_G1_ID",
-        "R2_G1_ID",
-        "R1_G2_ID",
-        "R2_G2_ID",
-        "R1_G1_MAPQ",
-        "R2_G1_MAPQ",
-        "R1_G2_MAPQ",
-        "R2_G2_MAPQ",
-        "R1_G1_reversedCurr",
-        "R2_G1_reversedCurr",
-        "R1_G2_reversedCurr",
-        "R2_G2_reversedCurr"]]=data[["R1_G1_ID",
-                                    "R2_G1_ID",
-                                    "R1_G2_ID",
-                                    "R2_G2_ID",
-                                    "R1_G1_MAPQ",
-                                    "R2_G1_MAPQ",
-                                    "R1_G2_MAPQ",
-                                    "R2_G2_MAPQ",
-                                    "R1_G1_reversedCurr",
-                                    "R2_G1_reversedCurr",
-                                    "R1_G2_reversedCurr",
-                                    "R2_G2_reversedCurr"]].fillna('',inplace=True)
+    data=data.merge(dataHostR1,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataHostR2,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataPathogenR1,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dataPathogenR2,left_on='QNAME', right_on='QNAME', how='left')
+    data[["R1_HOST_ID",
+        "R2_HOST_ID",
+        "R1_PATHOGEN_ID",
+        "R2_PATHOGEN_ID",
+        "R1_HOST_MAPQ",
+        "R2_HOST_MAPQ",
+        "R1_PATHOGEN_MAPQ",
+        "R2_PATHOGEN_MAPQ",
+        "R1_HOST_reversedCurr",
+        "R2_HOST_reversedCurr",
+        "R1_PATHOGEN_reversedCurr",
+        "R2_PATHOGEN_reversedCurr"]]=data[["R1_HOST_ID",
+                                    "R2_HOST_ID",
+                                    "R1_PATHOGEN_ID",
+                                    "R2_PATHOGEN_ID",
+                                    "R1_HOST_MAPQ",
+                                    "R2_HOST_MAPQ",
+                                    "R1_PATHOGEN_MAPQ",
+                                    "R2_PATHOGEN_MAPQ",
+                                    "R1_HOST_reversedCurr",
+                                    "R2_HOST_reversedCurr",
+                                    "R1_PATHOGEN_reversedCurr",
+                                    "R2_PATHOGEN_reversedCurr"]].fillna('',inplace=True)
     data.fillna(0,inplace=True)
     return data
 
-def createDataUnpaired(data,dataG1,dataG2):
-    dataG1=dataG1[dataG1['QNAME'].isin(set(data['QNAME']))].reset_index(drop=True)
-    dfG1=pd.DataFrame([])
-    dfG2=pd.DataFrame([])
-    dfG1[["QNAME",
-            "G1_TS",
-            "G1_TE",
-            "G1_ID",
-            "G1_RS",
-            "G1_RE",
+def createDataUnpaired(data,dataHost,dataPathogen):
+    dataHost=dataHost[dataHost['QNAME'].isin(set(data['QNAME']))].reset_index(drop=True)
+    dfHost=pd.DataFrame([])
+    dfPathogen=pd.DataFrame([])
+    dfHost[["QNAME",
+            "HOST_TS",
+            "HOST_TE",
+            "HOST_ID",
+            "HOST_RS",
+            "HOST_RE",
             "READ_LEN",
-            "G1_SEQ",
+            "HOST_SEQ",
             "QUAL",
-            "G1_MAPQ",
-            "G1_reversedCurr"]]=dataG1[["QNAME",
+            "HOST_MAPQ",
+            "HOST_reversedCurr"]]=dataHost[["QNAME",
                                             "Template_start",
                                             "Template_end",
                                             "RNAME",
@@ -297,15 +299,15 @@ def createDataUnpaired(data,dataG1,dataG2):
                                             "QUAL",
                                             "MAPQ",
                                             "reversedCurr"]]
-    dfG2[["QNAME",
-            "G2_TS",
-            "G2_TE",
-            "G2_ID",
-            "G2_RS",
-            "G2_RE",
-            "G2_SEQ",
-            "G2_MAPQ",
-            "G2_reversedCurr"]]=dataG2[["QNAME",
+    dfPathogen[["QNAME",
+            "PATHOGEN_TS",
+            "PATHOGEN_TE",
+            "PATHOGEN_ID",
+            "PATHOGEN_RS",
+            "PATHOGEN_RE",
+            "PATHOGEN_SEQ",
+            "PATHOGEN_MAPQ",
+            "PATHOGEN_reversedCurr"]]=dataPathogen[["QNAME",
                                             "Template_start",
                                             "Template_end",
                                             "RNAME",
@@ -314,19 +316,19 @@ def createDataUnpaired(data,dataG1,dataG2):
                                             "SEQ",
                                             "MAPQ",
                                             "reversedCurr"]]
-    data=data.merge(dfG1,left_on='QNAME', right_on='QNAME', how='left')
-    data=data.merge(dfG2,left_on='QNAME', right_on='QNAME', how='left')
-    data[["G1_ID",
-        "G2_ID",
-        "G1_MAPQ",
-        "G2_MAPQ",
-        "G1_reversedCurr",
-        "G2_reversedCurr"]]=data[["G1_ID",
-                                    "G2_ID",
-                                    "G1_MAPQ",
-                                    "G2_MAPQ",
-                                    "G1_reversedCurr",
-                                    "G2_reversedCurr"]].fillna(value='')
+    data=data.merge(dfHost,left_on='QNAME', right_on='QNAME', how='left')
+    data=data.merge(dfPathogen,left_on='QNAME', right_on='QNAME', how='left')
+    data[["HOST_ID",
+        "PATHOGEN_ID",
+        "HOST_MAPQ",
+        "PATHOGEN_MAPQ",
+        "HOST_reversedCurr",
+        "PATHOGEN_reversedCurr"]]=data[["HOST_ID",
+                                    "PATHOGEN_ID",
+                                    "HOST_MAPQ",
+                                    "PATHOGEN_MAPQ",
+                                    "HOST_reversedCurr",
+                                    "PATHOGEN_reversedCurr"]].fillna(value='')
     data.fillna(0,inplace=True)
     return data
 
@@ -368,43 +370,43 @@ def topologicalNormalizedEntropy(s):
 #another paper: Look at figure 2 https://www.nature.com/articles/srep19788#f2
 #more https://www.xycoon.com/normalized_entropy.htm
 
-def processAligns(seqG1,seqG2,qual,i1_g2,i2_g2,i1_g1,i2_g1,readLen,rG1,rG2):
+def processAligns(seqHost,seqPathogen,qual,i1_g2,i2_g2,i1_g1,i2_g1,readLen,rHost,rPathogen):
 
-    entropyScore_g2=0
-    entropyScore_g1=0
-    meanQual_g2=0
-    meanQual_g1=0
+    entropyScore_pathogen=0
+    entropyScore_host=0
+    meanQual_pathogen=0
+    meanQual_host=0
 
-    s_g2=""
-    if rG2==True: # if reverse complemented take into account
-        s_g2=seqG2[readLen-i2_g2:readLen-i1_g2]
+    s_pathogen=""
+    if rPathogen==True: # if reverse complemented take into account
+        s_pathogen=seqPathogen[readLen-i2_g2:readLen-i1_g2]
     else:
-        s_g2=seqG2[i1_g2:i2_g2]
-    if not len(s_g2)==0:
-        entropyScore_g2=topologicalNormalizedEntropy(s_g2)
+        s_pathogen=seqPathogen[i1_g2:i2_g2]
+    if not len(s_pathogen)==0:
+        entropyScore_pathogen=topologicalNormalizedEntropy(s_pathogen)
         q_g2=qual[i1_g2:i2_g2]
         if len(q_g2)>0:
-            meanQual_g2=sum([ord(x)-33 for x in q_g2])/len(q_g2)
+            meanQual_pathogen=sum([ord(x)-33 for x in q_g2])/len(q_g2)
         else:
-            meanQual_g2=0
+            meanQual_pathogen=0
 
-    s_g1=""
-    if rG1==True: # if reverse complemented take into account
-        s_g1=seqG1[readLen-i2_g1:readLen-i1_g1]
+    s_host=""
+    if rHost==True: # if reverse complemented take into account
+        s_host=seqHost[readLen-i2_g1:readLen-i1_g1]
     else:
-        s_g1=seqG1[i1_g1:i2_g1]
-    if not len(s_g1)==0:
-        entropyScore_g1=topologicalNormalizedEntropy(s_g1)
+        s_host=seqHost[i1_g1:i2_g1]
+    if not len(s_host)==0:
+        entropyScore_host=topologicalNormalizedEntropy(s_host)
         q_g1=qual[i1_g1:i2_g1]
         if len(q_g1)>0:
-            meanQual_g1=sum([ord(x)-33 for x in q_g1])/len(q_g1)
+            meanQual_host=sum([ord(x)-33 for x in q_g1])/len(q_g1)
         else:
-            meanQual_g1=0
+            meanQual_host=0
 
-    return pd.Series({"entropyScore_g2":entropyScore_g2,
-                        "meanQual_g2":meanQual_g2,
-                        "entropyScore_g1":entropyScore_g1,
-                        "meanQual_g1":meanQual_g1})
+    return pd.Series({"entropyScore_pathogen":entropyScore_pathogen,
+                        "meanQual_pathogen":meanQual_pathogen,
+                        "entropyScore_host":entropyScore_host,
+                        "meanQual_host":meanQual_host})
 
 
 # this function filters by overlap and flanking alignment length
@@ -412,248 +414,248 @@ def processAligns(seqG1,seqG2,qual,i1_g2,i2_g2,i1_g1,i2_g1,readLen,rG1,rG2):
 # output can be saved as .full.csv and then grouped by split position all at once
 
 # this function allows identifying best reads
-# However, since greater minLen values for G2 and G1 alignments will yield fewer reads but at higher confidence
+# However, since greater minLen values for PATHOGEN and HOST alignments will yield fewer reads but at higher confidence
 # support reads could ignore the min len requirement as long as the split position is identical
 # or perhaps the minLen requirement for the support reads should be lower
 def filterOverlapCombine(data,args):
-    dropList=["R1_G1_TS",
-              "R1_G1_TE",
-              "R1_G1_ID",
-              "R1_G1_RS",
-              "R1_G1_RE",
-              "R2_G1_TS",
-              "R2_G1_TE",
-              "R2_G1_ID",
-              "R2_G1_RS",
-              "R2_G1_RE",
-              "R1_G2_TS",
-              "R1_G2_TE",
-              "R1_G2_ID",
-              "R1_G2_RS",
-              "R1_G2_RE",
-              "R2_G2_TS",
-              "R2_G2_TE",
-              "R2_G2_ID",
-              "R2_G2_RS",
-              "R2_G2_RE",
+    dropList=["R1_HOST_TS",
+              "R1_HOST_TE",
+              "R1_HOST_ID",
+              "R1_HOST_RS",
+              "R1_HOST_RE",
+              "R2_HOST_TS",
+              "R2_HOST_TE",
+              "R2_HOST_ID",
+              "R2_HOST_RS",
+              "R2_HOST_RE",
+              "R1_PATHOGEN_TS",
+              "R1_PATHOGEN_TE",
+              "R1_PATHOGEN_ID",
+              "R1_PATHOGEN_RS",
+              "R1_PATHOGEN_RE",
+              "R2_PATHOGEN_TS",
+              "R2_PATHOGEN_TE",
+              "R2_PATHOGEN_ID",
+              "R2_PATHOGEN_RS",
+              "R2_PATHOGEN_RE",
               "overlapR1",
               "overlapR2",
               "gapR1",
               "gapR2",
-              "R1_G1_SEQ",
-              "R2_G1_SEQ",
-              "R1_G2_SEQ",
-              "R2_G2_SEQ",
+              "R1_HOST_SEQ",
+              "R2_HOST_SEQ",
+              "R1_PATHOGEN_SEQ",
+              "R2_PATHOGEN_SEQ",
               "QUAL_R1",
               "QUAL_R2",
-              "R1_G1_MAPQ",
-              "R1_G2_MAPQ",
-              "R2_G1_MAPQ",
-              "R2_G2_MAPQ",
+              "R1_HOST_MAPQ",
+              "R1_PATHOGEN_MAPQ",
+              "R2_HOST_MAPQ",
+              "R2_PATHOGEN_MAPQ",
               "READ_LEN_R1",
               "READ_LEN_R2",
-              "R1_G1_reversedCurr",
-              "R2_G1_reversedCurr",
-              "R1_G2_reversedCurr",
-              "R2_G2_reversedCurr"]
+              "R1_HOST_reversedCurr",
+              "R2_HOST_reversedCurr",
+              "R1_PATHOGEN_reversedCurr",
+              "R2_PATHOGEN_reversedCurr"]
 
     # R1 right
-    data['entropyScore_g2']=0
-    data['meanQual_g2']=0
-    data['mapQual_g2']=0
-    data['entropyScore_g1']=0
-    data['meanQual_g1']=0
-    data['mapQual_g1']=0
-    dataR1Right=data[data["G2"].str.contains("R1:r")]
-    dataR1Right=dataR1Right[~((dataR1Right["R1_G1_TS"]<dataR1Right["R1_G2_TS"])&(dataR1Right["R1_G1_TE"]>dataR1Right["R1_G2_TE"]))]
-    dataR1Right=dataR1Right[~((dataR1Right["R1_G2_TS"]<dataR1Right["R1_G1_TS"])&(dataR1Right["R1_G2_TE"]>dataR1Right["R1_G1_TE"]))]
-    dataR1Right["ins"]=dataR1Right["R1_G2_TS"]-dataR1Right["R1_G1_TE"]
-    dataR1Right["split"]=dataR1Right['R1_G1_RE'].astype(int).astype(str)+":"+dataR1Right['R1_G2_RS'].astype(int).astype(str)
-    dataR1Right['G1']=dataR1Right['R1_G1_RE'].astype(int)
-    dataR1Right["comb"]=dataR1Right.split+"@"+dataR1Right.R1_G1_ID+":"+dataR1Right.R1_G2_ID
-    dataR1Right["orient"]="R1-g1:g2"
+    data['entropyScore_pathogen']=0
+    data['meanQual_pathogen']=0
+    data['mapQual_pathogen']=0
+    data['entropyScore_host']=0
+    data['meanQual_host']=0
+    data['mapQual_host']=0
+    dataR1Right=data[data["PATHOGEN"].str.contains("R1:r")]
+    dataR1Right=dataR1Right[~((dataR1Right["R1_HOST_TS"]<dataR1Right["R1_PATHOGEN_TS"])&(dataR1Right["R1_HOST_TE"]>dataR1Right["R1_PATHOGEN_TE"]))]
+    dataR1Right=dataR1Right[~((dataR1Right["R1_PATHOGEN_TS"]<dataR1Right["R1_HOST_TS"])&(dataR1Right["R1_PATHOGEN_TE"]>dataR1Right["R1_HOST_TE"]))]
+    dataR1Right["ins"]=dataR1Right["R1_PATHOGEN_TS"]-dataR1Right["R1_HOST_TE"]
+    dataR1Right["split"]=dataR1Right['R1_HOST_RE'].astype(int).astype(str)+":"+dataR1Right['R1_PATHOGEN_RS'].astype(int).astype(str)
+    dataR1Right['HOST']=dataR1Right['R1_HOST_RE'].astype(int)
+    dataR1Right["comb"]=dataR1Right.split+"@"+dataR1Right.R1_HOST_ID+":"+dataR1Right.R1_PATHOGEN_ID
+    dataR1Right["orient"]="R1-host:pathogen"
     dataR1Right["overlap"]=dataR1Right["overlapR1"]
     dataR1Right["gap"]=dataR1Right["gapR1"]
-    dataR1Right["G1_TS"]=dataR1Right["R1_G1_TS"].astype(int)
-    dataR1Right["G1_TE"]=dataR1Right["R1_G1_TE"].astype(int)
-    dataR1Right["G1_RS"]=dataR1Right["R1_G1_RS"].astype(int)
-    dataR1Right["G1_RE"]=dataR1Right["R1_G1_RE"].astype(int)
-    dataR1Right["G2_TS"]=dataR1Right["R1_G2_TS"].astype(int)
-    dataR1Right["G2_TE"]=dataR1Right["R1_G2_TE"].astype(int)
-    dataR1Right["G2_RS"]=dataR1Right["R1_G2_RS"].astype(int)
-    dataR1Right["G2_RE"]=dataR1Right["R1_G2_RE"].astype(int)
-    dataR1Right["G1_ID"]=dataR1Right["R1_G1_ID"]
-    dataR1Right["G2_ID"]=dataR1Right["R1_G2_ID"]
-    dataR1Right["SEQ"]=dataR1Right["R1_G1_SEQ"]
-#     dataR1Right["SEQ"]=dataR1Right[dataR1Right['R1_G1_reversedCurr']==0]["R1_G1_SEQ"]
-#     dataR1Right["R_SEQ"]=dataR1Right[dataR1Right['R1_G1_reversedCurr']==16]["R1_G1_SEQ"]
-    dataR1Right["G2_MAPQ"]=dataR1Right["R1_G2_MAPQ"].astype(int)
-    dataR1Right["G1_MAPQ"]=dataR1Right["R1_G1_MAPQ"].astype(int)
-    dataR1Right["G2_AL"]=dataR1Right["G2_TE"]-dataR1Right["G2_TS"]-dataR1Right["overlap"]
-    dataR1Right["G1_AL"]=dataR1Right["G1_TE"]-dataR1Right["G1_TS"]-dataR1Right["overlap"]
-    dataR1Right=dataR1Right[(dataR1Right['G2_AL']>args.minLen)&(dataR1Right['G1_AL']>args.minLen)]
+    dataR1Right["HOST_TS"]=dataR1Right["R1_HOST_TS"].astype(int)
+    dataR1Right["HOST_TE"]=dataR1Right["R1_HOST_TE"].astype(int)
+    dataR1Right["HOST_RS"]=dataR1Right["R1_HOST_RS"].astype(int)
+    dataR1Right["HOST_RE"]=dataR1Right["R1_HOST_RE"].astype(int)
+    dataR1Right["PATHOGEN_TS"]=dataR1Right["R1_PATHOGEN_TS"].astype(int)
+    dataR1Right["PATHOGEN_TE"]=dataR1Right["R1_PATHOGEN_TE"].astype(int)
+    dataR1Right["PATHOGEN_RS"]=dataR1Right["R1_PATHOGEN_RS"].astype(int)
+    dataR1Right["PATHOGEN_RE"]=dataR1Right["R1_PATHOGEN_RE"].astype(int)
+    dataR1Right["HOST_ID"]=dataR1Right["R1_HOST_ID"]
+    dataR1Right["PATHOGEN_ID"]=dataR1Right["R1_PATHOGEN_ID"]
+    dataR1Right["SEQ"]=dataR1Right["R1_HOST_SEQ"]
+#     dataR1Right["SEQ"]=dataR1Right[dataR1Right['R1_HOST_reversedCurr']==0]["R1_HOST_SEQ"]
+#     dataR1Right["R_SEQ"]=dataR1Right[dataR1Right['R1_HOST_reversedCurr']==16]["R1_HOST_SEQ"]
+    dataR1Right["PATHOGEN_MAPQ"]=dataR1Right["R1_PATHOGEN_MAPQ"].astype(int)
+    dataR1Right["HOST_MAPQ"]=dataR1Right["R1_HOST_MAPQ"].astype(int)
+    dataR1Right["PATHOGEN_AL"]=dataR1Right["PATHOGEN_TE"]-dataR1Right["PATHOGEN_TS"]-dataR1Right["overlap"]
+    dataR1Right["HOST_AL"]=dataR1Right["HOST_TE"]-dataR1Right["HOST_TS"]-dataR1Right["overlap"]
+    dataR1Right=dataR1Right[(dataR1Right['PATHOGEN_AL']>args.minLen)&(dataR1Right['HOST_AL']>args.minLen)]
     if len(dataR1Right>0):
-        dataR1Right[['entropyScore_g2',
-                     'meanQual_g2',
-                     'entropyScore_g1',
-                     'meanQual_g1']]=dataR1Right.merge(dataR1Right.apply(lambda row: processAligns(row['R1_G1_SEQ'],
-                                                                                                    row['R1_G2_SEQ'],
+        dataR1Right[['entropyScore_pathogen',
+                     'meanQual_pathogen',
+                     'entropyScore_host',
+                     'meanQual_host']]=dataR1Right.merge(dataR1Right.apply(lambda row: processAligns(row['R1_HOST_SEQ'],
+                                                                                                    row['R1_PATHOGEN_SEQ'],
                                                                                                     row['QUAL_R1'],
-                                                                                                    int(row['G2_TS']+row['overlap']),
-                                                                                                    int(row['G2_TE']),
-                                                                                                    int(row['G1_TS']),
-                                                                                                    int(row['G1_TE']-row['overlap']),
+                                                                                                    int(row['PATHOGEN_TS']+row['overlap']),
+                                                                                                    int(row['PATHOGEN_TE']),
+                                                                                                    int(row['HOST_TS']),
+                                                                                                    int(row['HOST_TE']-row['overlap']),
                                                                                                     int(row['READ_LEN_R1']),
-                                                                                                    row["R1_G1_reversedCurr"]==16,
-                                                                                                    row["R1_G2_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_g2_y',
-                                                                                                                                                                                   'meanQual_g2_y',
-                                                                                                                                                                                   'entropyScore_g1_y',
-                                                                                                                                                                                   'meanQual_g1_y']]
+                                                                                                    row["R1_HOST_reversedCurr"]==16,
+                                                                                                    row["R1_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                                   'meanQual_host_y']]
     dataR1Right["READ_LEN"]=dataR1Right["READ_LEN_R1"]
     dataR1Right["R"]="R1"
     dataR1Right.drop(dropList,axis=1,inplace=True)
 
     # R1 left
-    dataR1Left=data[data["G2"].str.contains("R1:l")]
-    dataR1Left=dataR1Left[~((dataR1Left["R1_G1_TS"]<dataR1Left["R1_G2_TS"])&(dataR1Left["R1_G1_TE"]>dataR1Left["R1_G2_TE"]))]
-    dataR1Left=dataR1Left[~((dataR1Left["R1_G2_TS"]<dataR1Left["R1_G1_TS"])&(dataR1Left["R1_G2_TE"]>dataR1Left["R1_G1_TE"]))]
-    dataR1Left["ins"]=dataR1Left["R1_G1_TS"]-dataR1Left["R1_G2_TE"]
-    dataR1Left["split"]=dataR1Left['R1_G2_RE'].astype(int).astype(str)+":"+dataR1Left['R1_G1_RS'].astype(int).astype(str)
-    dataR1Left['G1']=dataR1Left['R1_G1_RS'].astype(int)
-    dataR1Left["comb"]=dataR1Left.split+"@"+dataR1Left.R1_G2_ID+":"+dataR1Left.R1_G1_ID
-    dataR1Left["orient"]="R1-g2:g1"
+    dataR1Left=data[data["PATHOGEN"].str.contains("R1:l")]
+    dataR1Left=dataR1Left[~((dataR1Left["R1_HOST_TS"]<dataR1Left["R1_PATHOGEN_TS"])&(dataR1Left["R1_HOST_TE"]>dataR1Left["R1_PATHOGEN_TE"]))]
+    dataR1Left=dataR1Left[~((dataR1Left["R1_PATHOGEN_TS"]<dataR1Left["R1_HOST_TS"])&(dataR1Left["R1_PATHOGEN_TE"]>dataR1Left["R1_HOST_TE"]))]
+    dataR1Left["ins"]=dataR1Left["R1_HOST_TS"]-dataR1Left["R1_PATHOGEN_TE"]
+    dataR1Left["split"]=dataR1Left['R1_PATHOGEN_RE'].astype(int).astype(str)+":"+dataR1Left['R1_HOST_RS'].astype(int).astype(str)
+    dataR1Left['HOST']=dataR1Left['R1_HOST_RS'].astype(int)
+    dataR1Left["comb"]=dataR1Left.split+"@"+dataR1Left.R1_PATHOGEN_ID+":"+dataR1Left.R1_HOST_ID
+    dataR1Left["orient"]="R1-pathogen:host"
     dataR1Left["overlap"]=dataR1Left["overlapR1"]
     dataR1Left["gap"]=dataR1Left["gapR1"]
-    dataR1Left["G1_TS"]=dataR1Left["R1_G1_TS"].astype(int)
-    dataR1Left["G1_TE"]=dataR1Left["R1_G1_TE"].astype(int)
-    dataR1Left["G1_RS"]=dataR1Left["R1_G1_RS"].astype(int)
-    dataR1Left["G1_RE"]=dataR1Left["R1_G1_RE"].astype(int)
-    dataR1Left["G2_TS"]=dataR1Left["R1_G2_TS"].astype(int)
-    dataR1Left["G2_TE"]=dataR1Left["R1_G2_TE"].astype(int)
-    dataR1Left["G2_RS"]=dataR1Left["R1_G2_RS"].astype(int)
-    dataR1Left["G2_RE"]=dataR1Left["R1_G2_RE"].astype(int)
-    dataR1Left["G1_ID"]=dataR1Left["R1_G1_ID"]
-    dataR1Left["G2_ID"]=dataR1Left["R1_G2_ID"]
-    dataR1Left["SEQ"]=dataR1Left["R1_G1_SEQ"]
-    dataR1Left["G2_MAPQ"]=dataR1Left["R1_G2_MAPQ"].astype(int)
-    dataR1Left["G1_MAPQ"]=dataR1Left["R1_G1_MAPQ"].astype(int)
-    dataR1Left["G2_AL"]=dataR1Left["G2_TE"]-dataR1Left["G2_TS"]-dataR1Left["overlap"]
-    dataR1Left["G1_AL"]=dataR1Left["G1_TE"]-dataR1Left["G1_TS"]-dataR1Left["overlap"]
-    dataR1Left=dataR1Left[(dataR1Left["G2_AL"]>args.minLen)&(dataR1Left["G1_AL"]>args.minLen)]
+    dataR1Left["HOST_TS"]=dataR1Left["R1_HOST_TS"].astype(int)
+    dataR1Left["HOST_TE"]=dataR1Left["R1_HOST_TE"].astype(int)
+    dataR1Left["HOST_RS"]=dataR1Left["R1_HOST_RS"].astype(int)
+    dataR1Left["HOST_RE"]=dataR1Left["R1_HOST_RE"].astype(int)
+    dataR1Left["PATHOGEN_TS"]=dataR1Left["R1_PATHOGEN_TS"].astype(int)
+    dataR1Left["PATHOGEN_TE"]=dataR1Left["R1_PATHOGEN_TE"].astype(int)
+    dataR1Left["PATHOGEN_RS"]=dataR1Left["R1_PATHOGEN_RS"].astype(int)
+    dataR1Left["PATHOGEN_RE"]=dataR1Left["R1_PATHOGEN_RE"].astype(int)
+    dataR1Left["HOST_ID"]=dataR1Left["R1_HOST_ID"]
+    dataR1Left["PATHOGEN_ID"]=dataR1Left["R1_PATHOGEN_ID"]
+    dataR1Left["SEQ"]=dataR1Left["R1_HOST_SEQ"]
+    dataR1Left["PATHOGEN_MAPQ"]=dataR1Left["R1_PATHOGEN_MAPQ"].astype(int)
+    dataR1Left["HOST_MAPQ"]=dataR1Left["R1_HOST_MAPQ"].astype(int)
+    dataR1Left["PATHOGEN_AL"]=dataR1Left["PATHOGEN_TE"]-dataR1Left["PATHOGEN_TS"]-dataR1Left["overlap"]
+    dataR1Left["HOST_AL"]=dataR1Left["HOST_TE"]-dataR1Left["HOST_TS"]-dataR1Left["overlap"]
+    dataR1Left=dataR1Left[(dataR1Left["PATHOGEN_AL"]>args.minLen)&(dataR1Left["HOST_AL"]>args.minLen)]
     if len(dataR1Left)>0:
-        dataR1Left[['entropyScore_g2',
-                     'meanQual_g2',
-                     'entropyScore_g1',
-                     'meanQual_g1']]=dataR1Left.merge(dataR1Left.apply(lambda row: processAligns(row['R1_G1_SEQ'],
-                                                                                                    row['R1_G2_SEQ'],
+        dataR1Left[['entropyScore_pathogen',
+                     'meanQual_pathogen',
+                     'entropyScore_host',
+                     'meanQual_host']]=dataR1Left.merge(dataR1Left.apply(lambda row: processAligns(row['R1_HOST_SEQ'],
+                                                                                                    row['R1_PATHOGEN_SEQ'],
                                                                                                     row['QUAL_R1'],
-                                                                                                    int(row['G2_TS']),
-                                                                                                    int(row['G2_TE']-row['overlap']),
-                                                                                                    int(row['G1_TS']+row['overlap']),
-                                                                                                    int(row['G1_TE']),
+                                                                                                    int(row['PATHOGEN_TS']),
+                                                                                                    int(row['PATHOGEN_TE']-row['overlap']),
+                                                                                                    int(row['HOST_TS']+row['overlap']),
+                                                                                                    int(row['HOST_TE']),
                                                                                                     int(row['READ_LEN_R1']),
-                                                                                                    row["R1_G1_reversedCurr"]==16,
-                                                                                                    row["R1_G2_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_g2_y',
-                                                                                                                                                                   'meanQual_g2_y',
-                                                                                                                                                                   'entropyScore_g1_y',
-                                                                                                                                                                   'meanQual_g1_y']]
+                                                                                                    row["R1_HOST_reversedCurr"]==16,
+                                                                                                    row["R1_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                   'meanQual_host_y']]
 
     dataR1Left["READ_LEN"]=dataR1Left["READ_LEN_R1"]
     dataR1Left["R"]="R1"
     dataR1Left.drop(dropList,axis=1,inplace=True)
 
     # R2 right
-    dataR2Right=data[data["G2"].str.contains("R2:r")]
-    dataR2Right=dataR2Right[~((dataR2Right["R2_G1_TS"]<dataR2Right["R2_G2_TS"])&(dataR2Right["R2_G1_TE"]>dataR2Right["R2_G2_TE"]))]
-    dataR2Right=dataR2Right[~((dataR2Right["R2_G2_TS"]<dataR2Right["R2_G1_TS"])&(dataR2Right["R2_G2_TE"]>dataR2Right["R2_G1_TE"]))]
-    dataR2Right["ins"]=dataR2Right["R2_G2_TS"]-dataR2Right["R2_G1_TE"]
-    dataR2Right["split"]=dataR2Right['R2_G1_RE'].astype(int).astype(str)+":"+dataR2Right['R2_G2_RS'].astype(int).astype(str)
-    dataR2Right['G1']=dataR2Right['R2_G1_RE'].astype(int)
-    dataR2Right["comb"]=dataR2Right.split+"@"+dataR2Right.R2_G1_ID+":"+dataR2Right.R2_G2_ID
-    dataR2Right["orient"]="R2-g1:g2"
+    dataR2Right=data[data["PATHOGEN"].str.contains("R2:r")]
+    dataR2Right=dataR2Right[~((dataR2Right["R2_HOST_TS"]<dataR2Right["R2_PATHOGEN_TS"])&(dataR2Right["R2_HOST_TE"]>dataR2Right["R2_PATHOGEN_TE"]))]
+    dataR2Right=dataR2Right[~((dataR2Right["R2_PATHOGEN_TS"]<dataR2Right["R2_HOST_TS"])&(dataR2Right["R2_PATHOGEN_TE"]>dataR2Right["R2_HOST_TE"]))]
+    dataR2Right["ins"]=dataR2Right["R2_PATHOGEN_TS"]-dataR2Right["R2_HOST_TE"]
+    dataR2Right["split"]=dataR2Right['R2_HOST_RE'].astype(int).astype(str)+":"+dataR2Right['R2_PATHOGEN_RS'].astype(int).astype(str)
+    dataR2Right['HOST']=dataR2Right['R2_HOST_RE'].astype(int)
+    dataR2Right["comb"]=dataR2Right.split+"@"+dataR2Right.R2_HOST_ID+":"+dataR2Right.R2_PATHOGEN_ID
+    dataR2Right["orient"]="R2-host:pathogen"
     dataR2Right["overlap"]=dataR2Right["overlapR2"]
     dataR2Right["gap"]=dataR2Right["gapR2"]
-    dataR2Right["G1_TS"]=dataR2Right["R2_G1_TS"].astype(int)
-    dataR2Right["G1_TE"]=dataR2Right["R2_G1_TE"].astype(int)
-    dataR2Right["G1_RS"]=dataR2Right["R2_G1_RS"].astype(int)
-    dataR2Right["G1_RE"]=dataR2Right["R2_G1_RE"].astype(int)
-    dataR2Right["G2_TS"]=dataR2Right["R2_G2_TS"].astype(int)
-    dataR2Right["G2_TE"]=dataR2Right["R2_G2_TE"].astype(int)
-    dataR2Right["G2_RS"]=dataR2Right["R2_G2_RS"].astype(int)
-    dataR2Right["G2_RE"]=dataR2Right["R2_G2_RE"].astype(int)
-    dataR2Right["G1_ID"]=dataR2Right["R2_G1_ID"]
-    dataR2Right["G2_ID"]=dataR2Right["R2_G2_ID"]
-    dataR2Right["SEQ"]=dataR2Right["R2_G1_SEQ"]
-    dataR2Right["G2_MAPQ"]=dataR2Right["R2_G2_MAPQ"].astype(int)
-    dataR2Right["G1_MAPQ"]=dataR2Right["R2_G1_MAPQ"].astype(int)
-    dataR2Right["G2_AL"]=dataR2Right["G2_TE"]-dataR2Right["G2_TS"]-dataR2Right["overlap"]
-    dataR2Right["G1_AL"]=dataR2Right["G1_TE"]-dataR2Right["G1_TS"]-dataR2Right["overlap"]
-    dataR2Right=dataR2Right[(dataR2Right["G2_AL"]>args.minLen)&(dataR2Right["G1_AL"]>args.minLen)]
+    dataR2Right["HOST_TS"]=dataR2Right["R2_HOST_TS"].astype(int)
+    dataR2Right["HOST_TE"]=dataR2Right["R2_HOST_TE"].astype(int)
+    dataR2Right["HOST_RS"]=dataR2Right["R2_HOST_RS"].astype(int)
+    dataR2Right["HOST_RE"]=dataR2Right["R2_HOST_RE"].astype(int)
+    dataR2Right["PATHOGEN_TS"]=dataR2Right["R2_PATHOGEN_TS"].astype(int)
+    dataR2Right["PATHOGEN_TE"]=dataR2Right["R2_PATHOGEN_TE"].astype(int)
+    dataR2Right["PATHOGEN_RS"]=dataR2Right["R2_PATHOGEN_RS"].astype(int)
+    dataR2Right["PATHOGEN_RE"]=dataR2Right["R2_PATHOGEN_RE"].astype(int)
+    dataR2Right["HOST_ID"]=dataR2Right["R2_HOST_ID"]
+    dataR2Right["PATHOGEN_ID"]=dataR2Right["R2_PATHOGEN_ID"]
+    dataR2Right["SEQ"]=dataR2Right["R2_HOST_SEQ"]
+    dataR2Right["PATHOGEN_MAPQ"]=dataR2Right["R2_PATHOGEN_MAPQ"].astype(int)
+    dataR2Right["HOST_MAPQ"]=dataR2Right["R2_HOST_MAPQ"].astype(int)
+    dataR2Right["PATHOGEN_AL"]=dataR2Right["PATHOGEN_TE"]-dataR2Right["PATHOGEN_TS"]-dataR2Right["overlap"]
+    dataR2Right["HOST_AL"]=dataR2Right["HOST_TE"]-dataR2Right["HOST_TS"]-dataR2Right["overlap"]
+    dataR2Right=dataR2Right[(dataR2Right["PATHOGEN_AL"]>args.minLen)&(dataR2Right["HOST_AL"]>args.minLen)]
     if len(dataR2Right)>0:
-        dataR2Right[['entropyScore_g2',
-                     'meanQual_g2',
-                     'entropyScore_g1',
-                     'meanQual_g1']]=dataR2Right.merge(dataR2Right.apply(lambda row: processAligns(row['R2_G1_SEQ'],
-                                                                                                    row['R2_G2_SEQ'],
+        dataR2Right[['entropyScore_pathogen',
+                     'meanQual_pathogen',
+                     'entropyScore_host',
+                     'meanQual_host']]=dataR2Right.merge(dataR2Right.apply(lambda row: processAligns(row['R2_HOST_SEQ'],
+                                                                                                    row['R2_PATHOGEN_SEQ'],
                                                                                                     row['QUAL_R2'],
-                                                                                                    int(row['G2_TS']+row['overlap']),
-                                                                                                    int(row['G2_TE']),
-                                                                                                    int(row['G1_TS']),
-                                                                                                    int(row['G1_TE']-row['overlap']),
+                                                                                                    int(row['PATHOGEN_TS']+row['overlap']),
+                                                                                                    int(row['PATHOGEN_TE']),
+                                                                                                    int(row['HOST_TS']),
+                                                                                                    int(row['HOST_TE']-row['overlap']),
                                                                                                     int(row['READ_LEN_R2']),
-                                                                                                    row["R2_G1_reversedCurr"]==16,
-                                                                                                    row["R2_G2_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_g2_y',
-                                                                                                                                                                                   'meanQual_g2_y',
-                                                                                                                                                                                   'entropyScore_g1_y',
-                                                                                                                                                                                   'meanQual_g1_y']]
+                                                                                                    row["R2_HOST_reversedCurr"]==16,
+                                                                                                    row["R2_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                                   'meanQual_host_y']]
     dataR2Right["READ_LEN"]=dataR2Right["READ_LEN_R2"]
     dataR2Right["R"]="R2"
     dataR2Right.drop(dropList,axis=1,inplace=True)
 
     # R2 left
-    dataR2Left=data[data["G2"].str.contains("R2:l")]
-    dataR2Left=dataR2Left[~((dataR2Left["R2_G1_TS"]<dataR2Left["R2_G2_TS"])&(dataR2Left["R2_G1_TE"]>dataR2Left["R2_G2_TE"]))]
-    dataR2Left=dataR2Left[~((dataR2Left["R2_G2_TS"]<dataR2Left["R2_G1_TS"])&(dataR2Left["R2_G2_TE"]>dataR2Left["R2_G1_TE"]))]
-    dataR2Left["ins"]=dataR2Left["R2_G1_TS"]-dataR2Left["R2_G2_TE"]
-    dataR2Left["split"]=dataR2Left['R2_G2_RE'].astype(int).astype(str)+":"+dataR2Left['R2_G1_RS'].astype(int).astype(str)
-    dataR2Left['G1']=dataR2Left['R2_G1_RS'].astype(int)
-    dataR2Left["comb"]=dataR2Left.split+"@"+dataR2Left.R2_G2_ID+":"+dataR2Left.R2_G1_ID
-    dataR2Left["orient"]="R2-g2:g1"
+    dataR2Left=data[data["PATHOGEN"].str.contains("R2:l")]
+    dataR2Left=dataR2Left[~((dataR2Left["R2_HOST_TS"]<dataR2Left["R2_PATHOGEN_TS"])&(dataR2Left["R2_HOST_TE"]>dataR2Left["R2_PATHOGEN_TE"]))]
+    dataR2Left=dataR2Left[~((dataR2Left["R2_PATHOGEN_TS"]<dataR2Left["R2_HOST_TS"])&(dataR2Left["R2_PATHOGEN_TE"]>dataR2Left["R2_HOST_TE"]))]
+    dataR2Left["ins"]=dataR2Left["R2_HOST_TS"]-dataR2Left["R2_PATHOGEN_TE"]
+    dataR2Left["split"]=dataR2Left['R2_PATHOGEN_RE'].astype(int).astype(str)+":"+dataR2Left['R2_HOST_RS'].astype(int).astype(str)
+    dataR2Left['HOST']=dataR2Left['R2_HOST_RS'].astype(int)
+    dataR2Left["comb"]=dataR2Left.split+"@"+dataR2Left.R2_PATHOGEN_ID+":"+dataR2Left.R2_HOST_ID
+    dataR2Left["orient"]="R2-pathogen:host"
     dataR2Left["overlap"]=dataR2Left["overlapR2"]
     dataR2Left["gap"]=dataR2Left["gapR2"]
-    dataR2Left["G1_TS"]=dataR2Left["R2_G1_TS"].astype(int)
-    dataR2Left["G1_TE"]=dataR2Left["R2_G1_TE"].astype(int)
-    dataR2Left["G1_RS"]=dataR2Left["R2_G1_RS"].astype(int)
-    dataR2Left["G1_RE"]=dataR2Left["R2_G1_RE"].astype(int)
-    dataR2Left["G2_TS"]=dataR2Left["R2_G2_TS"].astype(int)
-    dataR2Left["G2_TE"]=dataR2Left["R2_G2_TE"].astype(int)
-    dataR2Left["G2_RS"]=dataR2Left["R2_G2_RS"].astype(int)
-    dataR2Left["G2_RE"]=dataR2Left["R2_G2_RE"].astype(int)
-    dataR2Left["G1_ID"]=dataR2Left["R2_G1_ID"]
-    dataR2Left["G2_ID"]=dataR2Left["R2_G2_ID"]
-    dataR2Left["SEQ"]=dataR2Left["R2_G1_SEQ"]
-    dataR2Left["G2_MAPQ"]=dataR2Left["R2_G2_MAPQ"].astype(int)
-    dataR2Left["G1_MAPQ"]=dataR2Left["R2_G1_MAPQ"].astype(int)
-    dataR2Left["G2_AL"]=dataR2Left["G2_TE"]-dataR2Left["G2_TS"]-dataR2Left["overlap"]
-    dataR2Left["G1_AL"]=dataR2Left["G1_TE"]-dataR2Left["G1_TS"]-dataR2Left["overlap"]
-    dataR2Left=dataR2Left[(dataR2Left["G2_AL"]>args.minLen)&(dataR2Left["G1_AL"]>args.minLen)]
+    dataR2Left["HOST_TS"]=dataR2Left["R2_HOST_TS"].astype(int)
+    dataR2Left["HOST_TE"]=dataR2Left["R2_HOST_TE"].astype(int)
+    dataR2Left["HOST_RS"]=dataR2Left["R2_HOST_RS"].astype(int)
+    dataR2Left["HOST_RE"]=dataR2Left["R2_HOST_RE"].astype(int)
+    dataR2Left["PATHOGEN_TS"]=dataR2Left["R2_PATHOGEN_TS"].astype(int)
+    dataR2Left["PATHOGEN_TE"]=dataR2Left["R2_PATHOGEN_TE"].astype(int)
+    dataR2Left["PATHOGEN_RS"]=dataR2Left["R2_PATHOGEN_RS"].astype(int)
+    dataR2Left["PATHOGEN_RE"]=dataR2Left["R2_PATHOGEN_RE"].astype(int)
+    dataR2Left["HOST_ID"]=dataR2Left["R2_HOST_ID"]
+    dataR2Left["PATHOGEN_ID"]=dataR2Left["R2_PATHOGEN_ID"]
+    dataR2Left["SEQ"]=dataR2Left["R2_HOST_SEQ"]
+    dataR2Left["PATHOGEN_MAPQ"]=dataR2Left["R2_PATHOGEN_MAPQ"].astype(int)
+    dataR2Left["HOST_MAPQ"]=dataR2Left["R2_HOST_MAPQ"].astype(int)
+    dataR2Left["PATHOGEN_AL"]=dataR2Left["PATHOGEN_TE"]-dataR2Left["PATHOGEN_TS"]-dataR2Left["overlap"]
+    dataR2Left["HOST_AL"]=dataR2Left["HOST_TE"]-dataR2Left["HOST_TS"]-dataR2Left["overlap"]
+    dataR2Left=dataR2Left[(dataR2Left["PATHOGEN_AL"]>args.minLen)&(dataR2Left["HOST_AL"]>args.minLen)]
     if len(dataR2Left)>0:
-        dataR2Left[['entropyScore_g2',
-                     'meanQual_g2',
-                     'entropyScore_g1',
-                     'meanQual_g1']]=dataR2Left.merge(dataR2Left.apply(lambda row: processAligns(row['R2_G1_SEQ'],
-                                                                                                    row['R2_G2_SEQ'],
+        dataR2Left[['entropyScore_pathogen',
+                     'meanQual_pathogen',
+                     'entropyScore_host',
+                     'meanQual_host']]=dataR2Left.merge(dataR2Left.apply(lambda row: processAligns(row['R2_HOST_SEQ'],
+                                                                                                    row['R2_PATHOGEN_SEQ'],
                                                                                                     row['QUAL_R2'],
-                                                                                                    int(row['G2_TS']),
-                                                                                                    int(row['G2_TE']-row['overlap']),
-                                                                                                    int(row['G1_TS']+row['overlap']),
-                                                                                                    int(row['G1_TE']),
+                                                                                                    int(row['PATHOGEN_TS']),
+                                                                                                    int(row['PATHOGEN_TE']-row['overlap']),
+                                                                                                    int(row['HOST_TS']+row['overlap']),
+                                                                                                    int(row['HOST_TE']),
                                                                                                     int(row['READ_LEN_R2']),
-                                                                                                    row["R2_G1_reversedCurr"]==16,
-                                                                                                    row["R2_G2_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_g2_y',
-                                                                                                                                                                   'meanQual_g2_y',
-                                                                                                                                                                   'entropyScore_g1_y',
-                                                                                                                                                                   'meanQual_g1_y']]
+                                                                                                    row["R2_HOST_reversedCurr"]==16,
+                                                                                                    row["R2_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_host_y',
+                                                                                                                                                                   'meanQual_host_y',
+                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                   'meanQual_host_y']]
 
     
     dataR2Left["READ_LEN"]=dataR2Left["READ_LEN_R2"]
@@ -689,14 +691,14 @@ def filterOverlapCombine(data,args):
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
 
-    df["G2_AL_score"]=((df['G2_AL']-k)/((ssAl+(df['G2_AL']-k)**2.0)**0.5)+1.0)/2.0
-    df["G1_AL_score"]=((df['G1_AL']-k)/((ssAl+(df['G1_AL']-k)**2.0)**0.5)+1.0)/2.0
+    df["PATHOGEN_AL_score"]=((df['PATHOGEN_AL']-k)/((ssAl+(df['PATHOGEN_AL']-k)**2.0)**0.5)+1.0)/2.0
+    df["HOST_AL_score"]=((df['HOST_AL']-k)/((ssAl+(df['HOST_AL']-k)**2.0)**0.5)+1.0)/2.0
 
-    df['jointEntropy']=((df['entropyScore_g2'] \
-                    +df['entropyScore_g1']) \
+    df['jointEntropy']=((df['entropyScore_pathogen'] \
+                    +df['entropyScore_host']) \
                     /(2))
-    df['jointAlLen']=((df['G1_AL_score'] \
-                    +df['G2_AL_score']) \
+    df['jointAlLen']=((df['HOST_AL_score'] \
+                    +df['PATHOGEN_AL_score']) \
                     /(2))
     df["scorePrelim"]=(df['jointEntropy'] \
                     *df['jointAlLen'])
@@ -705,7 +707,7 @@ def filterOverlapCombine(data,args):
                   "jointAlLen"],axis=1,inplace=True)
     df=df.round({'scorePrelim': 4})
     df=df[df["scorePrelim"]>=args.score]
-    df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.G1,df.G2,df.overlap,df.gap))))
+    df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.HOST,df.PATHOGEN,df.overlap,df.gap))))
 
     # global reportDF
     dataLen=df["SEQ"].str.len()
@@ -719,98 +721,98 @@ def filterOverlapCombine(data,args):
 
 def filterOverlapCombineUnpaired(data,args):
     #right
-    data['entropyScore_g2']=0
-    data['meanQual_g2']=0
-    data['mapQual_g2']=0
-    data['entropyScore_g1']=0
-    data['meanQual_g1']=0
-    data['mapQual_g1']=0
-    dataRight=data[data["G2"].str.contains("r")]
-    dataRight=dataRight[~((dataRight["G1_TS"]<dataRight["G2_TS"])&(dataRight["G1_TE"]>dataRight["G2_TE"]))]
-    dataRight=dataRight[~((dataRight["G2_TS"]<dataRight["G1_TS"])&(dataRight["G2_TE"]>dataRight["G1_TE"]))]
-    dataRight["ins"]=dataRight["G2_TS"]-dataRight["G1_TE"]
-    dataRight["split"]=dataRight['G1_RE'].astype(int).astype(str)+":"+dataRight['G2_RS'].astype(int).astype(str)
-    dataRight['G1']=dataRight['G1_RE'].astype(int)
-    dataRight["comb"]=dataRight.split+"@"+dataRight.G1_ID+":"+dataRight.G2_ID
-    dataRight["orient"]="g1:g2"
+    data['entropyScore_pathogen']=0
+    data['meanQual_pathogen']=0
+    data['mapQual_pathogen']=0
+    data['entropyScore_host']=0
+    data['meanQual_host']=0
+    data['mapQual_host']=0
+    dataRight=data[data["PATHOGEN"].str.contains("r")]
+    dataRight=dataRight[~((dataRight["HOST_TS"]<dataRight["PATHOGEN_TS"])&(dataRight["HOST_TE"]>dataRight["PATHOGEN_TE"]))]
+    dataRight=dataRight[~((dataRight["PATHOGEN_TS"]<dataRight["HOST_TS"])&(dataRight["PATHOGEN_TE"]>dataRight["HOST_TE"]))]
+    dataRight["ins"]=dataRight["PATHOGEN_TS"]-dataRight["HOST_TE"]
+    dataRight["split"]=dataRight['HOST_RE'].astype(int).astype(str)+":"+dataRight['PATHOGEN_RS'].astype(int).astype(str)
+    dataRight['HOST']=dataRight['HOST_RE'].astype(int)
+    dataRight["comb"]=dataRight.split+"@"+dataRight.HOST_ID+":"+dataRight.PATHOGEN_ID
+    dataRight["orient"]="host:pathogen"
     dataRight["overlap"]=dataRight["overlap"]
     dataRight["gap"]=dataRight["gap"]
-    dataRight["G1_TS"]=dataRight["G1_TS"].astype(int)
-    dataRight["G1_TE"]=dataRight["G1_TE"].astype(int)
-    dataRight["G1_RS"]=dataRight["G1_RS"].astype(int)
-    dataRight["G1_RE"]=dataRight["G1_RE"].astype(int)
-    dataRight["G2_TS"]=dataRight["G2_TS"].astype(int)
-    dataRight["G2_TE"]=dataRight["G2_TE"].astype(int)
-    dataRight["G2_RS"]=dataRight["G2_RS"].astype(int)
-    dataRight["G2_RE"]=dataRight["G2_RE"].astype(int)
-    dataRight["G2_MAPQ"]=dataRight["G2_MAPQ"].astype(int)
-    dataRight["G1_MAPQ"]=dataRight["G1_MAPQ"].astype(int)
-    dataRight["SEQ"]=dataRight["G1_SEQ"]
-    dataRight["G2_AL"]=dataRight["G2_TE"]-dataRight["G2_TS"]-dataRight["overlap"]
-    dataRight["G1_AL"]=dataRight["G1_TE"]-dataRight["G1_TS"]-dataRight["overlap"]
-    dataRight=dataRight[(dataRight['G2_AL']>args.minLen)&(dataRight['G1_AL']>args.minLen)]
+    dataRight["HOST_TS"]=dataRight["HOST_TS"].astype(int)
+    dataRight["HOST_TE"]=dataRight["HOST_TE"].astype(int)
+    dataRight["HOST_RS"]=dataRight["HOST_RS"].astype(int)
+    dataRight["HOST_RE"]=dataRight["HOST_RE"].astype(int)
+    dataRight["PATHOGEN_TS"]=dataRight["PATHOGEN_TS"].astype(int)
+    dataRight["PATHOGEN_TE"]=dataRight["PATHOGEN_TE"].astype(int)
+    dataRight["PATHOGEN_RS"]=dataRight["PATHOGEN_RS"].astype(int)
+    dataRight["PATHOGEN_RE"]=dataRight["PATHOGEN_RE"].astype(int)
+    dataRight["PATHOGEN_MAPQ"]=dataRight["PATHOGEN_MAPQ"].astype(int)
+    dataRight["HOST_MAPQ"]=dataRight["HOST_MAPQ"].astype(int)
+    dataRight["SEQ"]=dataRight["HOST_SEQ"]
+    dataRight["PATHOGEN_AL"]=dataRight["PATHOGEN_TE"]-dataRight["PATHOGEN_TS"]-dataRight["overlap"]
+    dataRight["HOST_AL"]=dataRight["HOST_TE"]-dataRight["HOST_TS"]-dataRight["overlap"]
+    dataRight=dataRight[(dataRight['PATHOGEN_AL']>args.minLen)&(dataRight['HOST_AL']>args.minLen)]
     if len(dataRight)>0:
-        dataRight[['entropyScore_g2',
-                     'meanQual_g2',
-                     'entropyScore_g1',
-                     'meanQual_g1']]=dataRight.merge(dataRight.apply(lambda row: processAligns(row['G1_SEQ'],
-                                                                                                    row['G2_SEQ'],
+        dataRight[['entropyScore_pathogen',
+                     'meanQual_pathogen',
+                     'entropyScore_host',
+                     'meanQual_host']]=dataRight.merge(dataRight.apply(lambda row: processAligns(row['HOST_SEQ'],
+                                                                                                    row['PATHOGEN_SEQ'],
                                                                                                     row['QUAL'],
-                                                                                                    int(row['G2_TS']+row['overlap']),
-                                                                                                    int(row['G2_TE']),
-                                                                                                    int(row['G1_TS']),
-                                                                                                    int(row['G1_TE']-row['overlap']),
+                                                                                                    int(row['PATHOGEN_TS']+row['overlap']),
+                                                                                                    int(row['PATHOGEN_TE']),
+                                                                                                    int(row['HOST_TS']),
+                                                                                                    int(row['HOST_TE']-row['overlap']),
                                                                                                     int(row['READ_LEN']),
-                                                                                                    row["G1_reversedCurr"]==16,
-                                                                                                    row["G2_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_g2_y',
-                                                                                                                                                                                   'meanQual_g2_y',
-                                                                                                                                                                                   'entropyScore_g1_y',
-                                                                                                                                                                                   'meanQual_g1_y']]
+                                                                                                    row["HOST_reversedCurr"]==16,
+                                                                                                    row["PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                                   'meanQual_host_y']]
     dataRight["READ_LEN"]=dataRight["READ_LEN"]
     dataRight["R"]=0
 
     # left
-    dataLeft=data[data["G2"].str.contains("l")]
-    dataLeft=dataLeft[~((dataLeft["G1_TS"]<dataLeft["G2_TS"])&(dataLeft["G1_TE"]>dataLeft["G2_TE"]))]
-    dataLeft=dataLeft[~((dataLeft["G2_TS"]<dataLeft["G1_TS"])&(dataLeft["G2_TE"]>dataLeft["G1_TE"]))]
-    dataLeft["ins"]=dataLeft["G1_TS"]-dataLeft["G2_TE"]
-    dataLeft["split"]=dataLeft['G2_RE'].astype(int).astype(str)+":"+dataLeft['G1_RS'].astype(int).astype(str)
-    dataLeft['G1']=dataLeft['G1_RS'].astype(int)
-    dataLeft["comb"]=dataLeft.split+"@"+dataLeft.G2_ID+":"+dataLeft.G1_ID
-    dataLeft["orient"]="g2:g1"
+    dataLeft=data[data["PATHOGEN"].str.contains("l")]
+    dataLeft=dataLeft[~((dataLeft["HOST_TS"]<dataLeft["PATHOGEN_TS"])&(dataLeft["HOST_TE"]>dataLeft["PATHOGEN_TE"]))]
+    dataLeft=dataLeft[~((dataLeft["PATHOGEN_TS"]<dataLeft["HOST_TS"])&(dataLeft["PATHOGEN_TE"]>dataLeft["HOST_TE"]))]
+    dataLeft["ins"]=dataLeft["HOST_TS"]-dataLeft["PATHOGEN_TE"]
+    dataLeft["split"]=dataLeft['PATHOGEN_RE'].astype(int).astype(str)+":"+dataLeft['HOST_RS'].astype(int).astype(str)
+    dataLeft['HOST']=dataLeft['HOST_RS'].astype(int)
+    dataLeft["comb"]=dataLeft.split+"@"+dataLeft.PATHOGEN_ID+":"+dataLeft.HOST_ID
+    dataLeft["orient"]="pathogen:host"
     dataLeft["overlap"]=dataLeft["overlap"]
     dataLeft["gap"]=dataLeft["gap"]
-    dataLeft["G1_TS"]=dataLeft["G1_TS"].astype(int)
-    dataLeft["G1_TE"]=dataLeft["G1_TE"].astype(int)
-    dataLeft["G1_RS"]=dataLeft["G1_RS"].astype(int)
-    dataLeft["G1_RE"]=dataLeft["G1_RE"].astype(int)
-    dataLeft["G2_TS"]=dataLeft["G2_TS"].astype(int)
-    dataLeft["G2_TE"]=dataLeft["G2_TE"].astype(int)
-    dataLeft["G2_RS"]=dataLeft["G2_RS"].astype(int)
-    dataLeft["G2_RE"]=dataLeft["G2_RE"].astype(int)
-    dataLeft["G2_MAPQ"]=dataLeft["G2_MAPQ"].astype(int)
-    dataLeft["G1_MAPQ"]=dataLeft["G1_MAPQ"].astype(int)
-    dataLeft["SEQ"]=dataLeft["G1_SEQ"]
-    dataLeft["G2_AL"]=dataLeft["G2_TE"]-dataLeft["G2_TS"]-dataLeft["overlap"]
-    dataLeft["G1_AL"]=dataLeft["G1_TE"]-dataLeft["G1_TS"]-dataLeft["overlap"]
-    dataLeft=dataLeft[(dataLeft["G2_AL"]>args.minLen)&(dataLeft["G1_AL"]>args.minLen)]
+    dataLeft["HOST_TS"]=dataLeft["HOST_TS"].astype(int)
+    dataLeft["HOST_TE"]=dataLeft["HOST_TE"].astype(int)
+    dataLeft["HOST_RS"]=dataLeft["HOST_RS"].astype(int)
+    dataLeft["HOST_RE"]=dataLeft["HOST_RE"].astype(int)
+    dataLeft["PATHOGEN_TS"]=dataLeft["PATHOGEN_TS"].astype(int)
+    dataLeft["PATHOGEN_TE"]=dataLeft["PATHOGEN_TE"].astype(int)
+    dataLeft["PATHOGEN_RS"]=dataLeft["PATHOGEN_RS"].astype(int)
+    dataLeft["PATHOGEN_RE"]=dataLeft["PATHOGEN_RE"].astype(int)
+    dataLeft["PATHOGEN_MAPQ"]=dataLeft["PATHOGEN_MAPQ"].astype(int)
+    dataLeft["HOST_MAPQ"]=dataLeft["HOST_MAPQ"].astype(int)
+    dataLeft["SEQ"]=dataLeft["HOST_SEQ"]
+    dataLeft["PATHOGEN_AL"]=dataLeft["PATHOGEN_TE"]-dataLeft["PATHOGEN_TS"]-dataLeft["overlap"]
+    dataLeft["HOST_AL"]=dataLeft["HOST_TE"]-dataLeft["HOST_TS"]-dataLeft["overlap"]
+    dataLeft=dataLeft[(dataLeft["PATHOGEN_AL"]>args.minLen)&(dataLeft["HOST_AL"]>args.minLen)]
     if len(dataLeft)>0:
-        dataLeft[['entropyScore_g2',
-                     'meanQual_g2',
-                     'entropyScore_g1',
-                     'meanQual_g1']]=dataLeft.merge(dataLeft.apply(lambda row: processAligns(row['G1_SEQ'],
-                                                                                            row['G2_SEQ'],
+        dataLeft[['entropyScore_pathogen',
+                     'meanQual_pathogen',
+                     'entropyScore_host',
+                     'meanQual_host']]=dataLeft.merge(dataLeft.apply(lambda row: processAligns(row['HOST_SEQ'],
+                                                                                            row['PATHOGEN_SEQ'],
                                                                                             row['QUAL'],
-                                                                                            int(row['G2_TS']),
-                                                                                            int(row['G2_TE']-row['overlap']),
-                                                                                            int(row['G1_TS']+row['overlap']),
-                                                                                            int(row['G1_TE']),
+                                                                                            int(row['PATHOGEN_TS']),
+                                                                                            int(row['PATHOGEN_TE']-row['overlap']),
+                                                                                            int(row['HOST_TS']+row['overlap']),
+                                                                                            int(row['HOST_TE']),
                                                                                             int(row['READ_LEN']),
-                                                                                            row["G1_reversedCurr"]==16,
-                                                                                            row["G2_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_g2_y',
-                                                                                                                                                                   'meanQual_g2_y',
-                                                                                                                                                                   'entropyScore_g1_y',
-                                                                                                                                                                   'meanQual_g1_y']]
+                                                                                            row["HOST_reversedCurr"]==16,
+                                                                                            row["PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                   'meanQual_host_y']]
 
     dataLeft["READ_LEN"]=dataLeft["READ_LEN"]
     dataLeft["R"]=0
@@ -844,14 +846,14 @@ def filterOverlapCombineUnpaired(data,args):
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
 
-    df["G2_AL_score"]=((df['G2_AL']-k)/((ssAl+(df['G2_AL']-k)**2.0)**0.5)+1.0)/2.0
-    df["G1_AL_score"]=((df['G1_AL']-k)/((ssAl+(df['G1_AL']-k)**2.0)**0.5)+1.0)/2.0
+    df["PATHOGEN_AL_score"]=((df['PATHOGEN_AL']-k)/((ssAl+(df['PATHOGEN_AL']-k)**2.0)**0.5)+1.0)/2.0
+    df["HOST_AL_score"]=((df['HOST_AL']-k)/((ssAl+(df['HOST_AL']-k)**2.0)**0.5)+1.0)/2.0
 
-    df['jointEntropy']=((df['entropyScore_g2'] \
-                    +df['entropyScore_g1']) \
+    df['jointEntropy']=((df['entropyScore_pathogen'] \
+                    +df['entropyScore_host']) \
                     /(2))
-    df['jointAlLen']=((df['G1_AL_score'] \
-                    +df['G2_AL_score']) \
+    df['jointAlLen']=((df['HOST_AL_score'] \
+                    +df['PATHOGEN_AL_score']) \
                     /(2))
     df["scorePrelim"]=(df['jointEntropy'] \
                     *df['jointAlLen'])
@@ -860,38 +862,38 @@ def filterOverlapCombineUnpaired(data,args):
                   "jointAlLen"],axis=1,inplace=True)
     df=df.round({'scorePrelim': 4})
     df=df[df["scorePrelim"]>=args.score]
-    df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.G1,df.G2,df.overlap,df.gap))))
+    df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.HOST,df.PATHOGEN,df.overlap,df.gap))))
 
     return df
 
 def addSpan(data,dataPos):
-    def testR1(row,dataG2):
-        dataG2R1=dataG2[(dataG2['R1_G2_RS']-row['G2_RS']>-500)&(dataG2['R1_G2_RS']-row['G2_RS']<0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
-        dataG2R1=dataG2R1[(dataG2R1['R2_G1_RE']-row['G1_RE']<500)&(dataG2R1['R2_G1_RE']-row['G1_RE']>0)]
-        if len(dataG2R1)>0:
-            return [set(dataG2R1["QNAME"]),len(dataG2R1)] # return set of reads and count of reads
+    def testR1(row,dataPathogen):
+        dataPathogenR1=dataPathogen[(dataPathogen['R1_PATHOGEN_RS']-row['PATHOGEN_RS']>-500)&(dataPathogen['R1_PATHOGEN_RS']-row['PATHOGEN_RS']<0)] # check that the start of the pathogen is before the start of the pathogen in the grouped dataframe
+        dataPathogenR1=dataPathogenR1[(dataPathogenR1['R2_HOST_RE']-row['HOST_RE']<500)&(dataPathogenR1['R2_HOST_RE']-row['HOST_RE']>0)]
+        if len(dataPathogenR1)>0:
+            return [set(dataPathogenR1["QNAME"]),len(dataPathogenR1)] # return set of reads and count of reads
         return [{''},0]
         
-    def testR2(row,dataG2):
-        dataG2R2=dataG2[(dataG2['R2_G2_RE']-row['G2_RE']<500)&(dataG2['R2_G2_RE']-row['G2_RE']>0)] # check that the start of the hiv is before the start of the hiv in the grouped dataframe
-        dataG2R2=dataG2R2[(dataG2R2['R1_G1_RS']-row['G1_RS']>-500)&(dataG2R2['R1_G1_RS']-row['G1_RS']<0)]
-        if len(dataG2R2)>0:
-            return [set(dataG2R2["QNAME"]),len(dataG2R2)] # return set of reads and count of reads
+    def testR2(row,dataPathogen):
+        dataPathogenR2=dataPathogen[(dataPathogen['R2_PATHOGEN_RE']-row['PATHOGEN_RE']<500)&(dataPathogen['R2_PATHOGEN_RE']-row['PATHOGEN_RE']>0)] # check that the start of the pathogen is before the start of the pathogen in the grouped dataframe
+        dataPathogenR2=dataPathogenR2[(dataPathogenR2['R1_HOST_RS']-row['HOST_RS']>-500)&(dataPathogenR2['R1_HOST_RS']-row['HOST_RS']<0)]
+        if len(dataPathogenR2)>0:
+            return [set(dataPathogenR2["QNAME"]),len(dataPathogenR2)] # return set of reads and count of reads
         return [{''},0]
 
-    dataG2R1=data[data['G2'].str.contains('sepR2:1')]
-    dataG2R1=dataG2R1[~(dataG2R1['R1_G2_ID']==0)] # check that the hiv is on the same side
-    dataPosR1=dataPos[dataPos['orient'].str.contains('g2:g1')]
+    datapathogenR1=data[data['PATHOGEN'].str.contains('sepR2:1')]
+    datapathogenR1=datapathogenR1[~(datapathogenR1['R1_PATHOGEN_ID']==0)] # check that the pathogen is on the same side
+    dataPosR1=dataPos[dataPos['orient'].str.contains('pathogen:host')]
     if len(dataPosR1)>0:
         dataPosR1[['spanR1-R2',
-                    'spanCount']]=pd.DataFrame([x for x in dataPosR1.apply(lambda row: testR1(row,dataG2R1),axis=1)])
+                    'spanCount']]=pd.DataFrame([x for x in dataPosR1.apply(lambda row: testR1(row,datapathogenR1),axis=1)])
 
-    dataG2R2=data[data['G2'].str.contains('sepR1:2')]
-    dataG2R2=dataG2R2[~(dataG2R2['R2_G2_ID']==0)] # check that the hiv is on the same side
-    dataPosR2=dataPos[dataPos['orient'].str.contains('g1:g2')]
+    dataPathogenR2=data[data['PATHOGEN'].str.contains('sepR1:2')]
+    dataPathogenR2=dataPathogenR2[~(dataPathogenR2['R2_PATHOGEN_ID']==0)] # check that the pathogen is on the same side
+    dataPosR2=dataPos[dataPos['orient'].str.contains('host:pathogen')]
     if len(dataPosR2)>0:
         dataPosR2[['spanR1-R2',
-                    'spanCount']]=pd.DataFrame([x for x in dataPosR2.apply(lambda row: testR2(row,dataG2R2),axis=1)])
+                    'spanCount']]=pd.DataFrame([x for x in dataPosR2.apply(lambda row: testR2(row,dataPathogenR2),axis=1)])
 
     frames=[dataPosR1,dataPosR2]
     df=pd.concat(frames).reset_index(drop=True)
@@ -902,68 +904,68 @@ def addSpan(data,dataPos):
 # 2. add a column of high confidence support reads from the first parameter DF
 # 3. add a column of low confidence support reads from the second parameter DF
 def findSupport(data,minLen,unpaired):
-    dataPos=pd.DataFrame(data.groupby(by=["comb","split","G1_ID","R","orient"])[["QNAME",
-                                                                                    "G1_RS",
-                                                                                    "G1_RE",
-                                                                                    "G2_RS",
-                                                                                    "G2_RE",
-                                                                                    "G1_AL",
-                                                                                    "G2_AL",
+    dataPos=pd.DataFrame(data.groupby(by=["comb","split","HOST_ID","R","orient"])[["QNAME",
+                                                                                    "HOST_RS",
+                                                                                    "HOST_RE",
+                                                                                    "PATHOGEN_RS",
+                                                                                    "PATHOGEN_RE",
+                                                                                    "HOST_AL",
+                                                                                    "PATHOGEN_AL",
                                                                                     "READ_LEN",
-                                                                                    "entropyScore_g2",
-                                                                                    "meanQual_g2",
-                                                                                    "entropyScore_g1",
-                                                                                    "meanQual_g1",
-                                                                                    "G2_MAPQ",
-                                                                                    "G1_MAPQ",
+                                                                                    "entropyScore_pathogen",
+                                                                                    "meanQual_pathogen",
+                                                                                    "entropyScore_host",
+                                                                                    "meanQual_host",
+                                                                                    "PATHOGEN_MAPQ",
+                                                                                    "HOST_MAPQ",
                                                                                     "SEQ"]].agg(count=("QNAME", "count"),
                                                                                                 reads=("QNAME", lambda x: set(x)),
                                                                                                 seq=("SEQ", lambda x: (max(dict(list(x)), key=float),dict(list(x))[max(dict(list(x)), key=float)])),
-                                                                                                G1_RS=('G1_RS', 'min'),
-                                                                                                G1_RE=('G1_RE', 'max'),
-                                                                                                G2_RS=('G2_RS','min'),
-                                                                                                G2_RE=('G2_RE','max'),
-                                                                                                G2_AL=('G2_AL','sum'),
-                                                                                                G1_AL=('G1_AL','sum'),
+                                                                                                HOST_RS=('HOST_RS', 'min'),
+                                                                                                HOST_RE=('HOST_RE', 'max'),
+                                                                                                PATHOGEN_RS=('PATHOGEN_RS','min'),
+                                                                                                PATHOGEN_RE=('PATHOGEN_RE','max'),
+                                                                                                PATHOGEN_AL=('PATHOGEN_AL','sum'),
+                                                                                                HOST_AL=('HOST_AL','sum'),
                                                                                                 READ_LEN=('READ_LEN','sum'),
-                                                                                                entropyScore_g2=('entropyScore_g2','sum'),
-                                                                                                entropyScore_g1=('entropyScore_g1','sum'),
-                                                                                                meanQual_g2=('meanQual_g2','sum'),
-                                                                                                meanQual_g1=('meanQual_g1','sum'),
-                                                                                                G2_MAPQ=('G2_MAPQ','sum'),
-                                                                                                G1_MAPQ=('G1_MAPQ','sum'))).reset_index()
-    dataPos.rename(columns={'G1_ID':'chr'}, inplace=True)            
+                                                                                                entropyScore_pathogen=('entropyScore_pathogen','sum'),
+                                                                                                entropyScore_host=('entropyScore_host','sum'),
+                                                                                                meanQual_pathogen=('meanQual_pathogen','sum'),
+                                                                                                meanQual_host=('meanQual_host','sum'),
+                                                                                                PATHOGEN_MAPQ=('PATHOGEN_MAPQ','sum'),
+                                                                                                HOST_MAPQ=('HOST_MAPQ','sum'))).reset_index()
+    dataPos.rename(columns={'HOST_ID':'chr'}, inplace=True)            
     return dataPos
 
 def score(dataPos,args,minLen):
     dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(float)/dataPos["count"].astype(float)
-    dataPos["G2_MAPQ"]=dataPos["G2_MAPQ"].astype(float)/dataPos["count"].astype(float)
-    dataPos["G1_MAPQ"]=dataPos["G1_MAPQ"].astype(float)/dataPos["count"].astype(float)
-    dataPos["G2_AL"]=dataPos["G2_AL"].astype(float)/dataPos["count"].astype(float)
-    dataPos["G1_AL"]=dataPos["G1_AL"].astype(float)/dataPos["count"].astype(float)
-    dataPos["entropyScore_g2"]=dataPos["entropyScore_g2"].astype(float)/dataPos["count"].astype(float)
-    dataPos["entropyScore_g1"]=dataPos["entropyScore_g1"].astype(float)/dataPos["count"].astype(float)
+    dataPos["PATHOGEN_MAPQ"]=dataPos["PATHOGEN_MAPQ"].astype(float)/dataPos["count"].astype(float)
+    dataPos["HOST_MAPQ"]=dataPos["HOST_MAPQ"].astype(float)/dataPos["count"].astype(float)
+    dataPos["PATHOGEN_AL"]=dataPos["PATHOGEN_AL"].astype(float)/dataPos["count"].astype(float)
+    dataPos["HOST_AL"]=dataPos["HOST_AL"].astype(float)/dataPos["count"].astype(float)
+    dataPos["entropyScore_pathogen"]=dataPos["entropyScore_pathogen"].astype(float)/dataPos["count"].astype(float)
+    dataPos["entropyScore_host"]=dataPos["entropyScore_host"].astype(float)/dataPos["count"].astype(float)
     dataPos["count"]=dataPos["count"].astype(float)
 
-    dataPos["G2_AL"]=(dataPos["READ_LEN"]/2)-((dataPos["G2_AL"]-dataPos["READ_LEN"]/2).abs())
-    dataPos["G1_AL"]=(dataPos["READ_LEN"]/2)-((dataPos["G1_AL"]-dataPos["READ_LEN"]/2).abs())
+    dataPos["PATHOGEN_AL"]=(dataPos["READ_LEN"]/2)-((dataPos["PATHOGEN_AL"]-dataPos["READ_LEN"]/2).abs())
+    dataPos["HOST_AL"]=(dataPos["READ_LEN"]/2)-((dataPos["HOST_AL"]-dataPos["READ_LEN"]/2).abs())
 
     k=float(args.minLen)
     ssAl=args.steepSlopeAL
 
-    dataPos["G2_AL_score"]=((dataPos['G2_AL']-k)/((ssAl+(dataPos['G2_AL']-k)**2.0)**0.5)+1.0)/2.0
-    dataPos["G1_AL_score"]=((dataPos['G1_AL']-k)/((ssAl+(dataPos['G1_AL']-k)**2.0)**0.5)+1.0)/2.0
+    dataPos["PATHOGEN_AL_score"]=((dataPos['PATHOGEN_AL']-k)/((ssAl+(dataPos['PATHOGEN_AL']-k)**2.0)**0.5)+1.0)/2.0
+    dataPos["HOST_AL_score"]=((dataPos['HOST_AL']-k)/((ssAl+(dataPos['HOST_AL']-k)**2.0)**0.5)+1.0)/2.0
 
     m=float(args.minCount)/2.0
     dataPos["count_score"]=((dataPos['count']-m)/((1.0+(dataPos['count']-m)**2.0)**0.5)+1.0)/2.0 \
                                 *(1.0-args.maxCountPenalty) \
                                 +args.maxCountPenalty # algebraic sigmoid function of read count score
 
-    dataPos['jointEntropy']=((dataPos['entropyScore_g2'] \
-                    +dataPos['entropyScore_g1']) \
+    dataPos['jointEntropy']=((dataPos['entropyScore_pathogen'] \
+                    +dataPos['entropyScore_host']) \
                     /(2))
-    dataPos['jointAlLen']=((dataPos['G1_AL_score'] \
-                    +dataPos['G2_AL_score']) \
+    dataPos['jointAlLen']=((dataPos['HOST_AL_score'] \
+                    +dataPos['PATHOGEN_AL_score']) \
                     /(2))
     dataPos["score"]=(dataPos['jointEntropy'] \
                     *dataPos['count_score'] \
@@ -976,9 +978,9 @@ def score(dataPos,args,minLen):
 
 # the following function orders the integration events by distance and computes distance to the next site
 def approxCloseness(data,args):
-    data.sort_values(by=["G1_RS","hum_nearest_SS"],inplace=True)
-    data["diff1"]=abs(data['G1_RS']-data['G1_RS'].shift(-1))
-    data["diff2"]=abs(data['G1_RS']-data['G1_RS'].shift(1))
+    data.sort_values(by=["HOST_RS","gene_name"],inplace=True)
+    data["diff1"]=abs(data['HOST_RS']-data['HOST_RS'].shift(-1))
+    data["diff2"]=abs(data['HOST_RS']-data['HOST_RS'].shift(1))
     data['t1']=data["diff1"]<args.close
     data['t2']=data["diff2"]<args.close
     data['t']=data['t1']|data['t2']
@@ -1010,8 +1012,8 @@ def writeReadNames(outDir,row,fileNameR1,fileNameR2,baseName,dirPath):
     tempF=outD+'/tmp/fq'
     stringReads=row['reads'].replace(';','|')
 
-    outPath1_All="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+row["R"]+"@"+str(row['comb'].split("@")[0]))+"_R1.all.fa'"
-    outPath2_All="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+row["R"]+"@"+str(row['comb'].split("@")[0]))+"_R2.all.fa'"
+    outPath1_All="'"+outD+"/Positions/"+baseName+"/"+str(row['gene_name'].strip('\n')+"@"+row["R"]+"@"+str(row['comb'].split("@")[0]))+"_R1.all.fa'"
+    outPath2_All="'"+outD+"/Positions/"+baseName+"/"+str(row['gene_name'].strip('\n')+"@"+row["R"]+"@"+str(row['comb'].split("@")[0]))+"_R2.all.fa'"
     cmdR1="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileNameR1+" | seqtk seq -a - > "+outPath1_All
     cmdR2="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileNameR2+" | seqtk seq -a - > "+outPath2_All
     os.system(cmdR1)
@@ -1022,7 +1024,7 @@ def writeReadNamesUnpaired(outDir,row,fileName,baseName,dirPath):
     tempF=outD+'/tmp/fq'
     stringReads=row['reads'].replace(';','|')
 
-    outPath="'"+outD+"/Positions/"+baseName+"/"+str(row['hum_nearest_SS'].strip('\n')+"@"+str(row['comb'].split("@")[0]))+".fa'"
+    outPath="'"+outD+"/Positions/"+baseName+"/"+str(row['gene_name'].strip('\n')+"@"+str(row['comb'].split("@")[0]))+".fa'"
     cmd="egrep -A 3 '"+stringReads+"' "+tempF+"/"+fileName+" | seqtk seq -a - > "+outPath
     os.system(cmd)
     
@@ -1110,7 +1112,7 @@ def groupBySpliceSites(data):
         
     data.drop(colNames,axis=1,inplace=True)
     
-    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
+    dfg=pd.DataFrame(data.groupby(by=["gene_name",
                                       "chr",
                                       "R",
                                       "uid"])[["comb",
@@ -1118,13 +1120,13 @@ def groupBySpliceSites(data):
                                                 "count",
                                                 "spanCount",
                                                 "spanR1-R2",
-                                                "entropyScore_g1",
-                                                "entropyScore_g2",
-                                                "G2_AL",
-                                                "G1_AL",
+                                                "entropyScore_host",
+                                                "entropyScore_pathogen",
+                                                "PATHOGEN_AL",
+                                                "HOST_AL",
                                                 "READ_LEN",
-                                                "G2_MAPQ",
-                                                "G1_MAPQ",
+                                                "PATHOGEN_MAPQ",
+                                                "HOST_MAPQ",
                                                 "seq"]].agg(groupsCount=('reads','count'),
                                                             reads=('reads',lambda x: ';'.join(set(x))),
                                                             seq=('seq',lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
@@ -1132,13 +1134,13 @@ def groupBySpliceSites(data):
                                                             spanCount=('spanCount','sum'),
                                                             count=('count','sum'),
                                                             comb=('comb',lambda x: ';'.join(set(x))),
-                                                            entropyScore_g1=('entropyScore_g1','sum'),
-                                                            entropyScore_g2=('entropyScore_g2','sum'),
-                                                            G2_AL=('G2_AL','sum'),
-                                                            G1_AL=('G1_AL','sum'),
+                                                            entropyScore_host=('entropyScore_host','sum'),
+                                                            entropyScore_pathogen=('entropyScore_pathogen','sum'),
+                                                            PATHOGEN_AL=('PATHOGEN_AL','sum'),
+                                                            HOST_AL=('HOST_AL','sum'),
                                                             READ_LEN=('READ_LEN','sum'),
-                                                            G2_MAPQ=('G2_MAPQ','sum'),
-                                                            G1_MAPQ=('G1_MAPQ','sum'))).reset_index()
+                                                            PATHOGEN_MAPQ=('PATHOGEN_MAPQ','sum'),
+                                                            HOST_MAPQ=('HOST_MAPQ','sum'))).reset_index()
 
     return dfg.reset_index(drop=True)
 
@@ -1147,112 +1149,99 @@ def groupBySpliceSitesUnpaired(data):
         
     data.drop(colNames,axis=1,inplace=True)
     
-    dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
+    dfg=pd.DataFrame(data.groupby(by=["gene_name",
                                       "chr",
                                       "R",
                                       "uid"])[["comb",
                                                 "reads",
                                                 "count",
-                                                "entropyScore_g1",
-                                                "entropyScore_g2",
-                                                "G2_AL",
-                                                "G1_AL",
+                                                "entropyScore_host",
+                                                "entropyScore_pathogen",
+                                                "PATHOGEN_AL",
+                                                "HOST_AL",
                                                 "READ_LEN",
-                                                "G2_MAPQ",
-                                                "G1_MAPQ",
+                                                "PATHOGEN_MAPQ",
+                                                "HOST_MAPQ",
                                                 "seq"]].agg(groupsCount=("reads","count"),
                                                             reads=("reads",lambda x: ';'.join(set(x))),
                                                             seq=("seq",lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
                                                             count=('count','sum'),
                                                             comb=("comb",lambda x: ';'.join(set(x))),
-                                                            entropyScore_g1=('entropyScore_g1','sum'),
-                                                            entropyScore_g2=('entropyScore_g2','sum'),
-                                                            G2_AL=('G2_AL','sum'),
-                                                            G1_AL=('G1_AL','sum'),
+                                                            entropyScore_host=('entropyScore_host','sum'),
+                                                            entropyScore_pathogen=('entropyScore_pathogen','sum'),
+                                                            PATHOGEN_AL=('PATHOGEN_AL','sum'),
+                                                            HOST_AL=('HOST_AL','sum'),
                                                             READ_LEN=('READ_LEN','sum'),
-                                                            G2_MAPQ=('G2_MAPQ','sum'),
-                                                            G1_MAPQ=('G1_MAPQ','sum'))).reset_index()
+                                                            PATHOGEN_MAPQ=('PATHOGEN_MAPQ','sum'),
+                                                            HOST_MAPQ=('HOST_MAPQ','sum'))).reset_index()
 
     return dfg.reset_index(drop=True)
 
+def get_gene_name(attribute_str: str) -> str:
+    gff = attribute_str.startswith("ID=") or attribute_str.startswith("Parent=")
+
+    attrs = attribute_str.rstrip().rstrip(";").split(";")
+    attrs = [x.strip() for x in attrs]
+    attrs = [x.strip("\"") for x in attrs]
+    attrs_dict = dict()
+    sep = " \""
+    if gff:
+        sep = "="
+    for at in attrs:
+        k, v = at.split(sep)
+        attrs_dict.setdefault(k.lower(), v)
+        
+    for attr in ["gene_name","gene","name","gene_id","id"]:
+        if attr in attrs_dict:
+            return attrs_dict[attr]
+        
+    return "-"
+
 def annotate(dataBed,annPath,data):
-    data.reset_index(drop=True,inplace=True)
+    data.to_csv("/home/sparrow/JHU/ChimFinder/data.csv",index=False)
+    dataBed.to_csv("/home/sparrow/JHU/ChimFinder/dataBed.csv",index=False)
+    # extract gene names for the annotation
+    ann_df = pd.read_csv(annPath,sep="\t",comment="#",names=["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"])
+    ann_df = ann_df[ann_df["type"]=="gene"].reset_index(drop=True)
+    assert len(ann_df)>0,"annotation file must have records with type \"gene\" present. You can add gene records to your file with gffread"
+        
+    ann_df["gene_name"] = ann_df.attributes.apply(lambda row: get_gene_name(row))
+    ann_df = ann_df[~(ann_df["gene_name"]=="-")].reset_index(drop=True)
+
+    annBed = ann_df[["seqid","start","end","gene_name","score","strand"]]
+
+    # load both chimeric results and annotation into bedtools objects
     sites=BedTool.from_dataframe(dataBed)
-    annotation=BedTool(annPath)
+    annotation=BedTool.from_dataframe(annBed)
+
     nearby=annotation.intersect(sites, wo=True)
-    df=pd.read_table(nearby.fn,names=["chr",
-                                      "remove1",
-                                      "ord",
-                                      "startRegionPos",
-                                      "endRegionPos",
-                                      "something1",
-                                      "something2",
-                                      "something3",
-                                      "useful_info",
-                                      "remove2",
-                                      "startQuery",
-                                      "endQuery",
-                                      "distance"])
-    if len(df)==0:
-        return None
-
-    order={"exon":0,
-           "CDS":1,
-           "mRNA":2,
-           "gene":3,
-           "ncRNA":4,
-           "transcript":5,
-           "primary_transcript":6,
-           "rRNA":7,
-           "tRNA":8,
-           "locus":9}
-    reverseOrder={0:"exon",
-                  1:"CDS",
-                  2:"mRNA",
-                  3:"gene",
-                  4:"ncRNA",
-                  5:"transcript",
-                  6:"primary_transcript",
-                  7:"rRNA",
-                  8:"tRNA",
-                  9:"locus"}
-
-    df = df[df["ord"].isin(list(order))].reset_index(drop=True) # remove any unknown features
-    df=df.replace({'ord':order})
-    df["queryPair"]=df["startQuery"].astype(str)+":"+df['endQuery'].astype(str)
-
-    df[["parent","notID"]]=df["useful_info"].str.extract('ID=(.+?)\;(.*)',expand=True)
-    parentDF=df.dropna(axis=0) # this shall be used for pulling information from links
-
-    df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.loc[x['ord'].idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
-
-    finalBed = df.copy(deep=True)
+    if nearby.count()==0:
+        data['gene_name']="-"
+        return data
+    
+    # read the results of the intersection into a dataframe
+    df = pd.read_table(nearby.fn,names=["seqid","start","end","gene_name","score","strand","q_seqid","q_start","q_end","distance"])
+    
+    # select only the closest gene to each chimeric site
+    df["q_coords"]=df["q_seqid"].astype(str)+":"+df["q_start"].astype(str)+":"+df['q_end'].astype(str)
+    min_dist_idxs = df.groupby('q_coords', group_keys=False)['distance'].idxmin()
+    finalBed = df.loc[min_dist_idxs]
 
     if len(finalBed)==0:
-        data['hum_nearest_SS']="-"
+        data['gene_name']="-"
         return data
 
-    finalBed.drop(["startRegionPos",
-                   "endRegionPos",
-                   "something1",
-                   "something2",
-                   "something3",
-                   "distance"],axis=1,inplace=True)
+    finalBed = finalBed[["q_seqid","q_start","q_end","gene_name"]]
     finalBed.columns=['chr',
-                      'G1_RS',
-                      'G1_RE',
-                      'hum_nearest_SS']
+                    'HOST_RS',
+                    'HOST_RE',
+                    'gene_name']
 
     finalDF=pd.DataFrame(pd.merge(data,finalBed,on=['chr',
-                                                      'G1_RS',
-                                                      'G1_RE'],how='inner')).reset_index(drop=True)
-    # data1=pd.DataFrame([])
-    data=data[~(data['comb'].isin(set(finalDF["comb"])))].copy()
-    data.reset_index(drop=True,inplace=True)
-    data1=data.copy()
-    data1['hum_nearest_SS']="-"
-
-    return pd.concat([finalDF,data1]).reset_index(drop=True)
+                                                    'HOST_RS',
+                                                    'HOST_RE'],how='left')).reset_index(drop=True)
+    finalDF["gene_name"] = np.where(finalDF["gene_name"].isna(),"-",finalDF["gene_name"])
+    return finalDF.reset_index(drop=True)
 
 def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
     if not unpaired:
@@ -1260,7 +1249,7 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
         dataPos.loc[dataPos['spanCount'].isnull(),['spanCount']]=dataPos.loc[dataPos['spanCount'].isnull(),'spanCount'].apply(lambda x: 0)
         dataPos.loc[dataPos['spanR1-R2'].isnull(),['spanR1-R2']]=dataPos.loc[dataPos['spanR1-R2'].isnull(),'spanR1-R2'].apply(lambda x: set())
 
-    dataBed=dataPos[['chr','G1_RS','G1_RE']].drop_duplicates()
+    dataBed=dataPos[['chr','HOST_RS','HOST_RE']].drop_duplicates()
     if len(dataPos)>0:
         dataPos=annotate(dataBed,os.path.abspath(args.annotation),dataPos)
         if not dataPos is None:
@@ -1277,17 +1266,17 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
 
             dataPos=score(dataPos,args,args.minLen)
             dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
-            dataPos[['seq','hum_pos','drop','overlap','gap']]=dataPos['seq'].apply(pd.Series)
+            dataPos[['seq','host_pos','drop','overlap','gap']]=dataPos['seq'].apply(pd.Series)
             dataPos.drop("drop",axis=1,inplace=True)
 
             dataPos.to_csv(os.path.abspath(args.out)+"."+mate+".full.csv",index=False)
-            dataPosClean=dataPos[(dataPos['entropyScore_g2']>args.minEntropy) \
-                                &(dataPos['entropyScore_g1']>args.minEntropy) \
+            dataPosClean=dataPos[(dataPos['entropyScore_pathogen']>args.minEntropy) \
+                                &(dataPos['entropyScore_host']>args.minEntropy) \
                                 &(dataPos['score']>args.score)]
 
-            colsOrder=["hum_nearest_SS",
+            colsOrder=["gene_name",
                        "chr",
-                       "hum_pos",
+                       "host_pos",
                        "R",
                        "seq",
                        "count",
@@ -1301,16 +1290,16 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
                 colsOrder.remove("fileName")
 
             if unpaired:
-                dataPosClean["fileName"]="tmp"#dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
+                dataPosClean["fileName"]="tmp"#dataPosClean['gene_name'].str.strip('\n')+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+".fa"
             else:
-                dataPosClean["fileName"]="tmp"#dataPosClean['hum_nearest_SS'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
+                dataPosClean["fileName"]="tmp"#dataPosClean['gene_name'].str.strip('\n')+"@"+dataPosClean["R"]+"@"+dataPosClean['comb'].str.split("@",expand=True)[0]+"_R1.all.fa"
 
             dataPosClean[colsOrder].to_csv(os.path.abspath(args.out)+"."+mate+".csv",index=False)
 
             # completely forgot that we can write reads from the sam file
             # should make it much faster
             # for each comb in the Pos.csv file
-            # find corresponding positions in the original human file
+            # find corresponding positions in the original host file
             # save to csv with \n delimeter
             if args.writeReads:
                 if not unpaired:
@@ -1364,21 +1353,21 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         data.drop(["CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
         return data
 
-    def filterReads(dataG1_R1,dataG2_R1,dataG1_R2,dataG2_R2):
+    def filterReads(dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2):
         #remove all reads that belong to secondary or supplementary alignments and did not have PCR duplicates
-        dataG1_R1=dataG1_R1[(dataG1_R1["secondaryAlignment"]==0)&(dataG1_R1["PCRdup"]==0)&(dataG1_R1["suppAl"]==0)&(dataG1_R1["noPassFilter"]==0)]
-        dataG2_R1=dataG2_R1[(dataG2_R1["secondaryAlignment"]==0)&(dataG2_R1["PCRdup"]==0)&(dataG2_R1["suppAl"]==0)&(dataG2_R1["noPassFilter"]==0)]
-        dataG1_R2=dataG1_R2[(dataG1_R2["secondaryAlignment"]==0)&(dataG1_R2["PCRdup"]==0)&(dataG1_R2["suppAl"]==0)&(dataG1_R2["noPassFilter"]==0)]
-        dataG2_R2=dataG2_R2[(dataG2_R2["secondaryAlignment"]==0)&(dataG2_R2["PCRdup"]==0)&(dataG2_R2["suppAl"]==0)&(dataG2_R2["noPassFilter"]==0)]
-        return dataG1_R1.reset_index(drop=True),dataG2_R1.reset_index(drop=True),dataG1_R2.reset_index(drop=True),dataG2_R2.reset_index(drop=True)
+        dataHost_R1=dataHost_R1[(dataHost_R1["secondaryAlignment"]==0)&(dataHost_R1["PCRdup"]==0)&(dataHost_R1["suppAl"]==0)&(dataHost_R1["noPassFilter"]==0)]
+        dataPathogen_R1=dataPathogen_R1[(dataPathogen_R1["secondaryAlignment"]==0)&(dataPathogen_R1["PCRdup"]==0)&(dataPathogen_R1["suppAl"]==0)&(dataPathogen_R1["noPassFilter"]==0)]
+        dataHost_R2=dataHost_R2[(dataHost_R2["secondaryAlignment"]==0)&(dataHost_R2["PCRdup"]==0)&(dataHost_R2["suppAl"]==0)&(dataHost_R2["noPassFilter"]==0)]
+        dataPathogen_R2=dataPathogen_R2[(dataPathogen_R2["secondaryAlignment"]==0)&(dataPathogen_R2["PCRdup"]==0)&(dataPathogen_R2["suppAl"]==0)&(dataPathogen_R2["noPassFilter"]==0)]
+        return dataHost_R1.reset_index(drop=True),dataPathogen_R1.reset_index(drop=True),dataHost_R2.reset_index(drop=True),dataPathogen_R2.reset_index(drop=True)
 
-    def createData(data,dataHum_R1,dataHIV_R1,dataHum_R2,dataHIV_R2):
-        dataHumR1_HIVR2=data.merge(dataHum_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        dataHumR1_HIVR2=dataHumR1_HIVR2.merge(dataHIV_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+    def createData(data,dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2):
+        dataHostR1_PathogenR2=data.merge(dataHost_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+        dataHostR1_PathogenR2=dataHostR1_PathogenR2.merge(dataPathogen_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
         data
         
-        dataHumR2_HIVR1=data.merge(dataHum_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        dataHumR2_HIVR1=dataHumR2_HIVR1.merge(dataHIV_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+        dataHostR2_PathogenR1=data.merge(dataHost_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+        dataHostR2_PathogenR1=dataHostR2_PathogenR1.merge(dataPathogen_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
         
         return data
 
@@ -1414,102 +1403,101 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         
         return res
 
-    def processAligns(seqHIV,seqHUM,qual_hiv,qual_hum,i1_hiv,i2_hiv,i1_hum,i2_hum,len_hiv,len_hum,rHIV,rHUM):
+    def processAligns(seqPathogen,seqHost,qual_pathogen,qual_host,i1_pathogen,i2_pathogen,i1_host,i2_host,len_pathogen,len_host,rPathogen,rHost):
 
-        entropyScore_hiv=0
-        entropyScore_hum=0
-        meanQual_hiv=0
-        meanQual_hum=0
+        entropyScore_pathogen=0
+        entropyScore_host=0
+        meanQual_pathogen=0
+        meanQual_host=0
 
-        s_hiv=""
-        if rHIV==True: # if reverse complemented take into account
-            s_hiv=seqHIV[len_hiv-i2_hiv:len_hiv-i1_hiv]
+        s_pathogen=""
+        if rPathogen==True: # if reverse complemented take into account
+            s_pathogen=seqPathogen[len_pathogen-i2_pathogen:len_pathogen-i1_pathogen]
         else:
-            s_hiv=seqHIV[i1_hiv:i2_hiv]
-        if not len(s_hiv)==0:
-    #         print("hiv:",rHIV,i1_hiv,i2_hiv,s_hiv)
-            entropyScore_hiv=topologicalNormalizedEntropy(s_hiv)
-            q_hiv=qual_hiv[i1_hiv:i2_hiv]
-            if len(q_hiv)>0:
-                meanQual_hiv=sum([ord(x)-33 for x in q_hiv])/len(q_hiv)
+            s_pathogen=seqPathogen[i1_pathogen:i2_pathogen]
+        if not len(s_pathogen)==0:
+            entropyScore_pathogen=topologicalNormalizedEntropy(s_pathogen)
+            q_pathogen=qual_pathogen[i1_pathogen:i2_pathogen]
+            if len(q_pathogen)>0:
+                meanQual_pathogen=sum([ord(x)-33 for x in q_pathogen])/len(q_pathogen)
             else:
-                meanQual_hiv=0
+                meanQual_pathogen=0
 
-        s_hum=""
-        if rHUM==True: # if reverse complemented take into account
-            s_hum=seqHUM[len_hum-i2_hum:len_hum-i1_hum]
+        s_host=""
+        if rHost==True: # if reverse complemented take into account
+            s_host=seqHost[len_host-i2_host:len_host-i1_host]
         else:
-            s_hum=seqHUM[i1_hum:i2_hum]
-        if not len(s_hum)==0:
-    #         print("hum:",rHUM,i1_hum,i2_hum,s_hum)
-            entropyScore_hum=topologicalNormalizedEntropy(s_hum)
-            q_hum=qual_hum[i1_hum:i2_hum]
-            if len(q_hum)>0:
-                meanQual_hum=sum([ord(x)-33 for x in q_hum])/len(q_hum)
+            s_host=seqHost[i1_host:i2_host]
+        if not len(s_host)==0:
+            entropyScore_host=topologicalNormalizedEntropy(s_host)
+            q_host=qual_host[i1_host:i2_host]
+            if len(q_host)>0:
+                meanQual_host=sum([ord(x)-33 for x in q_host])/len(q_host)
             else:
-                meanQual_hum=0
+                meanQual_host=0
 
-        return pd.Series({"entropyScore_hiv":entropyScore_hiv,
-                            "meanQual_hiv":meanQual_hiv,
-                            "entropyScore_hum":entropyScore_hum,
-                            "meanQual_hum":meanQual_hum})
+        return pd.Series({"entropyScore_pathogen":entropyScore_pathogen,
+                            "meanQual_pathogen":meanQual_pathogen,
+                            "entropyScore_host":entropyScore_host,
+                            "meanQual_host":meanQual_host})
 
     def filterOverlapCombine(data):
         #right
         df=data.copy(deep=True)
-        df['entropyScore_hiv']=0
-        df['meanQual_hiv']=0
-        df['mapQual_hiv']=0
-        df['entropyScore_hum']=0
-        df['meanQual_hum']=0
-        df['mapQual_hum']=0
-        df['HUM']=df['HUM_RE'].astype(int)
-        df['HIV']=df['HIV_RE'].astype(int)
-        df["comb"]=df.HUM.astype(str)+"@"+df.HUM_ID+":"+df.HIV_ID
-        df["HUM_TS"]=df["HUM_TS"].astype(int)
-        df["HUM_TE"]=df["HUM_TE"].astype(int)
-        df["HUM_RS"]=df["HUM_RS"].astype(int)
-        df["HUM_RE"]=df["HUM_RE"].astype(int)
-        df["HUM_MAPQ"]=df["HUM_MAPQ"].astype(int)
-        df["HIV_TS"]=df["HIV_TS"].astype(int)
-        df["HIV_TE"]=df["HIV_TE"].astype(int)
-        df["HIV_RS"]=df["HIV_RS"].astype(int)
-        df["HIV_RE"]=df["HIV_RE"].astype(int)
-        df["HIV_MAPQ"]=df["HIV_MAPQ"].astype(int)
-        df["HIV_AL"]=df["HIV_TE"]-df["HIV_TS"]
-        df["HUM_AL"]=df["HUM_TE"]-df["HUM_TS"]
-        df=df[(df['HIV_AL']>minLen)&((df["HIV_LEN"]-df['HIV_AL'])<args.maxLenUnmapped)&(df['HUM_AL']>minLen)&((df["HUM_LEN"]-df['HUM_AL'])<args.maxLenUnmapped)]
+        df['entropyScore_pathogen']=0
+        df['meanQual_pathogen']=0
+        df['mapQual_pathogen']=0
+        df['entropyScore_host']=0
+        df['meanQual_host']=0
+        df['mapQual_host']=0
+        df['HOST']=df['HOST_RE'].astype(int)
+        df['PATHOGEN']=df['PATHOGEN_RE'].astype(int)
+        df["comb"]=df.HOST.astype(str)+"@"+df.HOST_ID+":"+df.PATHOGEN_ID
+        df["HOST_TS"]=df["HOST_TS"].astype(int)
+        df["HOST_TE"]=df["HOST_TE"].astype(int)
+        df["HOST_RS"]=df["HOST_RS"].astype(int)
+        df["HOST_RE"]=df["HOST_RE"].astype(int)
+        df["HOST_MAPQ"]=df["HOST_MAPQ"].astype(int)
+        df["PATHOGEN_TS"]=df["PATHOGEN_TS"].astype(int)
+        df["PATHOGEN_TE"]=df["PATHOGEN_TE"].astype(int)
+        df["PATHOGEN_RS"]=df["PATHOGEN_RS"].astype(int)
+        df["PATHOGEN_RE"]=df["PATHOGEN_RE"].astype(int)
+        df["PATHOGEN_MAPQ"]=df["PATHOGEN_MAPQ"].astype(int)
+        df["PATHOGEN_AL"]=df["PATHOGEN_TE"]-df["PATHOGEN_TS"]
+        df["HOST_AL"]=df["HOST_TE"]-df["HOST_TS"]
+        df=df[(df['PATHOGEN_AL']>minLen)&((df["PATHOGEN_LEN"]-df['PATHOGEN_AL'])<args.maxLenUnmapped)&(df['HOST_AL']>minLen)&((df["HOST_LEN"]-df['HOST_AL'])<args.maxLenUnmapped)].reset_index(drop=True)
         if len(df)>0:
-            df[['entropyScore_hiv',
-                  'meanQual_hiv',
-                  'entropyScore_hum',
-                  'meanQual_hum']]=df.merge(df.apply(lambda row: processAligns(row['HIV_SEQ'],
-                                                                                    row['HUM_SEQ'],
-                                                                                    row['HIV_QUAL'],
-                                                                                    row['HUM_QUAL'],
-                                                                                    int(row['HIV_TS']),
-                                                                                    int(row['HIV_TE']),
-                                                                                    int(row['HUM_TS']),
-                                                                                    int(row['HUM_TE']),
-                                                                                    int(row['HIV_LEN']),
-                                                                                    int(row['HUM_LEN']),
-                                                                                    row["HIV_reversedCurr"]==16,
-                                                                                    row["HUM_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_hiv_y',
-                                                                                                                                                            'meanQual_hiv_y',
-                                                                                                                                                            'entropyScore_hum_y',
-                                                                                                                                                            'meanQual_hum_y']]
+            df[['entropyScore_pathogen',
+                  'meanQual_pathogen',
+                  'entropyScore_host',
+                  'meanQual_host']]=df.merge(df.apply(lambda row: processAligns(row['PATHOGEN_SEQ'],
+                                                                                    row['HOST_SEQ'],
+                                                                                    row['PATHOGEN_QUAL'],
+                                                                                    row['HOST_QUAL'],
+                                                                                    int(row['PATHOGEN_TS']),
+                                                                                    int(row['PATHOGEN_TE']),
+                                                                                    int(row['HOST_TS']),
+                                                                                    int(row['HOST_TE']),
+                                                                                    int(row['PATHOGEN_LEN']),
+                                                                                    int(row['HOST_LEN']),
+                                                                                    row["PATHOGEN_reversedCurr"]==16,
+                                                                                    row["HOST_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                                                                            'meanQual_pathogen_y',
+                                                                                                                                                            'entropyScore_host_y',
+                                                                                                                                                            'meanQual_host_y']]
+            df = df.reset_index(drop=True)
 
 
         k=float(args.minLen)
         ssAl=args.steepSlopeAL
-        df["HIV_AL_score"]=((df['HIV_AL']-k)/((ssAl+(df['HIV_AL']-k)**2.0)**0.5)+1.0)/2.0
-        df["HUM_AL_score"]=((df['HUM_AL']-k)/((ssAl+(df['HUM_AL']-k)**2.0)**0.5)+1.0)/2.0
+        df["PATHOGEN_AL_score"]=((df['PATHOGEN_AL']-k)/((ssAl+(df['PATHOGEN_AL']-k)**2.0)**0.5)+1.0)/2.0
+        df["HOST_AL_score"]=((df['HOST_AL']-k)/((ssAl+(df['HOST_AL']-k)**2.0)**0.5)+1.0)/2.0
 
-        df['jointEntropy']=((df['entropyScore_hiv'] \
-                        +df['entropyScore_hum']) \
+        df['jointEntropy']=((df['entropyScore_pathogen'] \
+                        +df['entropyScore_host']) \
                         /(2))
-        df['jointAlLen']=((df['HUM_AL_score'] \
-                        +df['HIV_AL_score']) \
+        df['jointAlLen']=((df['HOST_AL_score'] \
+                        +df['PATHOGEN_AL_score']) \
                         /(2))
         df["scorePrelim"]=(df['jointEntropy'] \
                         *df['jointAlLen'])
@@ -1518,179 +1506,51 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
                       "jointAlLen"],axis=1,inplace=True)
         df=df.round({'scorePrelim': 4})
         df=df[df["scorePrelim"]>=args.score]
-        df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.HUM_SEQ,df.HIV_SEQ,df.HUM_RS.astype(int),df.HUM_RE.astype(int),df.HIV_RS.astype(int),df.HIV_RE.astype(int)))))
+        df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.HOST_SEQ,df.PATHOGEN_SEQ,df.HOST_RS.astype(int),df.HOST_RE.astype(int),df.PATHOGEN_RS.astype(int),df.PATHOGEN_RE.astype(int)))))
 
-        return df
+        return df.reset_index(drop=True)
 
     def findSupport(data,minLen,unpaired):
         
-        dataPos=pd.DataFrame(data.groupby(by=["comb","HUM_ID"])[["QNAME",
-                                                                "HUM_RS",
-                                                                "HUM_RE",
-                                                                "HIV_RS",
-                                                                "HIV_RE",
-                                                                "HUM_AL",
-                                                                "HIV_AL",
-                                                                "HUM_LEN",
-                                                                "HIV_LEN",
-                                                                "entropyScore_hiv",
-                                                                "meanQual_hiv",
-                                                                "entropyScore_hum",
-                                                                "meanQual_hum",
-                                                                "HIV_MAPQ",
-                                                                "HUM_MAPQ",
+        dataPos=pd.DataFrame(data.groupby(by=["comb","HOST_ID"])[["QNAME",
+                                                                "HOST_RS",
+                                                                "HOST_RE",
+                                                                "PATHOGEN_RS",
+                                                                "PATHOGEN_RE",
+                                                                "HOST_AL",
+                                                                "PATHOGEN_AL",
+                                                                "HOST_LEN",
+                                                                "PATHOGEN_LEN",
+                                                                "entropyScore_pathogen",
+                                                                "meanQual_pathogen",
+                                                                "entropyScore_host",
+                                                                "meanQual_host",
+                                                                "PATHOGEN_MAPQ",
+                                                                "HOST_MAPQ",
                                                                 "SEQ"]].agg(count=('QNAME','count'),
                                                                             reads=('QNAME', lambda x: set(x)),
                                                                             seq=('SEQ',lambda x: (max(dict(list(x)), key=float),dict(list(x))[max(dict(list(x)), key=float)])),
-                                                                            HUM_RS=('HUM_RS','min'),
-                                                                            HUM_RE=('HUM_RE','max'),
-                                                                            HIV_RS=('HIV_RS','min'),
-                                                                            HIV_RE=('HIV_RE','max'),
-                                                                            HIV_AL=('HIV_AL','sum'),
-                                                                            HUM_AL=('HUM_AL','sum'),
-                                                                            HUM_LEN=('HUM_LEN','sum'),
-                                                                            HIV_LEN=('HIV_LEN','sum'),
-                                                                            entropyScore_hiv=('entropyScore_hiv','sum'),
-                                                                            entropyScore_hum=('entropyScore_hum','sum'),
-                                                                            meanQual_hiv=('meanQual_hiv','sum'),
-                                                                            meanQual_hum=('meanQual_hum','sum'),
-                                                                            HIV_MAPQ=('HIV_MAPQ','sum'),
-                                                                            HUM_MAPQ=('HUM_MAPQ','sum'))).reset_index()
-        dataPos.rename(columns={'HUM_ID':'chr'}, inplace=True)            
+                                                                            HOST_RS=('HOST_RS','min'),
+                                                                            HOST_RE=('HOST_RE','max'),
+                                                                            PATHOGEN_RS=('PATHOGEN_RS','min'),
+                                                                            PATHOGEN_RE=('PATHOGEN_RE','max'),
+                                                                            PATHOGEN_AL=('PATHOGEN_AL','sum'),
+                                                                            HOST_AL=('HOST_AL','sum'),
+                                                                            HOST_LEN=('HOST_LEN','sum'),
+                                                                            PATHOGEN_LEN=('PATHOGEN_LEN','sum'),
+                                                                            entropyScore_pathogen=('entropyScore_pathogen','sum'),
+                                                                            entropyScore_host=('entropyScore_host','sum'),
+                                                                            meanQual_pathogen=('meanQual_pathogen','sum'),
+                                                                            meanQual_host=('meanQual_host','sum'),
+                                                                            PATHOGEN_MAPQ=('PATHOGEN_MAPQ','sum'),
+                                                                            HOST_MAPQ=('HOST_MAPQ','sum'))).reset_index()
+        dataPos.rename(columns={'HOST_ID':'chr'}, inplace=True)            
         return dataPos
 
-    def annotate(dataBed,annPath,data):
-        data.reset_index(drop=True,inplace=True)
-        sites=BedTool.from_dataframe(dataBed)
-        annotation=BedTool(annPath)
-        nearby=annotation.intersect(sites, wo=True)
-        df=pd.read_table(nearby.fn,names=["chr",
-                                          "remove1",
-                                          "ord",
-                                          "startRegionPos",
-                                          "endRegionPos",
-                                          "something1",
-                                          "something2",
-                                          "something3",
-                                          "useful_info",
-                                          "remove2",
-                                          "startQuery",
-                                          "endQuery",
-                                          "distance"])
-        if len(df)==0:
-            return None
-
-        order={"exon":0,
-               "CDS":1,
-               "mRNA":2,
-               "gene":3,
-               "ncRNA":4,
-               "transcript":5,
-               "primary_transcript":6,
-               "rRNA":7,
-               "tRNA":8,
-               "locus":9}
-        reverseOrder={0:"exon",
-                      1:"CDS",
-                      2:"mRNA",
-                      3:"gene",
-                      4:"ncRNA",
-                      5:"transcript",
-                      6:"primary_transcript",
-                      7:"rRNA",
-                      8:"tRNA",
-                      9:"locus"}
-
-        df = df[df["ord"].isin(order.keys())].reset_index(drop=True)
-        df=df.replace({'ord':order})
-        df["queryPair"]=df["startQuery"].astype(str)+":"+df['endQuery'].astype(str)
-
-        df[["parent","notID"]]=df["useful_info"].str.extract('ID=(.+?)\;(.*)',expand=True)
-        parentDF=df.dropna(axis=0) # this shall be used for pulling information from links
-
-
-        df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.loc[x['ord'].idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
-        # df=df.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
-        linksDF=pd.DataFrame([])
-        if len(df)>0:
-            df["link"]=df["useful_info"].str.extract('Parent=(.*)',expand=False)
-            linksDF=df.dropna(subset=["link"],axis=0)# contains all which need to be linked
-
-        readyDF=df[~df.index.isin(linksDF.index)] # contains all which can do not need anything else done to them except extracting info
-        readyDF=readyDF.replace({'ord':reverseOrder})
-        if len(readyDF)>0:
-            readyDF["gene_name"]=readyDF["notID"].str.extract('gene_name=(.+?)\;',expand=False)
-            readyDF['hum_nearest_SS']=readyDF['ord']+":"+readyDF['gene_name']
-            readyDF.drop(['remove1',
-                          'ord',
-                          'useful_info',
-                          'remove2',
-                          'queryPair',
-                          'parent',
-                          'notID',
-                          'link',
-                          'gene_name'],inplace=True,axis=1)
-
-        # now lets work on the links
-        setLink=set(linksDF['link'])
-        parentDF=parentDF[parentDF["parent"].isin(setLink)]
-        parentDF=parentDF.groupby('queryPair', group_keys=False).apply(lambda x: x.loc[x['ord'].idxmin()]).reset_index(drop=True) # this might contain links and non links. these need to be separated and processed separately. For links pull information from Non-links and for others just calculate from there
-        # parentDF=parentDF.groupby('queryPair', group_keys=False).apply(lambda x: x.ix[x.ord.idxmin()]).reset_index(drop=True)
-        parentDF=parentDF.replace({'ord':reverseOrder})
-        if len(parentDF)>0:
-            parentDF["gene_name"]=parentDF["notID"].str.extract('gene_name=(.+?)\;',expand=False)
-            parentDF['hum_nearest_SS']=parentDF['ord']+":"+parentDF['gene_name']
-            parentDF.drop(['remove1',
-                          'ord',
-                          'useful_info',
-                          'remove2',
-                          'queryPair',
-                          'parent',
-                          'notID',
-                          'gene_name'],inplace=True,axis=1)
-
-        finalBed=pd.DataFrame([])
-        if len(parentDF)>0 and len(readyDF)>0:
-            finalBed=pd.concat([readyDF,parentDF]).reset_index(drop=True)
-        if len(parentDF)>0 and len(readyDF)==0:
-            finalBed=parentDF.copy(deep=True)
-        if len(parentDF)==0 and len(readyDF)>0:
-            finalBed=readyDF.copy(deep=True)
-
-        if len(finalBed)==0:
-            return
-
-        finalBed.drop(["startRegionPos",
-                       "endRegionPos",
-                       "something1",
-                       "something2",
-                       "something3",
-                       "distance"],axis=1,inplace=True)
-        finalBed.columns=['chr',
-                          'HUM_RS',
-                          'HUM_RE',
-                          'hum_nearest_SS']
-
-        finalDF=pd.DataFrame(pd.merge(data,finalBed,on=['chr',
-                                                          'HUM_RS',
-                                                          'HUM_RE'],how='inner')).reset_index(drop=True)
-
-        data=data[~(data['comb'].isin(set(finalDF["comb"])))].copy()
-        data.reset_index(drop=True,inplace=True)
-        data1=data.copy()
-        data1['hum_nearest_SS']="-"
-        
-        if len(finalDF)>0 and len(data1)>0:
-            return pd.concat([finalDF,data1]).reset_index(drop=True)
-        elif len(finalDF)>0 and not len(data1)>0:
-            return finalDF.reset_index(drop=True)
-        else:
-            return data1.reset_index(drop=True)
-
     def approxCloseness(data,args):
-        data.sort_values(by=["HUM_RS","hum_nearest_SS"],inplace=True)
-        data["diff1"]=abs(data['HUM_RS']-data['HUM_RS'].shift(-1))
-        data["diff2"]=abs(data['HUM_RS']-data['HUM_RS'].shift(1))
+        data.sort_values(by=["HOST_RS","gene_name"],inplace=True)
+        data["diff1"]=abs(data['HOST_RS']-data['HOST_RS'].shift(-1))
+        data["diff2"]=abs(data['HOST_RS']-data['HOST_RS'].shift(1))
         data['t1']=data["diff1"]<30
         data['t2']=data["diff2"]<30
         data['t']=data['t1']|data['t2']
@@ -1715,62 +1575,62 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
 
     def groupBySpliceSites(data):
         
-        dfg=pd.DataFrame(data.groupby(by=["hum_nearest_SS",
+        dfg=pd.DataFrame(data.groupby(by=["gene_name",
                                           "chr",
                                           "uid"])[["comb",
                                                     "reads",
                                                     "count",
-                                                    "entropyScore_hum",
-                                                    "entropyScore_hiv",
-                                                    "HIV_AL",
-                                                    "HUM_AL",
-                                                    "HUM_LEN",
-                                                    "HIV_LEN",
-                                                    "HIV_MAPQ",
-                                                    "HUM_MAPQ",
+                                                    "entropyScore_host",
+                                                    "entropyScore_pathogen",
+                                                    "PATHOGEN_AL",
+                                                    "HOST_AL",
+                                                    "HOST_LEN",
+                                                    "PATHOGEN_LEN",
+                                                    "PATHOGEN_MAPQ",
+                                                    "HOST_MAPQ",
                                                     "seq"]].agg(groupsCount=('reads','count'),
                                                                 reads=('reads',lambda x: ';'.join(set(x))),
                                                                 seq=('seq',lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
                                                                 count=('count','sum'),
                                                                 comb=('comb',lambda x: ';'.join(set(x))),
-                                                                entropyScore_hum=('entropyScore_hum','sum'),
-                                                                entropyScore_hiv=('entropyScore_hiv','sum'),
-                                                                HIV_AL=('HIV_AL','sum'),
-                                                                HUM_AL=('HUM_AL','sum'),
-                                                                HUM_LEN=('HUM_LEN','sum'),
-                                                                HIV_LEN=('HIV_LEN','sum'),
-                                                                HIV_MAPQ=('HIV_MAPQ','sum'),
-                                                                HUM_MAPQ=('HUM_MAPQ','sum'))).reset_index()
+                                                                entropyScore_host=('entropyScore_host','sum'),
+                                                                entropyScore_pathogen=('entropyScore_pathogen','sum'),
+                                                                PATHOGEN_AL=('PATHOGEN_AL','sum'),
+                                                                HOST_AL=('HOST_AL','sum'),
+                                                                HOST_LEN=('HOST_LEN','sum'),
+                                                                PATHOGEN_LEN=('PATHOGEN_LEN','sum'),
+                                                                PATHOGEN_MAPQ=('PATHOGEN_MAPQ','sum'),
+                                                                HOST_MAPQ=('HOST_MAPQ','sum'))).reset_index()
 
         return dfg.reset_index(drop=True)
 
     def score(dataPos,minLen):
-        dataPos["HUM_LEN"]=dataPos["HUM_LEN"].astype(float)/dataPos["count"].astype(float)
-        dataPos["HIV_LEN"]=dataPos["HIV_LEN"].astype(float)/dataPos["count"].astype(float)
-        dataPos["HIV_MAPQ"]=dataPos["HIV_MAPQ"].astype(float)/dataPos["count"].astype(float)
-        dataPos["HUM_MAPQ"]=dataPos["HUM_MAPQ"].astype(float)/dataPos["count"].astype(float)
-        dataPos["HIV_AL"]=dataPos["HIV_AL"].astype(float)/dataPos["count"].astype(float)
-        dataPos["HUM_AL"]=dataPos["HUM_AL"].astype(float)/dataPos["count"].astype(float)
-        dataPos["entropyScore_hiv"]=dataPos["entropyScore_hiv"].astype(float)/dataPos["count"].astype(float)
-        dataPos["entropyScore_hum"]=dataPos["entropyScore_hum"].astype(float)/dataPos["count"].astype(float)
+        dataPos["HOST_LEN"]=dataPos["HOST_LEN"].astype(float)/dataPos["count"].astype(float)
+        dataPos["PATHOGEN_LEN"]=dataPos["PATHOGEN_LEN"].astype(float)/dataPos["count"].astype(float)
+        dataPos["PATHOGEN_MAPQ"]=dataPos["PATHOGEN_MAPQ"].astype(float)/dataPos["count"].astype(float)
+        dataPos["HOST_MAPQ"]=dataPos["HOST_MAPQ"].astype(float)/dataPos["count"].astype(float)
+        dataPos["PATHOGEN_AL"]=dataPos["PATHOGEN_AL"].astype(float)/dataPos["count"].astype(float)
+        dataPos["HOST_AL"]=dataPos["HOST_AL"].astype(float)/dataPos["count"].astype(float)
+        dataPos["entropyScore_pathogen"]=dataPos["entropyScore_pathogen"].astype(float)/dataPos["count"].astype(float)
+        dataPos["entropyScore_host"]=dataPos["entropyScore_host"].astype(float)/dataPos["count"].astype(float)
         dataPos["count"]=dataPos["count"].astype(float)
 
         k=float(minLen)
         ssAl=0.1
 
-        dataPos["HIV_AL_score"]=((dataPos['HIV_AL']-k)/((ssAl+(dataPos['HIV_AL']-k)**2.0)**0.5)+1.0)/2.0
-        dataPos["HUM_AL_score"]=((dataPos['HUM_AL']-k)/((ssAl+(dataPos['HUM_AL']-k)**2.0)**0.5)+1.0)/2.0
+        dataPos["PATHOGEN_AL_score"]=((dataPos['PATHOGEN_AL']-k)/((ssAl+(dataPos['PATHOGEN_AL']-k)**2.0)**0.5)+1.0)/2.0
+        dataPos["HOST_AL_score"]=((dataPos['HOST_AL']-k)/((ssAl+(dataPos['HOST_AL']-k)**2.0)**0.5)+1.0)/2.0
 
         m=float(1)/2.0
         dataPos["count_score"]=((dataPos['count']-m)/((1.0+(dataPos['count']-m)**2.0)**0.5)+1.0)/2.0 \
                                     *(1.0-0.85) \
                                     +0.85 # algebraic sigmoid function of read count score
 
-        dataPos['jointEntropy']=((dataPos['entropyScore_hiv'] \
-                        +dataPos['entropyScore_hum']) \
+        dataPos['jointEntropy']=((dataPos['entropyScore_pathogen'] \
+                        +dataPos['entropyScore_host']) \
                         /(2))
-        dataPos['jointAlLen']=((dataPos['HUM_AL_score'] \
-                        +dataPos['HIV_AL_score']) \
+        dataPos['jointAlLen']=((dataPos['HOST_AL_score'] \
+                        +dataPos['PATHOGEN_AL_score']) \
                         /(2))
         dataPos["score"]=(dataPos['jointEntropy'] \
                         *dataPos['count_score'] \
@@ -1782,129 +1642,129 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         return dataPos
     
     global sam_colnames
-    dataHIV_R1=pd.read_csv(os.path.abspath(args.input1r1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
-    dataHum_R1=pd.read_csv(os.path.abspath(args.input2r1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
-    dataHIV_R2=pd.read_csv(os.path.abspath(args.input1r2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
-    dataHum_R2=pd.read_csv(os.path.abspath(args.input2r2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataPathogen_R1=pd.read_csv(os.path.abspath(args.pathogenR1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataHost_R1=pd.read_csv(os.path.abspath(args.hostR1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataPathogen_R2=pd.read_csv(os.path.abspath(args.pathogenR2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataHost_R2=pd.read_csv(os.path.abspath(args.hostR2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
 
-    if ((len(dataHIV_R1)==0 and len(dataHum_R2)==0) or (len(dataHIV_R2)==0 or len(dataHum_R1)==0)): #exit if either alignment is empty
+    if ((len(dataPathogen_R1)==0 and len(dataHost_R2)==0) or (len(dataPathogen_R2)==0 or len(dataHost_R1)==0)): #exit if either alignment is empty
         print("incorrect")
         
-    extractFlagBits(dataHIV_R1)
-    extractFlagBits(dataHum_R1)
-    extractFlagBits(dataHIV_R2)
-    extractFlagBits(dataHum_R2)
+    extractFlagBits(dataPathogen_R1)
+    extractFlagBits(dataHost_R1)
+    extractFlagBits(dataPathogen_R2)
+    extractFlagBits(dataHost_R2)
 
-    dataHum_R1,dataHIV_R1,dataHum_R2,dataHIV_R2=filterReads(dataHum_R1,dataHIV_R1,dataHum_R2,dataHIV_R2)
+    dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2=filterReads(dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2)
 
-    dataHIV_R1=extractStartEnd(dataHIV_R1)
-    dataHIV_R2=extractStartEnd(dataHIV_R2)
-    dataHum_R1=extractStartEnd(dataHum_R1)
-    dataHum_R2=extractStartEnd(dataHum_R2)
+    dataPathogen_R1=extractStartEnd(dataPathogen_R1)
+    dataPathogen_R2=extractStartEnd(dataPathogen_R2)
+    dataHost_R1=extractStartEnd(dataHost_R1)
+    dataHost_R2=extractStartEnd(dataHost_R2)
 
-    data=pd.DataFrame(pd.Series(list(set(dataHIV_R1["QNAME"]).union(set(dataHIV_R2["QNAME"]))))).reset_index(drop=True)
+    data=pd.DataFrame(pd.Series(list(set(dataPathogen_R1["QNAME"]).union(set(dataPathogen_R2["QNAME"]))))).reset_index(drop=True)
     data.columns=["QNAME"]
 
-    dataHumR1_HIVR2=data.merge(dataHum_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-    dataHumR1_HIVR2=dataHumR1_HIVR2[dataHumR1_HIVR2["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
-    dataHumR1_HIVR2=dataHumR1_HIVR2.merge(dataHIV_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-    dataHumR1_HIVR2=dataHumR1_HIVR2[dataHumR1_HIVR2["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
+    dataHostR1_PathogenR2=data.merge(dataHost_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+    dataHostR1_PathogenR2=dataHostR1_PathogenR2[dataHostR1_PathogenR2["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
+    dataHostR1_PathogenR2=dataHostR1_PathogenR2.merge(dataPathogen_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+    dataHostR1_PathogenR2=dataHostR1_PathogenR2[dataHostR1_PathogenR2["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
 
-    dataHumR2_HIVR1=data.merge(dataHum_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-    dataHumR2_HIVR1=dataHumR2_HIVR1[dataHumR2_HIVR1["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
-    dataHumR2_HIVR1=dataHumR2_HIVR1.merge(dataHIV_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-    dataHumR2_HIVR1=dataHumR2_HIVR1[dataHumR2_HIVR1["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
+    dataHostR2_PathogenR1=data.merge(dataHost_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+    dataHostR2_PathogenR1=dataHostR2_PathogenR1[dataHostR2_PathogenR1["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
+    dataHostR2_PathogenR1=dataHostR2_PathogenR1.merge(dataPathogen_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
+    dataHostR2_PathogenR1=dataHostR2_PathogenR1[dataHostR2_PathogenR1["_merge"]=="both"].drop("_merge",axis=1).reset_index(drop=True)
 
     colnames = ['QNAME','RNAME_x','MAPQ_x','QUAL_x','SEQ_x','reversedCurr_x','Template_start_x','Template_end_x',
                 'Reference_start_x','Reference_end_x','READ_LEN_x','RNAME_y','MAPQ_y','QUAL_y','SEQ_y','reversedCurr_y',
                 'Template_start_y','Template_end_y','Reference_start_y','Reference_end_y','READ_LEN_y']
-    dataHumR1_HIVR2=dataHumR1_HIVR2[colnames]
-    dataHumR2_HIVR1=dataHumR2_HIVR1[colnames]
+    dataHostR1_PathogenR2=dataHostR1_PathogenR2[colnames]
+    dataHostR2_PathogenR1=dataHostR2_PathogenR1[colnames]
 
-    colnames = ['QNAME','HUM_ID','HUM_MAPQ','HUM_QUAL','HUM_SEQ','HUM_reversedCurr','HUM_TS','HUM_TE','HUM_RS','HUM_RE','HUM_LEN',
-                'HIV_ID','HIV_MAPQ','HIV_QUAL','HIV_SEQ','HIV_reversedCurr','HIV_TS','HIV_TE','HIV_RS','HIV_RE','HIV_LEN']
-    dataHumR1_HIVR2.columns=colnames
-    dataHumR2_HIVR1.columns=colnames
+    colnames = ['QNAME','HOST_ID','HOST_MAPQ','HOST_QUAL','HOST_SEQ','HOST_reversedCurr','HOST_TS','HOST_TE','HOST_RS','HOST_RE','HOST_LEN',
+                'PATHOGEN_ID','PATHOGEN_MAPQ','PATHOGEN_QUAL','PATHOGEN_SEQ','PATHOGEN_reversedCurr','PATHOGEN_TS','PATHOGEN_TE','PATHOGEN_RS','PATHOGEN_RE','PATHOGEN_LEN']
+    dataHostR1_PathogenR2.columns=colnames
+    dataHostR2_PathogenR1.columns=colnames
 
-    dataHumR1_HIVR2.replace('', np.nan,inplace=True)
-    dataHumR1_HIVR2.fillna(0,inplace=True)
-    dataHumR2_HIVR1.replace('', np.nan,inplace=True)
-    dataHumR2_HIVR1.fillna(0,inplace=True)
+    dataHostR1_PathogenR2.replace('', np.nan,inplace=True)
+    dataHostR1_PathogenR2.fillna(0,inplace=True)
+    dataHostR2_PathogenR1.replace('', np.nan,inplace=True)
+    dataHostR2_PathogenR1.fillna(0,inplace=True)
 
-    dataHumR1_HIVR2=dataHumR1_HIVR2[~(dataHumR1_HIVR2["HUM_SEQ"]==dataHumR1_HIVR2["HIV_SEQ"])]
-    dataHumR2_HIVR1=dataHumR2_HIVR1[~(dataHumR2_HIVR1["HUM_SEQ"]==dataHumR2_HIVR1["HIV_SEQ"])]
+    dataHostR1_PathogenR2=dataHostR1_PathogenR2[~(dataHostR1_PathogenR2["HOST_SEQ"]==dataHostR1_PathogenR2["PATHOGEN_SEQ"])]
+    dataHostR2_PathogenR1=dataHostR2_PathogenR1[~(dataHostR2_PathogenR1["HOST_SEQ"]==dataHostR2_PathogenR1["PATHOGEN_SEQ"])]
 
-    dataPosHumR1_HIVR2=pd.DataFrame([])
-    dataPosHumR1_HIVR2=filterOverlapCombine(dataHumR1_HIVR2)
+    dataPosHostR1_PathogenR2=pd.DataFrame([])
+    dataPosHostR1_PathogenR2=filterOverlapCombine(dataHostR1_PathogenR2)
 
-    dataPosHumR2_HIVR1=pd.DataFrame([])
-    dataPosHumR2_HIVR1=filterOverlapCombine(dataHumR2_HIVR1)
+    dataPosHostR2_PathogenR1=pd.DataFrame([])
+    dataPosHostR2_PathogenR1=filterOverlapCombine(dataHostR2_PathogenR1)
 
-    dataPosHumR1_HIVR2=findSupport(dataPosHumR1_HIVR2,args.minLen,False)
-    dataPosHumR2_HIVR1=findSupport(dataPosHumR2_HIVR1,args.minLen,False)
+    dataPosHostR1_PathogenR2=findSupport(dataPosHostR1_PathogenR2,args.minLen,False)
+    dataPosHostR2_PathogenR1=findSupport(dataPosHostR2_PathogenR1,args.minLen,False)
 
-    dataBedHumR1_HIVR2=dataPosHumR1_HIVR2[['chr','HUM_RS','HUM_RE']].drop_duplicates().reset_index(drop=True)
-    dataBedHumR2_HIVR1=dataPosHumR2_HIVR1[['chr','HUM_RS','HUM_RE']].drop_duplicates().reset_index(drop=True)
+    dataBedHostR1_PathogenR2=dataPosHostR1_PathogenR2[['chr','HOST_RS','HOST_RE']].drop_duplicates().reset_index(drop=True)
+    dataBedHostR2_PathogenR1=dataPosHostR2_PathogenR1[['chr','HOST_RS','HOST_RE']].drop_duplicates().reset_index(drop=True)
 
-    if len(dataPosHumR2_HIVR1)>0:
-        dataPosHumR2_HIVR1=annotate(dataBedHumR2_HIVR1,os.path.abspath(args.annotation),dataPosHumR2_HIVR1)
-    if len(dataPosHumR1_HIVR2)>0:
-        dataPosHumR1_HIVR2=annotate(dataBedHumR1_HIVR2,os.path.abspath(args.annotation),dataPosHumR1_HIVR2)
+    if len(dataPosHostR2_PathogenR1)>0:
+        dataPosHostR2_PathogenR1=annotate(dataBedHostR2_PathogenR1,os.path.abspath(args.annotation),dataPosHostR2_PathogenR1)
+    if len(dataPosHostR1_PathogenR2)>0:
+        dataPosHostR1_PathogenR2=annotate(dataBedHostR1_PathogenR2,os.path.abspath(args.annotation),dataPosHostR1_PathogenR2)
 
-    if not dataPosHumR1_HIVR2 is None and len(dataPosHumR1_HIVR2)>0:
-        dataPosHumR1_HIVR2=approxCloseness(dataPosHumR1_HIVR2,30)
-        dataPosHumR1_HIVR2["reads"]=dataPosHumR1_HIVR2["reads"].str.join(";")
-    if not dataPosHumR2_HIVR1 is None and len(dataPosHumR2_HIVR1)>0:
-        dataPosHumR2_HIVR1=approxCloseness(dataPosHumR2_HIVR1,30)
-        dataPosHumR2_HIVR1["reads"]=dataPosHumR2_HIVR1["reads"].str.join(";")
+    if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
+        dataPosHostR1_PathogenR2=approxCloseness(dataPosHostR1_PathogenR2,30)
+        dataPosHostR1_PathogenR2["reads"]=dataPosHostR1_PathogenR2["reads"].str.join(";")
+    if not dataPosHostR2_PathogenR1 is None and len(dataPosHostR2_PathogenR1)>0:
+        dataPosHostR2_PathogenR1=approxCloseness(dataPosHostR2_PathogenR1,30)
+        dataPosHostR2_PathogenR1["reads"]=dataPosHostR2_PathogenR1["reads"].str.join(";")
 
-    if not dataPosHumR1_HIVR2 is None and len(dataPosHumR1_HIVR2)>0:
-        dataPosHumR1_HIVR2=groupBySpliceSites(dataPosHumR1_HIVR2)
-    if not dataPosHumR2_HIVR1 is None and len(dataPosHumR2_HIVR1)>0:
-        dataPosHumR2_HIVR1=groupBySpliceSites(dataPosHumR2_HIVR1)
+    if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
+        dataPosHostR1_PathogenR2=groupBySpliceSites(dataPosHostR1_PathogenR2)
+    if not dataPosHostR2_PathogenR1 is None and len(dataPosHostR2_PathogenR1)>0:
+        dataPosHostR2_PathogenR1=groupBySpliceSites(dataPosHostR2_PathogenR1)
 
-    if not dataPosHumR1_HIVR2 is None and len(dataPosHumR1_HIVR2)>0:
-        dataPosHumR1_HIVR2=score(dataPosHumR1_HIVR2,args.minLen)
-    if not dataPosHumR2_HIVR1 is None and len(dataPosHumR2_HIVR1)>0:
-        dataPosHumR2_HIVR1=score(dataPosHumR2_HIVR1,args.minLen)
+    if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
+        dataPosHostR1_PathogenR2=score(dataPosHostR1_PathogenR2,args.minLen)
+    if not dataPosHostR2_PathogenR1 is None and len(dataPosHostR2_PathogenR1)>0:
+        dataPosHostR2_PathogenR1=score(dataPosHostR2_PathogenR1,args.minLen)
 
-    if not dataPosHumR1_HIVR2 is None and len(dataPosHumR1_HIVR2)>0:
-        dataPosHumR1_HIVR2=dataPosHumR1_HIVR2.sort_values(by='score',ascending=False).reset_index(drop=True)
-        dataPosHumR1_HIVR2[['hum_seq','hiv_seq','hum_rs','hum_re','hiv_rs','hiv_re']]=dataPosHumR1_HIVR2['seq'].apply(pd.Series)
+    if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
+        dataPosHostR1_PathogenR2=dataPosHostR1_PathogenR2.sort_values(by='score',ascending=False).reset_index(drop=True)
+        dataPosHostR1_PathogenR2[['host_seq','pathogen_seq','host_rs','host_re','pathogen_rs','pathogen_re']]=dataPosHostR1_PathogenR2['seq'].apply(pd.Series)
         
-    if not dataPosHumR2_HIVR1 is None and len(dataPosHumR2_HIVR1)>0:
-        dataPosHumR2_HIVR1=dataPosHumR2_HIVR1.sort_values(by='score',ascending=False).reset_index(drop=True)
-        dataPosHumR2_HIVR1[['hum_seq','hiv_seq','hum_rs','hum_re','hiv_rs','hiv_re']]=dataPosHumR2_HIVR1['seq'].apply(pd.Series)
+    if not dataPosHostR2_PathogenR1 is None and len(dataPosHostR2_PathogenR1)>0:
+        dataPosHostR2_PathogenR1=dataPosHostR2_PathogenR1.sort_values(by='score',ascending=False).reset_index(drop=True)
+        dataPosHostR2_PathogenR1[['host_seq','pathogen_seq','host_rs','host_re','pathogen_rs','pathogen_re']]=dataPosHostR2_PathogenR1['seq'].apply(pd.Series)
 
-    dataPos=pd.concat([pd.DataFrame(dataPosHumR1_HIVR2),pd.DataFrame(dataPosHumR2_HIVR1)])
+    dataPos=pd.concat([pd.DataFrame(dataPosHostR1_PathogenR2),pd.DataFrame(dataPosHostR2_PathogenR1)])
     if not len(dataPos)>0:
         return
-    colsOrder=["hum_nearest_SS",
+    colsOrder=["gene_name",
                "chr",
-               "hum_rs",
-               "hum_re",
-               "hiv_rs",
-               "hiv_re",
-               "hum_seq",
-               "hiv_seq",
+               "host_rs",
+               "host_re",
+               "pathogen_rs",
+               "pathogen_re",
+               "host_seq",
+               "pathogen_seq",
                "count",
                "score"]
 
     dataPos.to_csv(os.path.abspath(args.out)+".span.full.csv",index=False)
-    dataPos_Clean=dataPos[(dataPos['entropyScore_hiv']>args.minEntropy) \
-                            &(dataPos['entropyScore_hum']>args.minEntropy) \
+    dataPos_Clean=dataPos[(dataPos['entropyScore_pathogen']>args.minEntropy) \
+                            &(dataPos['entropyScore_host']>args.minEntropy) \
                             &(dataPos['score']>args.score)]
 
     if not dataPos_Clean is None and len(dataPos_Clean)>0:
         dataPos_Clean[colsOrder].to_csv(os.path.abspath(args.out)+".span.csv",index=False)
 
-def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
+def wrapper(outDir,baseName,dirPath,fileName,minLen,args,pathogen_fname,host_fname,s,mate):
     # load data from local alignments
     global sam_colnames
-    dataG2=pd.read_csv(os.path.abspath(in1),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
-    dataG1=pd.read_csv(os.path.abspath(in2),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataPathogen=pd.read_csv(os.path.abspath(pathogen_fname),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
+    dataHost=pd.read_csv(os.path.abspath(host_fname),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
 
-    if (len(dataG2)==0 or len(dataG1)==0): #exit if either alignment is empty
+    if (len(dataPathogen)==0 or len(dataHost)==0): #exit if either alignment is empty
         return
     
     outDirPOS=outDir+"/Positions/"
@@ -1914,18 +1774,18 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
         os.mkdir(os.path.abspath(outDir+"/Positions/"+baseName))
 
     global reportDF
-    if len(dataG2)>0 and len(dataG1)>0:
-        dataLen=dataG1["SEQ"].str.len()
-        reportDF["number of reads before removing spliced reads"]=len(dataG1)
+    if len(dataPathogen)>0 and len(dataHost)>0:
+        dataLen=dataHost["SEQ"].str.len()
+        reportDF["number of reads before removing spliced reads"]=len(dataHost)
         reportDF["original read len mean"]=dataLen.mean()
         reportDF["original read len std"]=dataLen.std()
         reportDF["original read len min"]=dataLen.min()
         reportDF["original read len max"]=dataLen.max()
         # extract flag information
-        extractFlagBits(dataG2)
-        extractFlagBits(dataG1)
+        extractFlagBits(dataPathogen)
+        extractFlagBits(dataHost)
         unpaired=False
-        if len(dataG2[dataG2["paired"]>0])==0 and len(dataG1[dataG1["paired"]>0])==0:
+        if len(dataPathogen[dataPathogen["paired"]>0])==0 and len(dataHost[dataHost["paired"]>0])==0:
             unpaired=True
         
         # need to verify that both paired and unpaired work below.
@@ -1936,73 +1796,73 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
                 dataSpliced=pd.read_csv(os.path.abspath(s),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
                 extractFlagBits(dataSpliced)
                 dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
-                dataG1["tid"]=dataG1['QNAME']+dataG1['firstRead'].astype(str)+dataG1['lastRead'].astype(str)
-                dataG2["tid"]=dataG2['QNAME']+dataG2['firstRead'].astype(str)+dataG2['lastRead'].astype(str)
-                dataG2=dataG2[~dataG2['tid'].isin(set(dataSpliced['tid']))]
-                dataG1=dataG1[dataG1['tid'].isin(set(dataG2['tid']))]
-                dataG2=dataG2[dataG2['tid'].isin(set(dataG1['tid']))]
-                dataG2.drop(['tid'],axis=1,inplace=True)
-                dataG1.drop(['tid'],axis=1,inplace=True)
+                dataHost["tid"]=dataHost['QNAME']+dataHost['firstRead'].astype(str)+dataHost['lastRead'].astype(str)
+                dataPathogen["tid"]=dataPathogen['QNAME']+dataPathogen['firstRead'].astype(str)+dataPathogen['lastRead'].astype(str)
+                dataPathogen=dataPathogen[~dataPathogen['tid'].isin(set(dataSpliced['tid']))]
+                dataHost=dataHost[dataHost['tid'].isin(set(dataPathogen['tid']))]
+                dataPathogen=dataPathogen[dataPathogen['tid'].isin(set(dataHost['tid']))]
+                dataPathogen.drop(['tid'],axis=1,inplace=True)
+                dataHost.drop(['tid'],axis=1,inplace=True)
 
-                dataLen=dataG1["SEQ"].str.len()
-                reportDF["number of reads shared between G2 and human post splicing"]=len(dataG1)
-                reportDF["read len mean shared between G2 and human post splicing"]=dataLen.mean()
-                reportDF["read len std shared between G2 and human post splicing"]=dataLen.std()
-                reportDF["read len min shared between G2 and human post splicing"]=dataLen.min()
-                reportDF["read len max shared between G2 and human post splicing"]=dataLen.max()
+                dataLen=dataHost["SEQ"].str.len()
+                reportDF["number of reads shared between pathogen and host post splicing"]=len(dataHost)
+                reportDF["read len mean shared between pathogen and host post splicing"]=dataLen.mean()
+                reportDF["read len std shared between pathogen and host post splicing"]=dataLen.std()
+                reportDF["read len min shared between pathogen and host post splicing"]=dataLen.min()
+                reportDF["read len max shared between pathogen and host post splicing"]=dataLen.max()
             else:
                 print("Spliced file does not exist")
-        elif unpaired==False: # still remove all human which are not in hiv
-            dataG1["tid"]=dataG1['QNAME']+dataG1['firstRead'].astype(str)+dataG1['lastRead'].astype(str)
-            dataG2["tid"]=dataG2['QNAME']+dataG2['firstRead'].astype(str)+dataG2['lastRead'].astype(str)
-            dataG2=dataG2[dataG2['tid'].isin(set(dataG1['tid']))]
-            dataG1=dataG1[dataG1['tid'].isin(set(dataG2['tid']))]
-            dataG2.drop(['tid'],axis=1,inplace=True)
-            dataG1.drop(['tid'],axis=1,inplace=True)
-            dataLen=dataG1["SEQ"].str.len()
-            reportDF["number of reads shared between G2 and human post splicing"]=len(dataG1)
-            reportDF["read len mean shared between G2 and human post splicing"]=dataLen.mean()
-            reportDF["read len std shared between G2 and human post splicing"]=dataLen.std()
-            reportDF["read len min shared between G2 and human post splicing"]=dataLen.min()
-            reportDF["read len max shared between G2 and human post splicing"]=dataLen.max()
+        elif unpaired==False: # still remove all host which are not in pathogen
+            dataHost["tid"]=dataHost['QNAME']+dataHost['firstRead'].astype(str)+dataHost['lastRead'].astype(str)
+            dataPathogen["tid"]=dataPathogen['QNAME']+dataPathogen['firstRead'].astype(str)+dataPathogen['lastRead'].astype(str)
+            dataPathogen=dataPathogen[dataPathogen['tid'].isin(set(dataHost['tid']))]
+            dataHost=dataHost[dataHost['tid'].isin(set(dataPathogen['tid']))]
+            dataPathogen.drop(['tid'],axis=1,inplace=True)
+            dataHost.drop(['tid'],axis=1,inplace=True)
+            dataLen=dataHost["SEQ"].str.len()
+            reportDF["number of reads shared between pathogen and host post splicing"]=len(dataHost)
+            reportDF["read len mean shared between pathogen and host post splicing"]=dataLen.mean()
+            reportDF["read len std shared between pathogen and host post splicing"]=dataLen.std()
+            reportDF["read len min shared between pathogen and host post splicing"]=dataLen.min()
+            reportDF["read len max shared between pathogen and host post splicing"]=dataLen.max()
         else:
-            dataG1["tid"]=dataG1['QNAME']
-            dataG2["tid"]=dataG2['QNAME']
-            dataG2=dataG2[dataG2['tid'].isin(set(dataG1['tid']))]
-            dataG1=dataG1[dataG1['tid'].isin(set(dataG2['tid']))]
-            dataG2.drop(['tid'],axis=1,inplace=True)
-            dataG1.drop(['tid'],axis=1,inplace=True)
-            dataLen=dataG1["SEQ"].str.len()
-            reportDF["number of reads shared between G2 and human post splicing"]=len(dataG1)
-            reportDF["read len mean shared between G2 and human post splicing"]=dataLen.mean()
-            reportDF["read len std shared between G2 and human post splicing"]=dataLen.std()
-            reportDF["read len min shared between G2 and human post splicing"]=dataLen.min()
-            reportDF["read len max shared between G2 and human post splicing"]=dataLen.max()
+            dataHost["tid"]=dataHost['QNAME']
+            dataPathogen["tid"]=dataPathogen['QNAME']
+            dataPathogen=dataPathogen[dataPathogen['tid'].isin(set(dataHost['tid']))]
+            dataHost=dataHost[dataHost['tid'].isin(set(dataPathogen['tid']))]
+            dataPathogen.drop(['tid'],axis=1,inplace=True)
+            dataHost.drop(['tid'],axis=1,inplace=True)
+            dataLen=dataHost["SEQ"].str.len()
+            reportDF["number of reads shared between pathogen and host post splicing"]=len(dataHost)
+            reportDF["read len mean shared between pathogen and host post splicing"]=dataLen.mean()
+            reportDF["read len std shared between pathogen and host post splicing"]=dataLen.std()
+            reportDF["read len min shared between pathogen and host post splicing"]=dataLen.min()
+            reportDF["read len max shared between pathogen and host post splicing"]=dataLen.max()
 
         # extract start and end for both template and reference
-        dataG2=extractStartEnd(dataG2)
-        dataG1=extractStartEnd(dataG1)
+        dataPathogen=extractStartEnd(dataPathogen)
+        dataHost=extractStartEnd(dataHost)
 
-        dataG1,dataG2=filterReads(dataG1,dataG2)
-        dataLen=dataG1["SEQ"].str.len()
-        reportDF["number of reads after sam flag filtering"]=len(dataG1)
+        dataHost,dataPathogen=filterReads(dataHost,dataPathogen)
+        dataLen=dataHost["SEQ"].str.len()
+        reportDF["number of reads after sam flag filtering"]=len(dataHost)
         reportDF["read len mean after sam flag filtering"]=dataLen.mean()
         reportDF["read len std after sam flag filtering"]=dataLen.std()
         reportDF["read len min after sam flag filtering"]=dataLen.min()
         reportDF["read len max after sam flag filtering"]=dataLen.max()
-        if len(dataG1)==0:
+        if len(dataHost)==0:
             return
 
-        data=pd.DataFrame(dataG2["QNAME"]).reset_index(drop=True)
-        dataG1=dataG1.reset_index(drop=True)
-        dataG2=dataG2.reset_index(drop=True)
+        data=pd.DataFrame(dataPathogen["QNAME"]).reset_index(drop=True)
+        dataHost=dataHost.reset_index(drop=True)
+        dataPathogen=dataPathogen.reset_index(drop=True)
         if unpaired:
-            data=createDataUnpaired(data,dataG1,dataG2)
+            data=createDataUnpaired(data,dataHost,dataPathogen)
         else:
-            data=createData(data,dataG1,dataG2)
+            data=createData(data,dataHost,dataPathogen)
 
-        del dataG1
-        del dataG2
+        del dataHost
+        del dataPathogen
         data.replace('', np.nan,inplace=True)
         data.fillna(0,inplace=True)
         if unpaired:
@@ -2018,7 +1878,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,in1,in2,s,mate):
             dataPos=filterOverlapCombineUnpaired(data,args)
         else:
             dataPos=filterOverlapCombine(data,args)
-        dataPos=dataPos[(dataPos["entropyScore_g1"]>args.minEntropy)&(dataPos["entropyScore_g2"]>args.minEntropy)]
+        dataPos=dataPos[(dataPos["entropyScore_host"]>args.minEntropy)&(dataPos["entropyScore_pathogen"]>args.minEntropy)]
 
         dataPos=findSupport(dataPos,minLen,unpaired)
         if len(dataPos)>0:
@@ -2032,14 +1892,14 @@ def main(args):
         print('output directory does not exist')
         return
 
-    al1r1=os.path.abspath(args.input1r1)
-    al2r1=os.path.abspath(args.input2r1)
-    al1r2=os.path.abspath(args.input1r1)
-    al2r2=os.path.abspath(args.input2r1)
-    fullPath1r1=os.path.abspath(os.path.realpath(al1r1))
-    fullPath2r1=os.path.abspath(os.path.realpath(al2r1))
-    fullPath1r2=os.path.abspath(os.path.realpath(al1r2))
-    fullPath2r2=os.path.abspath(os.path.realpath(al2r2))
+    pathogen_r1=os.path.abspath(args.pathogenR1)
+    host_r1=os.path.abspath(args.hostR1)
+    pathogen_r2=os.path.abspath(args.pathogenR2)
+    host_r2=os.path.abspath(args.hostR2)
+    fullPath1r1=os.path.abspath(os.path.realpath(pathogen_r1))
+    fullPath2r1=os.path.abspath(os.path.realpath(host_r1))
+    fullPath1r2=os.path.abspath(os.path.realpath(pathogen_r2))
+    fullPath2r2=os.path.abspath(os.path.realpath(host_r2))
 
     if os.path.exists(fullPath1r1) and os.path.exists(fullPath2r1) and os.path.exists(fullPath1r2) and os.path.exists(fullPath2r2):
         fileName=fullPath1r1.split('/')[-1]
@@ -2047,7 +1907,7 @@ def main(args):
         baseName=fileName.split(".")[0]
         ext=".".join(fileName.split(".")[1:-1])
 
-        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r1,args.input2r1,args.splicedR1,"r1")
+        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.pathogenR1,args.hostR1,args.splicedR1,"r1")
         if not args.quiet:
             print("report after wrapper r1")
             printReport()
@@ -2055,8 +1915,8 @@ def main(args):
         global reportDF
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
 
-        reportDF=pd.DataFrame([])
-        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.input1r2,args.input2r2,args.splicedR2,"r2")
+        reportDF=pd.DataFrame([[]])
+        resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.pathogenR2,args.hostR2,args.splicedR2,"r2")
         if not args.quiet:
             print("report after wrapper r2")
             printReport()
@@ -2077,27 +1937,22 @@ def chimFinder(argv):
 #==== Take two alignments and output ======
 #=========== suggested chimeras ===========
 #==========================================
-#./hiv.py -i1 hiv.sam -i2 hum.sam -o ${outputDir}_R2/${sample}${baseEnd} -t 12 --minLen 30 -a ${annotation} --overlap 5 --gap 5
-    parser.add_argument('-i1r1',
-                              '--input1r1',
+    parser.add_argument('--pathogenR1',
                               required=True,
                               type=str,
-                              help="first alignment r1")
-    parser.add_argument('-i1r2',
-                              '--input1r2',
+                              help="Alignments of Mate 1 reads to pathogen genome")
+    parser.add_argument('--pathogenR2',
                               required=True,
                               type=str,
-                              help="first alignment r2")
-    parser.add_argument('-i2r1',
-                              '--input2r1',
+                              help="Alignments of Mate 2 reads to pathogen genome")
+    parser.add_argument('--hostR1',
                               required=True,
                               type=str,
-                              help="second alignment r1")
-    parser.add_argument('-i2r2',
-                              '--input2r2',
+                              help="Alignments of Mate 1 reads to host genome")
+    parser.add_argument('--hostR2',
                               required=True,
                               type=str,
-                              help="second alignment r2")
+                              help="Alignments of Mate 2 reads to host genome")
     parser.add_argument('-o',
                               '--out',
                               required=False,
@@ -2195,7 +2050,7 @@ def chimFinder(argv):
                               '--annotation',
                               required=True,
                               type=str,
-                              help="annotation for the human genome")
+                              help="annotation for the host genome")
     parser.add_argument('-w',
                               '--writeReads',
                               action="store_true",
