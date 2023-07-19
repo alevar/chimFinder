@@ -1198,8 +1198,6 @@ def get_gene_name(attribute_str: str) -> str:
     return "-"
 
 def annotate(dataBed,annPath,data):
-    data.to_csv("/home/sparrow/JHU/ChimFinder/data.csv",index=False)
-    dataBed.to_csv("/home/sparrow/JHU/ChimFinder/dataBed.csv",index=False)
     # extract gene names for the annotation
     ann_df = pd.read_csv(annPath,sep="\t",comment="#",names=["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"])
     ann_df = ann_df[ann_df["type"]=="gene"].reset_index(drop=True)
