@@ -2,11 +2,11 @@
 
 inputDir=${1}
 outputDir=${2}
-genome1DB=${3}
-genome2DB=${4}
-genome2_annotation=${5}
+pathogenDB=${3}
+hostDB=${4}
+host_annotation=${5}
 threads=${6}
-genome2Splicing=${7}
+hostSplicing=${7}
 trim_galore=${8}
 
 mkdir -p ${outputDir}_R1
@@ -64,30 +64,30 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 	SECONDS=0
-	echo BOWTIE2 ALIGNING R1 TO first genome index
+	echo BOWTIE2 ALIGNING R1 TO pathogen genome index
 	bowtie2 --very-sensitive-local \
 			--no-unal \
 			--local \
 			--phred33 \
 			-p ${threads} \
-			-x ${genome1DB} \
+			-x ${pathogenDB} \
 			-U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.fastq \
-			-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.i1.bowtie.sam \
+			-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.pathogen.bowtie.sam \
 			--al ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 	SECONDS=0
-	echo BOWTIE2 ALIGNING R2 TO first genome index
+	echo BOWTIE2 ALIGNING R2 TO pathogen genome index
 	bowtie2 --very-sensitive-local \
 			--no-unal \
 			--local \
 			--phred33 \
 			-p ${threads} \
-			-x ${genome1DB} \
+			-x ${pathogenDB} \
 			-U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.fastq \
-			-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.i1.bowtie.sam \
+			-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.pathogen.bowtie.sam \
 			--al ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
@@ -107,76 +107,76 @@ for file in ${inputDir}/*R1*fastq.gz ; do
 
 
 	SECONDS=0
-	echo BOWTIE2 ALIGNING R1 TO the second genome index
+	echo BOWTIE2 ALIGNING R1 TO the host genome index
 	bowtie2 --very-sensitive-local \
 			--no-unal \
 			--local \
 			--phred33 \
 			-p ${threads} \
-			-x ${genome2DB} \
+			-x ${hostDB} \
 			-U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq \
-			-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.i2.bowtie.sam
+			-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.host.bowtie.sam
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 	SECONDS=0
-	echo HISAT ALIGNING R1 TO the second genome index
+	echo HISAT ALIGNING R1 TO the host genome index
 	hisat2 -p ${threads} \
 			--very-sensitive \
 			--end-to-end \
-			--known-splicesite-infile ${genome2Splicing} \
+			--known-splicesite-infile ${hostSplicing} \
 			--no-unal \
 			--phred33 \
-			-x ${genome2DB} \
+			-x ${hostDB} \
 			-U ${outputDir}_R1/tmp/fq/${sample}${baseEnd}_R1.al.fastq \
-			-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.i2.hisat.sam
+			-S ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.host.hisat.sam
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 	SECONDS=0
-	echo BOWTIE2 ALIGNING R2 TO the second genome index
+	echo BOWTIE2 ALIGNING R2 TO the host genome index
 	bowtie2 --very-sensitive-local \
 			--no-unal \
 			--local \
 			--phred33 \
 			-p ${threads} \
-			-x ${genome2DB} \
+			-x ${hostDB} \
 			-U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq \
-			-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.i2.bowtie.sam
+			-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.host.bowtie.sam
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 	SECONDS=0
-	echo HISAT ALIGNING R2 TO the second genome index
+	echo HISAT ALIGNING R2 TO the host genome index
 	hisat2 -p ${threads} \
 			--very-sensitive \
 			--end-to-end \
-			--known-splicesite-infile ${genome2Splicing} \
+			--known-splicesite-infile ${hostSplicing} \
 			--no-unal \
 			--phred33 \
-			-x ${genome2DB} \
+			-x ${hostDB} \
 			-U ${outputDir}_R2/tmp/fq/${sample}${baseEnd}_R2.al.fastq \
-			-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.i2.hisat.sam
+			-S ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.host.hisat.sam
 	DUR="$(($SECONDS / 60)) minutes and $(($SECONDS % 60)) seconds"
 	echo DONE IN ${DUR}
 	TOTAL_TIME=$((TOTAL_TIME + ${SECONDS}))
 
 	SECONDS=0
 	echo ANALYZING
-	./chimFinder.py --input1r1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.i1.bowtie.sam \
-					--input2r1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.i2.bowtie.sam \
-					--input1r2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.i1.bowtie.sam \
-					--input2r2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.i2.bowtie.sam \
-					--splicedR1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.i2.hisat.sam \
-					--splicedR2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.i2.hisat.sam \
+	./chimFinder.py --pathogenR1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.pathogen.bowtie.sam \
+					--hostR1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.host.bowtie.sam \
+					--pathogenR2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.pathogen.bowtie.sam \
+					--hostR2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.host.bowtie.sam \
+					--splicedR1 ${outputDir}_R1/tmp/alns/${sample}${baseEnd}.host.hisat.sam \
+					--splicedR2 ${outputDir}_R2/tmp/alns/${sample}${baseEnd}.host.hisat.sam \
 					-o ${outputDir}/${sample}${baseEnd} \
 					-t 12 \
 					--minLen 20 \
 					--maxLenUnmapped 30 \
-					-a ${genome2_annotation} \
+					-a ${host_annotation} \
 					--overlap 5 \
 					--gap 5 \
 					--minEntropy 0.84 \

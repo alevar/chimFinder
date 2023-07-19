@@ -1753,7 +1753,7 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     dataPos.to_csv(os.path.abspath(args.out)+".span.full.csv",index=False)
     dataPos_Clean=dataPos[(dataPos['entropyScore_pathogen']>args.minEntropy) \
                             &(dataPos['entropyScore_host']>args.minEntropy) \
-                            &(dataPos['score']>args.score)]
+                            &(dataPos['score']>args.score)].reset_index(drop=True)
 
     if not dataPos_Clean is None and len(dataPos_Clean)>0:
         dataPos_Clean[colsOrder].to_csv(os.path.abspath(args.out)+".span.csv",index=False)
