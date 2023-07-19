@@ -1198,8 +1198,6 @@ def get_gene_name(attribute_str: str) -> str:
     return "-"
 
 def annotate(dataBed,annPath,data):
-    data.to_csv("/home/sparrow/JHU/ChimFinder/data.csv",index=False)
-    dataBed.to_csv("/home/sparrow/JHU/ChimFinder/dataBed.csv",index=False)
     # extract gene names for the annotation
     ann_df = pd.read_csv(annPath,sep="\t",comment="#",names=["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"])
     ann_df = ann_df[ann_df["type"]=="gene"].reset_index(drop=True)
@@ -1269,12 +1267,15 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
             dataPos[['seq','host_pos','drop','overlap','gap']]=dataPos['seq'].apply(pd.Series)
             dataPos.drop("drop",axis=1,inplace=True)
 
+            dataPos["sample"] = args.pathogenR1.split("/")[-1].split(".")[0]
+    
             dataPos.to_csv(os.path.abspath(args.out)+"."+mate+".full.csv",index=False)
             dataPosClean=dataPos[(dataPos['entropyScore_pathogen']>args.minEntropy) \
                                 &(dataPos['entropyScore_host']>args.minEntropy) \
                                 &(dataPos['score']>args.score)]
 
-            colsOrder=["gene_name",
+            colsOrder=["sample",
+                       "gene_name",
                        "chr",
                        "host_pos",
                        "R",
@@ -1739,7 +1740,10 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     dataPos=pd.concat([pd.DataFrame(dataPosHostR1_PathogenR2),pd.DataFrame(dataPosHostR2_PathogenR1)])
     if not len(dataPos)>0:
         return
-    colsOrder=["gene_name",
+    
+    dataPos["sample"] = args.pathogenR1.split("/")[-1].split(".")[0]
+    colsOrder=["sample",
+               "gene_name",
                "chr",
                "host_rs",
                "host_re",
@@ -1907,21 +1911,22 @@ def main(args):
         baseName=fileName.split(".")[0]
         ext=".".join(fileName.split(".")[1:-1])
 
+        global reportDF
+        reportDF["sample"]=args.pathogenR1.split("/")[-1].split(".")[0]
         resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.pathogenR1,args.hostR1,args.splicedR1,"r1")
         if not args.quiet:
             print("report after wrapper r1")
             printReport()
-
-        global reportDF
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
 
         reportDF=pd.DataFrame([[]])
+        reportDF["sample"]=args.pathogenR1.split("/")[-1].split(".")[0]
         resultsRow=wrapper(outDir,baseName,dirPath,fileName,args.minLen,args,args.pathogenR2,args.hostR2,args.splicedR2,"r2")
         if not args.quiet:
             print("report after wrapper r2")
             printReport()
-
         reportDF.to_csv(os.path.abspath(args.out)+".report",index=False)
+        
         wrapperSpan(outDir,baseName,dirPath,fileName,args.minLen,args)
 
     else:
