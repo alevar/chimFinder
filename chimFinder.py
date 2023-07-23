@@ -937,7 +937,7 @@ def findSupport(data,minLen,unpaired):
     dataPos.rename(columns={'HOST_ID':'chr'}, inplace=True)            
     return dataPos
 
-def score(dataPos,args,minLen):
+def score(dataPos,args):
     dataPos["READ_LEN"]=dataPos["READ_LEN"].astype(float)/dataPos["count"].astype(float)
     dataPos["PATHOGEN_MAPQ"]=dataPos["PATHOGEN_MAPQ"].astype(float)/dataPos["count"].astype(float)
     dataPos["HOST_MAPQ"]=dataPos["HOST_MAPQ"].astype(float)/dataPos["count"].astype(float)
@@ -1002,10 +1002,6 @@ def approxCloseness(data,args):
     data["uid"]=pd.Series(newL)
 
     return data.drop(['diff1','diff2','t1','t2','t'],axis=1).reset_index(drop=True)
-
-def getSet(row):
-    tmpLocalQNAME=list(row["reads"])
-    return tmpLocalQNAME
 
 def writeReadNames(outDir,row,fileNameR1,fileNameR2,baseName,dirPath):
     outD=os.path.abspath(outDir)
@@ -1262,7 +1258,7 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
             else:
                 dataPos=groupBySpliceSites(dataPos)
 
-            dataPos=score(dataPos,args,args.minLen)
+            dataPos=score(dataPos,args)
             dataPos=dataPos.sort_values(by='score',ascending=False).reset_index(drop=True)
             dataPos[['seq','host_pos','drop','overlap','gap']]=dataPos['seq'].apply(pd.Series)
             dataPos.drop("drop",axis=1,inplace=True)
@@ -1313,46 +1309,7 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
                     dataPosClean=dataPosClean[dataPosClean['score']>0.9]
                     dataPosClean.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
 
-def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
-    def extractFlagBits(data):
-        data["paired"]=data["FLAG"]               &1 #template having multiple segments in sequencing
-        data["aligned2Mates"]=data["FLAG"]        &2 #each segment properly aligned according to the aligner
-        data["unmappedCurr"]=data["FLAG"]         &4 #segment unmapped
-        data["unmappedMate"]=data["FLAG"]         &8 #next segment in the template unmapped
-        data["reversedCurr"]=data["FLAG"]         &16 #SEQ being reverse complemented
-        data["reversedMate"]=data["FLAG"]         &32 #SEQ of the next segment in the template being reverse complemented
-        data["firstRead"]=data["FLAG"]            &64 #the first segment in the template
-        data["lastRead"]=data["FLAG"]             &128 #the last segment in the template
-        data["secondaryAlignment"]=data["FLAG"]   &256 #secondary alignment
-        data["noPassFilter"]=data["FLAG"]         &512 #not passing filters, such as platform/vendor quality controls
-        data["PCRdup"]=data["FLAG"]               &1024 #PCR or optical duplicate
-        data["suppAl"]=data["FLAG"]               &2048 #supplementary alignment
-        
-    def extractStartEnd(data):
-        data["CIGAR"].replace("*",np.nan,inplace=True)
-        data.dropna(axis=0,inplace=True)
-        data.reset_index(drop=True,inplace=True)
-
-        data["READ_LEN"]=data.SEQ.str.len()
-        data["CIGAR_POST"]=data.CIGAR.str.extract("[M]([0-9]+)[A-Z]$",expand=False).replace(np.nan,0).astype(int)
-        data["END"]=data.READ_LEN-data.CIGAR_POST
-        data["CIGAR_PRE"]=data.CIGAR.str.extract("^([0-9]+)[S]",expand=False).replace(np.nan,0).astype(int)
-
-        data16=data[data["reversedCurr"]==16].reset_index(drop=True)
-        data0=data[data["reversedCurr"]==0].reset_index(drop=True)
-        data16["Template_start"]=data16.READ_LEN-data16.END
-        data16["Template_end"]=data16.READ_LEN-data16.CIGAR_PRE-1
-        data0["Template_start"]=data0.CIGAR_PRE
-        data0["Template_end"]=data0.END
-
-        data16["Reference_start"]=data16.READ_LEN-data16.END+data16.POS-data16.Template_start
-        data16["Reference_end"]=data16.READ_LEN-data16.CIGAR_PRE-1+data16.POS-data16.Template_start
-        data0["Reference_start"]=data0.POS
-        data0["Reference_end"]=data0.END+data0.POS-data0.CIGAR_PRE
-
-        data=pd.concat([data16,data0]).reset_index(drop=True)
-        data.drop(["CIGAR_POST","END","CIGAR_PRE"],axis=1,inplace=True)
-        return data
+def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args): 
 
     def filterReads(dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2):
         #remove all reads that belong to secondary or supplementary alignments and did not have PCR duplicates
@@ -1365,44 +1322,11 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     def createData(data,dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2):
         dataHostR1_PathogenR2=data.merge(dataHost_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
         dataHostR1_PathogenR2=dataHostR1_PathogenR2.merge(dataPathogen_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        data
         
         dataHostR2_PathogenR1=data.merge(dataHost_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
         dataHostR2_PathogenR1=dataHostR2_PathogenR1.merge(dataPathogen_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
         
         return data
-
-    memo={}
-    # the function below should compute normalized entropy as described in https://academic.oup.com/bioinformatics/article/27/8/1061/227307/Topological-entropy-of-DNA-sequences
-    def topologicalNormalizedEntropy(s):
-        def findCF(l):
-            for i in range(1,l):
-                lt=((4**i)+i)-1 #lesser term of the CF expression
-                if lt>l:
-                    return i-1
-
-        def countSubString(s,l):
-            substrings=[]
-            for i in range(len(s)-l):
-                substrings.append(s[i:i+l])
-            return len(set(substrings))
-
-        # calculate the expected entropy
-        def expectedEntropy(n):
-            fourN=float(4**n)
-            logTerm=(fourN-(fourN*((1.0-(1.0/fourN))**fourN)))
-            return math.log(logTerm,4)/float(n)
-
-        global memo
-        if len(s) in memo:
-            maxSubstringLen=memo[len(s)]
-        else:
-            maxSubstringLen=findCF(len(s))
-            memo[len(s)]=maxSubstringLen
-        n=countSubString(s,maxSubstringLen)
-        res=math.log(n,4)/maxSubstringLen
-        
-        return res
 
     def processAligns(seqPathogen,seqHost,qual_pathogen,qual_host,i1_pathogen,i2_pathogen,i1_host,i2_host,len_pathogen,len_host,rPathogen,rHost):
 
@@ -1548,32 +1472,6 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         dataPos.rename(columns={'HOST_ID':'chr'}, inplace=True)            
         return dataPos
 
-    def approxCloseness(data,args):
-        data.sort_values(by=["HOST_RS","gene_name"],inplace=True)
-        data["diff1"]=abs(data['HOST_RS']-data['HOST_RS'].shift(-1))
-        data["diff2"]=abs(data['HOST_RS']-data['HOST_RS'].shift(1))
-        data['t1']=data["diff1"]<30
-        data['t2']=data["diff2"]<30
-        data['t']=data['t1']|data['t2']
-
-        l=list(data["t"])
-        uid=0
-        start=True
-        newL=[]
-        for x in range(len(l)):
-            if start:
-                newL.append(uid)
-                start=False
-            elif l[x]==l[x-1]:
-                newL.append(uid)
-            else:
-                uid=uid+1
-                newL.append(uid)
-        data.reset_index(inplace=True,drop=True)
-        data["uid"]=pd.Series(newL)
-
-        return data.drop(['diff1','diff2','t1','t2','t'],axis=1).reset_index(drop=True)
-
     def groupBySpliceSites(data):
         
         dfg=pd.DataFrame(data.groupby(by=["gene_name",
@@ -1605,7 +1503,7 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
 
         return dfg.reset_index(drop=True)
 
-    def score(dataPos,minLen):
+    def score(dataPos,args):
         dataPos["HOST_LEN"]=dataPos["HOST_LEN"].astype(float)/dataPos["count"].astype(float)
         dataPos["PATHOGEN_LEN"]=dataPos["PATHOGEN_LEN"].astype(float)/dataPos["count"].astype(float)
         dataPos["PATHOGEN_MAPQ"]=dataPos["PATHOGEN_MAPQ"].astype(float)/dataPos["count"].astype(float)
@@ -1616,16 +1514,16 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         dataPos["entropyScore_host"]=dataPos["entropyScore_host"].astype(float)/dataPos["count"].astype(float)
         dataPos["count"]=dataPos["count"].astype(float)
 
-        k=float(minLen)
-        ssAl=0.1
+        k=float(args.minLen)
+        ssAl=args.steepSlopeAL
 
         dataPos["PATHOGEN_AL_score"]=((dataPos['PATHOGEN_AL']-k)/((ssAl+(dataPos['PATHOGEN_AL']-k)**2.0)**0.5)+1.0)/2.0
         dataPos["HOST_AL_score"]=((dataPos['HOST_AL']-k)/((ssAl+(dataPos['HOST_AL']-k)**2.0)**0.5)+1.0)/2.0
 
-        m=float(1)/2.0
+        m=float(args.minCount)/2.0
         dataPos["count_score"]=((dataPos['count']-m)/((1.0+(dataPos['count']-m)**2.0)**0.5)+1.0)/2.0 \
-                                    *(1.0-0.85) \
-                                    +0.85 # algebraic sigmoid function of read count score
+                                    *(1.0-args.maxCountPenalty) \
+                                    +args.maxCountPenalty # algebraic sigmoid function of read count score
 
         dataPos['jointEntropy']=((dataPos['entropyScore_pathogen'] \
                         +dataPos['entropyScore_host']) \
@@ -1713,10 +1611,10 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         dataPosHostR1_PathogenR2=annotate(dataBedHostR1_PathogenR2,os.path.abspath(args.annotation),dataPosHostR1_PathogenR2)
 
     if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
-        dataPosHostR1_PathogenR2=approxCloseness(dataPosHostR1_PathogenR2,30)
+        dataPosHostR1_PathogenR2=approxCloseness(dataPosHostR1_PathogenR2,args)
         dataPosHostR1_PathogenR2["reads"]=dataPosHostR1_PathogenR2["reads"].str.join(";")
     if not dataPosHostR2_PathogenR1 is None and len(dataPosHostR2_PathogenR1)>0:
-        dataPosHostR2_PathogenR1=approxCloseness(dataPosHostR2_PathogenR1,30)
+        dataPosHostR2_PathogenR1=approxCloseness(dataPosHostR2_PathogenR1,args)
         dataPosHostR2_PathogenR1["reads"]=dataPosHostR2_PathogenR1["reads"].str.join(";")
 
     if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
@@ -1725,9 +1623,9 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
         dataPosHostR2_PathogenR1=groupBySpliceSites(dataPosHostR2_PathogenR1)
 
     if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
-        dataPosHostR1_PathogenR2=score(dataPosHostR1_PathogenR2,args.minLen)
+        dataPosHostR1_PathogenR2=score(dataPosHostR1_PathogenR2,args)
     if not dataPosHostR2_PathogenR1 is None and len(dataPosHostR2_PathogenR1)>0:
-        dataPosHostR2_PathogenR1=score(dataPosHostR2_PathogenR1,args.minLen)
+        dataPosHostR2_PathogenR1=score(dataPosHostR2_PathogenR1,args)
 
     if not dataPosHostR1_PathogenR2 is None and len(dataPosHostR1_PathogenR2)>0:
         dataPosHostR1_PathogenR2=dataPosHostR1_PathogenR2.sort_values(by='score',ascending=False).reset_index(drop=True)
