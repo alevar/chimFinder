@@ -2,19 +2,19 @@
 
 #./chimFinder.py --pathogenR1 ./r1/154_pos_21_S7_001.i1.bowtie.sam --hostR1 ./r1/154_pos_21_S7_001.host.bowtie.sam --pathogenR2 ./r2/154_pos_21_S7_001.i1.bowtie.sam --hostR2 ./r2/154_pos_21_S7_001.host.bowtie.sam --splicedR1 ./r1/154_pos_21_S7_001.host.hisat.sam --splicedR2 ./r2/154_pos_21_S7_001.host.hisat.sam -o ./res -t 12 --minLen 20 --maxLenUnmapped 30 -a ./data/hg38_p8.refseq.gff3 --overlap 5 --gap 5 --minEntropy 0.84 --close 5 --score 0.75 -q
 
-import pandas as pd
-import numpy as np
-import math
 import os
-import subprocess
-import multiprocessing
-import signal
+import sys
 import sys
 import glob
-import itertools
+import math
+import signal
 import argparse
+import itertools
+import subprocess
+import numpy as np
+import pandas as pd
+import multiprocessing
 from pybedtools import BedTool
-
 
 gff3cols = ["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"]
 sam_colnames = ['QNAME','FLAG','RNAME','POS','MAPQ','CIGAR','RNEXT','PNEXT','TLEN','SEQ','QUAL']
@@ -370,7 +370,7 @@ def topologicalNormalizedEntropy(s):
 #another paper: Look at figure 2 https://www.nature.com/articles/srep19788#f2
 #more https://www.xycoon.com/normalized_entropy.htm
 
-def processAligns(seqHost,seqPathogen,qual,i1_g2,i2_g2,i1_g1,i2_g1,readLen,rHost,rPathogen):
+def processAligns(seqHost,seqPathogen,qual,i1_pathogen,i2_pathogen,i1_host,i2_host,readLen,rHost,rPathogen):
 
     entropyScore_pathogen=0
     entropyScore_host=0
@@ -379,32 +379,34 @@ def processAligns(seqHost,seqPathogen,qual,i1_g2,i2_g2,i1_g1,i2_g1,readLen,rHost
 
     s_pathogen=""
     if rPathogen==True: # if reverse complemented take into account
-        s_pathogen=seqPathogen[readLen-i2_g2:readLen-i1_g2]
+        s_pathogen=seqPathogen[readLen-i2_pathogen:readLen-i1_pathogen]
     else:
-        s_pathogen=seqPathogen[i1_g2:i2_g2]
+        s_pathogen=seqPathogen[i1_pathogen:i2_pathogen]
     if not len(s_pathogen)==0:
         entropyScore_pathogen=topologicalNormalizedEntropy(s_pathogen)
-        q_g2=qual[i1_g2:i2_g2]
-        if len(q_g2)>0:
-            meanQual_pathogen=sum([ord(x)-33 for x in q_g2])/len(q_g2)
+        q_pathogen=qual[i1_pathogen:i2_pathogen]
+        if len(q_pathogen)>0:
+            meanQual_pathogen=sum([ord(x)-33 for x in q_pathogen])/len(q_pathogen)
         else:
             meanQual_pathogen=0
 
     s_host=""
     if rHost==True: # if reverse complemented take into account
-        s_host=seqHost[readLen-i2_g1:readLen-i1_g1]
+        s_host=seqHost[readLen-i2_host:readLen-i1_host]
     else:
-        s_host=seqHost[i1_g1:i2_g1]
+        s_host=seqHost[i1_host:i2_host]
     if not len(s_host)==0:
         entropyScore_host=topologicalNormalizedEntropy(s_host)
-        q_g1=qual[i1_g1:i2_g1]
-        if len(q_g1)>0:
-            meanQual_host=sum([ord(x)-33 for x in q_g1])/len(q_g1)
+        q_host=qual[i1_host:i2_host]
+        if len(q_host)>0:
+            meanQual_host=sum([ord(x)-33 for x in q_host])/len(q_host)
         else:
             meanQual_host=0
 
-    return pd.Series({"entropyScore_pathogen":entropyScore_pathogen,
+    return pd.Series({  "subseq_pathogen":s_pathogen,
+                        "entropyScore_pathogen":entropyScore_pathogen,
                         "meanQual_pathogen":meanQual_pathogen,
+                        "subseq_host":s_host,
                         "entropyScore_host":entropyScore_host,
                         "meanQual_host":meanQual_host})
 
@@ -460,9 +462,11 @@ def filterOverlapCombine(data,args):
               "R2_PATHOGEN_reversedCurr"]
 
     # R1 right
+    data["subseq_pathogen"] = 0
     data['entropyScore_pathogen']=0
     data['meanQual_pathogen']=0
     data['mapQual_pathogen']=0
+    data["subseq_host"] = 0
     data['entropyScore_host']=0
     data['meanQual_host']=0
     data['mapQual_host']=0
@@ -495,8 +499,10 @@ def filterOverlapCombine(data,args):
     dataR1Right["HOST_AL"]=dataR1Right["HOST_TE"]-dataR1Right["HOST_TS"]-dataR1Right["overlap"]
     dataR1Right=dataR1Right[(dataR1Right['PATHOGEN_AL']>args.minLen)&(dataR1Right['HOST_AL']>args.minLen)]
     if len(dataR1Right>0):
-        dataR1Right[['entropyScore_pathogen',
+        dataR1Right[['subseq_pathogen',
+                     'entropyScore_pathogen',
                      'meanQual_pathogen',
+                     'subseq_host',
                      'entropyScore_host',
                      'meanQual_host']]=dataR1Right.merge(dataR1Right.apply(lambda row: processAligns(row['R1_HOST_SEQ'],
                                                                                                     row['R1_PATHOGEN_SEQ'],
@@ -507,8 +513,10 @@ def filterOverlapCombine(data,args):
                                                                                                     int(row['HOST_TE']-row['overlap']),
                                                                                                     int(row['READ_LEN_R1']),
                                                                                                     row["R1_HOST_reversedCurr"]==16,
-                                                                                                    row["R1_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                    row["R1_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['subseq_pathogen_y',
+                                                                                                                                                                                   'entropyScore_pathogen_y',
                                                                                                                                                                                    'meanQual_pathogen_y',
+                                                                                                                                                                                   'subseq_host_y',
                                                                                                                                                                                    'entropyScore_host_y',
                                                                                                                                                                                    'meanQual_host_y']]
     dataR1Right["READ_LEN"]=dataR1Right["READ_LEN_R1"]
@@ -543,8 +551,10 @@ def filterOverlapCombine(data,args):
     dataR1Left["HOST_AL"]=dataR1Left["HOST_TE"]-dataR1Left["HOST_TS"]-dataR1Left["overlap"]
     dataR1Left=dataR1Left[(dataR1Left["PATHOGEN_AL"]>args.minLen)&(dataR1Left["HOST_AL"]>args.minLen)]
     if len(dataR1Left)>0:
-        dataR1Left[['entropyScore_pathogen',
+        dataR1Left[['subseq_pathogen',
+                     'entropyScore_pathogen',
                      'meanQual_pathogen',
+                     'subseq_host',
                      'entropyScore_host',
                      'meanQual_host']]=dataR1Left.merge(dataR1Left.apply(lambda row: processAligns(row['R1_HOST_SEQ'],
                                                                                                     row['R1_PATHOGEN_SEQ'],
@@ -555,10 +565,12 @@ def filterOverlapCombine(data,args):
                                                                                                     int(row['HOST_TE']),
                                                                                                     int(row['READ_LEN_R1']),
                                                                                                     row["R1_HOST_reversedCurr"]==16,
-                                                                                                    row["R1_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
-                                                                                                                                                                   'meanQual_pathogen_y',
-                                                                                                                                                                   'entropyScore_host_y',
-                                                                                                                                                                   'meanQual_host_y']]
+                                                                                                    row["R1_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['subseq_pathogen_y',
+                                                                                                                                                                                   'entropyScore_pathogen_y',
+                                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                                   'subseq_host_y',
+                                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                                   'meanQual_host_y']]
 
     dataR1Left["READ_LEN"]=dataR1Left["READ_LEN_R1"]
     dataR1Left["R"]="R1"
@@ -592,8 +604,10 @@ def filterOverlapCombine(data,args):
     dataR2Right["HOST_AL"]=dataR2Right["HOST_TE"]-dataR2Right["HOST_TS"]-dataR2Right["overlap"]
     dataR2Right=dataR2Right[(dataR2Right["PATHOGEN_AL"]>args.minLen)&(dataR2Right["HOST_AL"]>args.minLen)]
     if len(dataR2Right)>0:
-        dataR2Right[['entropyScore_pathogen',
+        dataR2Right[['subseq_pathogen',
+                     'entropyScore_pathogen',
                      'meanQual_pathogen',
+                     'subseq_host',
                      'entropyScore_host',
                      'meanQual_host']]=dataR2Right.merge(dataR2Right.apply(lambda row: processAligns(row['R2_HOST_SEQ'],
                                                                                                     row['R2_PATHOGEN_SEQ'],
@@ -604,8 +618,10 @@ def filterOverlapCombine(data,args):
                                                                                                     int(row['HOST_TE']-row['overlap']),
                                                                                                     int(row['READ_LEN_R2']),
                                                                                                     row["R2_HOST_reversedCurr"]==16,
-                                                                                                    row["R2_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                    row["R2_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['subseq_pathogen_y',
+                                                                                                                                                                                   'entropyScore_pathogen_y',
                                                                                                                                                                                    'meanQual_pathogen_y',
+                                                                                                                                                                                   'subseq_host_y',
                                                                                                                                                                                    'entropyScore_host_y',
                                                                                                                                                                                    'meanQual_host_y']]
     dataR2Right["READ_LEN"]=dataR2Right["READ_LEN_R2"]
@@ -640,8 +656,10 @@ def filterOverlapCombine(data,args):
     dataR2Left["HOST_AL"]=dataR2Left["HOST_TE"]-dataR2Left["HOST_TS"]-dataR2Left["overlap"]
     dataR2Left=dataR2Left[(dataR2Left["PATHOGEN_AL"]>args.minLen)&(dataR2Left["HOST_AL"]>args.minLen)]
     if len(dataR2Left)>0:
-        dataR2Left[['entropyScore_pathogen',
+        dataR2Left[['subseq_pathogen',
+                     'entropyScore_pathogen',
                      'meanQual_pathogen',
+                     'subseq_host',
                      'entropyScore_host',
                      'meanQual_host']]=dataR2Left.merge(dataR2Left.apply(lambda row: processAligns(row['R2_HOST_SEQ'],
                                                                                                     row['R2_PATHOGEN_SEQ'],
@@ -652,10 +670,12 @@ def filterOverlapCombine(data,args):
                                                                                                     int(row['HOST_TE']),
                                                                                                     int(row['READ_LEN_R2']),
                                                                                                     row["R2_HOST_reversedCurr"]==16,
-                                                                                                    row["R2_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_host_y',
-                                                                                                                                                                   'meanQual_host_y',
-                                                                                                                                                                   'entropyScore_host_y',
-                                                                                                                                                                   'meanQual_host_y']]
+                                                                                                    row["R2_PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['subseq_pathogen_y',
+                                                                                                                                                                                   'entropyScore_pathogen_y',
+                                                                                                                                                                                   'meanQual_pathogen_y',
+                                                                                                                                                                                   'subseq_host_y',
+                                                                                                                                                                                   'entropyScore_host_y',
+                                                                                                                                                                                   'meanQual_host_y']]
 
     
     dataR2Left["READ_LEN"]=dataR2Left["READ_LEN_R2"]
@@ -671,15 +691,9 @@ def filterOverlapCombine(data,args):
     reportDF["read len std after minimum alignment length cutoff"]=dataLen.std()
     reportDF["read len min after minimum alignment length cutoff"]=dataLen.min()
     reportDF["read len max after minimum alignment length cutoff"]=dataLen.max()
-    if not args.overlap<0 and not args.gap<0:
-        df=df[(df["overlap"]<=args.overlap)&(df["gap"]<=args.gap)]
-    elif not args.overlap<0:
-        df=df[df["overlap"]<=args.overlap]
-    elif not args.gap<0:
-        df=df[df["gap"]<=args.gap]
-    else:
-        df=df
 
+    df=df[(df["overlap"]<=args.overlap)&(df["gap"]<=args.gap)].reset_index(drop=True)
+    
     # global reportDF
     dataLen=df["SEQ"].str.len()
     reportDF["number of reads after overlap/gap cutoff"]=len(df)
@@ -706,7 +720,7 @@ def filterOverlapCombine(data,args):
     df.drop(["jointEntropy",
                   "jointAlLen"],axis=1,inplace=True)
     df=df.round({'scorePrelim': 4})
-    df=df[df["scorePrelim"]>=args.score]
+    df=df[df["scorePrelim"]>=args.score].reset_index(drop=True)
     df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.HOST,df.PATHOGEN,df.overlap,df.gap))))
 
     # global reportDF
@@ -721,15 +735,17 @@ def filterOverlapCombine(data,args):
 
 def filterOverlapCombineUnpaired(data,args):
     #right
+    data["subseq_pathogen"] = 0
     data['entropyScore_pathogen']=0
     data['meanQual_pathogen']=0
     data['mapQual_pathogen']=0
+    data["subseq_host"] = 0
     data['entropyScore_host']=0
     data['meanQual_host']=0
     data['mapQual_host']=0
     dataRight=data[data["PATHOGEN"].str.contains("r")]
-    dataRight=dataRight[~((dataRight["HOST_TS"]<dataRight["PATHOGEN_TS"])&(dataRight["HOST_TE"]>dataRight["PATHOGEN_TE"]))]
-    dataRight=dataRight[~((dataRight["PATHOGEN_TS"]<dataRight["HOST_TS"])&(dataRight["PATHOGEN_TE"]>dataRight["HOST_TE"]))]
+    dataRight=dataRight[~((dataRight["HOST_TS"]<dataRight["PATHOGEN_TS"])&(dataRight["HOST_TE"]>dataRight["PATHOGEN_TE"]))].reset_index(drop=True)
+    dataRight=dataRight[~((dataRight["PATHOGEN_TS"]<dataRight["HOST_TS"])&(dataRight["PATHOGEN_TE"]>dataRight["HOST_TE"]))].reset_index(drop=True)
     dataRight["ins"]=dataRight["PATHOGEN_TS"]-dataRight["HOST_TE"]
     dataRight["split"]=dataRight['HOST_RE'].astype(int).astype(str)+":"+dataRight['PATHOGEN_RS'].astype(int).astype(str)
     dataRight['HOST']=dataRight['HOST_RE'].astype(int)
@@ -750,10 +766,12 @@ def filterOverlapCombineUnpaired(data,args):
     dataRight["SEQ"]=dataRight["HOST_SEQ"]
     dataRight["PATHOGEN_AL"]=dataRight["PATHOGEN_TE"]-dataRight["PATHOGEN_TS"]-dataRight["overlap"]
     dataRight["HOST_AL"]=dataRight["HOST_TE"]-dataRight["HOST_TS"]-dataRight["overlap"]
-    dataRight=dataRight[(dataRight['PATHOGEN_AL']>args.minLen)&(dataRight['HOST_AL']>args.minLen)]
+    dataRight=dataRight[(dataRight['PATHOGEN_AL']>args.minLen)&(dataRight['HOST_AL']>args.minLen)].reset_index(drop=True)
     if len(dataRight)>0:
-        dataRight[['entropyScore_pathogen',
+        dataRight[['subseq_pathogen',
+                     'entropyScore_pathogen',
                      'meanQual_pathogen',
+                     'subseq_host',
                      'entropyScore_host',
                      'meanQual_host']]=dataRight.merge(dataRight.apply(lambda row: processAligns(row['HOST_SEQ'],
                                                                                                     row['PATHOGEN_SEQ'],
@@ -764,8 +782,10 @@ def filterOverlapCombineUnpaired(data,args):
                                                                                                     int(row['HOST_TE']-row['overlap']),
                                                                                                     int(row['READ_LEN']),
                                                                                                     row["HOST_reversedCurr"]==16,
-                                                                                                    row["PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
+                                                                                                    row["PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[[  'subseq_pathogen_y',
+                                                                                                                                                                                   'entropyScore_pathogen_y',
                                                                                                                                                                                    'meanQual_pathogen_y',
+                                                                                                                                                                                   'subseq_host_y',
                                                                                                                                                                                    'entropyScore_host_y',
                                                                                                                                                                                    'meanQual_host_y']]
     dataRight["READ_LEN"]=dataRight["READ_LEN"]
@@ -797,8 +817,10 @@ def filterOverlapCombineUnpaired(data,args):
     dataLeft["HOST_AL"]=dataLeft["HOST_TE"]-dataLeft["HOST_TS"]-dataLeft["overlap"]
     dataLeft=dataLeft[(dataLeft["PATHOGEN_AL"]>args.minLen)&(dataLeft["HOST_AL"]>args.minLen)]
     if len(dataLeft)>0:
-        dataLeft[['entropyScore_pathogen',
+        dataLeft[['subseq_pathogen',
+                     'entropyScore_pathogen',
                      'meanQual_pathogen',
+                     'subseq_host',
                      'entropyScore_host',
                      'meanQual_host']]=dataLeft.merge(dataLeft.apply(lambda row: processAligns(row['HOST_SEQ'],
                                                                                             row['PATHOGEN_SEQ'],
@@ -809,16 +831,17 @@ def filterOverlapCombineUnpaired(data,args):
                                                                                             int(row['HOST_TE']),
                                                                                             int(row['READ_LEN']),
                                                                                             row["HOST_reversedCurr"]==16,
-                                                                                            row["PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['entropyScore_pathogen_y',
-                                                                                                                                                                   'meanQual_pathogen_y',
-                                                                                                                                                                   'entropyScore_host_y',
-                                                                                                                                                                   'meanQual_host_y']]
+                                                                                            row["PATHOGEN_reversedCurr"]==16),axis=1),left_index=True,right_index=True)[['subseq_pathogen_y',
+                                                                                                                                                                        'entropyScore_pathogen_y',
+                                                                                                                                                                        'meanQual_pathogen_y',
+                                                                                                                                                                        'subseq_host_y',
+                                                                                                                                                                        'entropyScore_host_y',
+                                                                                                                                                                        'meanQual_host_y']]
 
     dataLeft["READ_LEN"]=dataLeft["READ_LEN"]
     dataLeft["R"]=0
 
-    frames=[dataRight,dataLeft]
-    df=pd.concat(frames).reset_index(drop=True)
+    df=pd.concat([dataRight,dataLeft]).reset_index(drop=True)
     global reportDF
     dataLen=df["SEQ"].str.len()
     reportDF["number of reads after minimum alignment length cutoff"]=len(df)
@@ -826,14 +849,8 @@ def filterOverlapCombineUnpaired(data,args):
     reportDF["read len std after minimum alignment length cutoff"]=dataLen.std()
     reportDF["read len min after minimum alignment length cutoff"]=dataLen.min()
     reportDF["read len max after minimum alignment length cutoff"]=dataLen.max()
-    if not args.overlap<0 and not args.gap<0:
-        df=df[(df["overlap"]<=args.overlap)&(df["gap"]<=args.gap)]
-    elif not args.overlap<0:
-        df=df[df["overlap"]<=args.overlap]
-    elif not args.gap<0:
-        df=df[df["gap"]<=args.gap]
-    else:
-        df=df
+    
+    df=df[(df["overlap"]<=args.overlap)&(df["gap"]<=args.gap)].reset_index(drop=True)
 
     # global reportDF
     dataLen=df["SEQ"].str.len()
@@ -861,7 +878,7 @@ def filterOverlapCombineUnpaired(data,args):
     df.drop(["jointEntropy",
                   "jointAlLen"],axis=1,inplace=True)
     df=df.round({'scorePrelim': 4})
-    df=df[df["scorePrelim"]>=args.score]
+    df=df[df["scorePrelim"]>=args.score].reset_index(drop=True)
     df["SEQ"]=list(zip(df.scorePrelim,list(zip(df.SEQ,df.HOST,df.PATHOGEN,df.overlap,df.gap))))
 
     return df
@@ -912,8 +929,10 @@ def findSupport(data,minLen,unpaired):
                                                                                     "HOST_AL",
                                                                                     "PATHOGEN_AL",
                                                                                     "READ_LEN",
+                                                                                    "subseq_pathogen",
                                                                                     "entropyScore_pathogen",
                                                                                     "meanQual_pathogen",
+                                                                                    "subseq_host",
                                                                                     "entropyScore_host",
                                                                                     "meanQual_host",
                                                                                     "PATHOGEN_MAPQ",
@@ -928,6 +947,8 @@ def findSupport(data,minLen,unpaired):
                                                                                                 PATHOGEN_AL=('PATHOGEN_AL','sum'),
                                                                                                 HOST_AL=('HOST_AL','sum'),
                                                                                                 READ_LEN=('READ_LEN','sum'),
+                                                                                                subseq_pathogen=('subseq_pathogen',lambda x: set(x)),
+                                                                                                subseq_host=('subseq_host',lambda x: set(x)),
                                                                                                 entropyScore_pathogen=('entropyScore_pathogen','sum'),
                                                                                                 entropyScore_host=('entropyScore_host','sum'),
                                                                                                 meanQual_pathogen=('meanQual_pathogen','sum'),
@@ -1116,6 +1137,8 @@ def groupBySpliceSites(data):
                                                 "count",
                                                 "spanCount",
                                                 "spanR1-R2",
+                                                "subseq_host",
+                                                "subseq_pathogen",
                                                 "entropyScore_host",
                                                 "entropyScore_pathogen",
                                                 "PATHOGEN_AL",
@@ -1130,6 +1153,8 @@ def groupBySpliceSites(data):
                                                             spanCount=('spanCount','sum'),
                                                             count=('count','sum'),
                                                             comb=('comb',lambda x: ';'.join(set(x))),
+                                                            subseq_host=('subseq_host',lambda x: set.union(*[set(x) for x in x.tolist()])),
+                                                            subseq_pathogen=('subseq_pathogen',lambda x: set.union(*[set(x) for x in x.tolist()])),
                                                             entropyScore_host=('entropyScore_host','sum'),
                                                             entropyScore_pathogen=('entropyScore_pathogen','sum'),
                                                             PATHOGEN_AL=('PATHOGEN_AL','sum'),
@@ -1151,6 +1176,8 @@ def groupBySpliceSitesUnpaired(data):
                                       "uid"])[["comb",
                                                 "reads",
                                                 "count",
+                                                "subseq_host",
+                                                "subseq_pathogen",
                                                 "entropyScore_host",
                                                 "entropyScore_pathogen",
                                                 "PATHOGEN_AL",
@@ -1163,6 +1190,8 @@ def groupBySpliceSitesUnpaired(data):
                                                             seq=("seq",lambda x: dict(list(x))[max(dict(list(x)), key=float)]),
                                                             count=('count','sum'),
                                                             comb=("comb",lambda x: ';'.join(set(x))),
+                                                            subseq_host=('subseq_host',lambda x: set.union(*[set(x) for x in x.tolist()])),
+                                                            subseq_pathogen=('subseq_pathogen',lambda x: set.union(*[set(x) for x in x.tolist()])),
                                                             entropyScore_host=('entropyScore_host','sum'),
                                                             entropyScore_pathogen=('entropyScore_pathogen','sum'),
                                                             PATHOGEN_AL=('PATHOGEN_AL','sum'),
@@ -1193,9 +1222,42 @@ def get_gene_name(attribute_str: str) -> str:
         
     return "-"
 
+def get_donor_acceptor_set(gtf_df):
+    damap = gtf_df.copy(deep=True)
+
+    damap=damap[damap["type"]=="exon"].reset_index(drop=True)
+
+    # check if GFF or GTF
+    gff3 = False
+    if "Parent=" in damap.iloc[0].attributes:
+        gff3=True
+
+    if gff3:
+        damap["parent"]=damap["attributes"].str.split("Parent=",expand=True)[1].str.split(";",expand=True)[0]
+    else:
+        damap["parent"]=damap["attributes"].str.split("transcript_id \"",expand=True)[1].str.split("\"",expand=True)[0]
+
+    damap.sort_values(by=["parent","seqid","strand","start","end"],ascending=True,inplace=True)
+    damap["next_parent"]=damap["parent"].shift(-1)
+    damap["next_start"]=damap["start"].shift(-1)
+    damap.dropna(inplace=True)
+    damap["next_start"]=damap.next_start.astype(int)
+    damap=damap[damap["parent"]==damap["next_parent"]].reset_index(drop=True)
+    
+    damap["start"]=damap["end"]
+    damap["end"]=damap["next_start"]
+    damap["type"]="intron"
+    damap.drop_duplicates(["seqid","strand","start","end"],inplace=True)
+
+    return set(damap["start"]).union(set(damap["end"]))
+
+
 def annotate(dataBed,annPath,data):
     # extract gene names for the annotation
     ann_df = pd.read_csv(annPath,sep="\t",comment="#",names=["seqid", "source", "type", "start", "end", "score", "strand", "phase", "attributes"])
+
+    # donor_acceptor_set = get_donor_acceptor_set(ann_df)
+
     ann_df = ann_df[ann_df["type"]=="gene"].reset_index(drop=True)
     assert len(ann_df)>0,"annotation file must have records with type \"gene\" present. You can add gene records to your file with gffread"
         
@@ -1235,6 +1297,7 @@ def annotate(dataBed,annPath,data):
                                                     'HOST_RS',
                                                     'HOST_RE'],how='left')).reset_index(drop=True)
     finalDF["gene_name"] = np.where(finalDF["gene_name"].isna(),"-",finalDF["gene_name"])
+
     return finalDF.reset_index(drop=True)
 
 def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
@@ -1309,25 +1372,7 @@ def rest(dataPos,args,data,unpaired,baseName,outDir,dirPath,mate):
                     dataPosClean=dataPosClean[dataPosClean['score']>0.9]
                     dataPosClean.apply(lambda row: writeReadNamesUnpaired(os.path.abspath(outDir),row,fileName,baseName,dirPath),axis=1)
 
-def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args): 
-
-    def filterReads(dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2):
-        #remove all reads that belong to secondary or supplementary alignments and did not have PCR duplicates
-        dataHost_R1=dataHost_R1[(dataHost_R1["secondaryAlignment"]==0)&(dataHost_R1["PCRdup"]==0)&(dataHost_R1["suppAl"]==0)&(dataHost_R1["noPassFilter"]==0)]
-        dataPathogen_R1=dataPathogen_R1[(dataPathogen_R1["secondaryAlignment"]==0)&(dataPathogen_R1["PCRdup"]==0)&(dataPathogen_R1["suppAl"]==0)&(dataPathogen_R1["noPassFilter"]==0)]
-        dataHost_R2=dataHost_R2[(dataHost_R2["secondaryAlignment"]==0)&(dataHost_R2["PCRdup"]==0)&(dataHost_R2["suppAl"]==0)&(dataHost_R2["noPassFilter"]==0)]
-        dataPathogen_R2=dataPathogen_R2[(dataPathogen_R2["secondaryAlignment"]==0)&(dataPathogen_R2["PCRdup"]==0)&(dataPathogen_R2["suppAl"]==0)&(dataPathogen_R2["noPassFilter"]==0)]
-        return dataHost_R1.reset_index(drop=True),dataPathogen_R1.reset_index(drop=True),dataHost_R2.reset_index(drop=True),dataPathogen_R2.reset_index(drop=True)
-
-    def createData(data,dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2):
-        dataHostR1_PathogenR2=data.merge(dataHost_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        dataHostR1_PathogenR2=dataHostR1_PathogenR2.merge(dataPathogen_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        
-        dataHostR2_PathogenR1=data.merge(dataHost_R2,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        dataHostR2_PathogenR1=dataHostR2_PathogenR1.merge(dataPathogen_R1,left_on='QNAME',right_on='QNAME',how='inner',indicator=True)
-        
-        return data
-
+def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     def processAligns(seqPathogen,seqHost,qual_pathogen,qual_host,i1_pathogen,i2_pathogen,i1_host,i2_host,len_pathogen,len_host,rPathogen,rHost):
 
         entropyScore_pathogen=0
@@ -1554,7 +1599,8 @@ def wrapperSpan(outDir,baseName,dirPath,fileName,minLen,args):
     extractFlagBits(dataPathogen_R2)
     extractFlagBits(dataHost_R2)
 
-    dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2=filterReads(dataHost_R1,dataPathogen_R1,dataHost_R2,dataPathogen_R2)
+    dataHost_R1,dataPathogen_R1=filterReads(dataHost_R1,dataPathogen_R1)
+    dataHost_R2,dataPathogen_R2=filterReads(dataHost_R2,dataPathogen_R2)
 
     dataPathogen_R1=extractStartEnd(dataPathogen_R1)
     dataPathogen_R2=extractStartEnd(dataPathogen_R2)
@@ -1936,12 +1982,12 @@ def chimFinder(argv):
                               help="the minimum overall score to keep.")
     parser.add_argument('--overlap',
                               required=False,
-                              default=-1,
+                              default=sys.maxsize,
                               type=int,
                               help="overlap threshold")
     parser.add_argument('--gap',
                               required=False,
-                              default=-1,
+                              default=sys.maxsize,
                               type=int,
                               help="gap threshold")
     parser.add_argument('--close',
