@@ -332,36 +332,46 @@ def createDataUnpaired(data,dataHost,dataPathogen):
     data.fillna(0,inplace=True)
     return data
 
+def findCF(l):
+    for i in range(1,l):
+        lt=((4**i)+i)-1 #lesser term of the CF expression
+        if lt>l:
+            return i-1,((4**(i-1))+(i-1))-1 # returns the CF and the applicable sequence length
+
+def countSubString(s,l):
+    substrings=[]
+    for i in range(len(s)-l):
+        substrings.append(s[i:i+l])
+    return len(set(substrings))
+
+# calculate the expected entropy
+def expectedEntropy(n):
+    fourN=float(4**n)
+    logTerm=(fourN-(fourN*((1.0-(1.0/fourN))**fourN)))
+    return math.log(logTerm,4)/float(n)
+
 memo={}
 # the function below should compute normalized entropy as described in https://academic.oup.com/bioinformatics/article/27/8/1061/227307/Topological-entropy-of-DNA-sequences
 def topologicalNormalizedEntropy(s):
-    def findCF(l):
-        for i in range(1,l):
-            lt=((4**i)+i)-1 #lesser term of the CF expression
-            if lt>l:
-                return i-1
-
-    def countSubString(s,l):
-        substrings=[]
-        for i in range(len(s)-l):
-            substrings.append(s[i:i+l])
-        return len(set(substrings))
-
-    # calculate the expected entropy
-    def expectedEntropy(n):
-        fourN=float(4**n)
-        logTerm=(fourN-(fourN*((1.0-(1.0/fourN))**fourN)))
-        return math.log(logTerm,4)/float(n)
-
     global memo
+    maxSubstringLen = 0
+    seqlen = 0
     if len(s) in memo:
-        maxSubstringLen=memo[len(s)]
+        maxSubstringLen,seqlen=memo[len(s)]
     else:
-        maxSubstringLen=findCF(len(s))
-        memo[len(s)]=maxSubstringLen
+        maxSubstringLen,seqlen=findCF(len(s))
+        memo[len(s)]=(maxSubstringLen,seqlen)
+    
+    # for i in range(0, len(s) - 17 + 1):
+    #     sub = s[i:i + 17]
+    #     n=countSubString(sub,2)
+    #     res=math.log(n,4)/2
+    #     if res<=0.0:
+    #         return 0
+        
+    # return sum(entropies)/len(entropies)
     n=countSubString(s,maxSubstringLen)
     res=math.log(n,4)/maxSubstringLen
-
     return res
 
 # How to compute the mimimum entropy for a string of a given length and characters
@@ -1738,7 +1748,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,pathogen_fname,host_fna
         
         # need to verify that both paired and unpaired work below.
         # i guess for paired we need to consider the case when splicing occurs on one mate, and thus we only want to remove that mate
-        # but not the other mate, since that might still contain a chimeric site, provided it is not an end-to-tnd alignment
+        # but not the other mate, since that might still contain a chimeric site, provided it is not an end-to-end alignment
         if s is not None:
             if os.path.exists(os.path.abspath(s)):
                 dataSpliced=pd.read_csv(os.path.abspath(s),sep="\t",comment='@',usecols=[0,1,2,3,4,5,6,7,8,9,10],names=sam_colnames)
@@ -1746,7 +1756,7 @@ def wrapper(outDir,baseName,dirPath,fileName,minLen,args,pathogen_fname,host_fna
                 dataSpliced["tid"]=dataSpliced['QNAME']+dataSpliced['firstRead'].astype(str)+dataSpliced['lastRead'].astype(str)
                 dataHost["tid"]=dataHost['QNAME']+dataHost['firstRead'].astype(str)+dataHost['lastRead'].astype(str)
                 dataPathogen["tid"]=dataPathogen['QNAME']+dataPathogen['firstRead'].astype(str)+dataPathogen['lastRead'].astype(str)
-                dataPathogen=dataPathogen[~dataPathogen['tid'].isin(set(dataSpliced['tid']))]
+                dataPathogen=dataPathogen[~(dataPathogen['tid'].isin(set(dataSpliced['tid'])))]
                 dataHost=dataHost[dataHost['tid'].isin(set(dataPathogen['tid']))]
                 dataPathogen=dataPathogen[dataPathogen['tid'].isin(set(dataHost['tid']))]
                 dataPathogen.drop(['tid'],axis=1,inplace=True)
